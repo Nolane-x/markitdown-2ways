@@ -68,7 +68,14 @@ def test_duplicate_member_names_fail_closed():
 
 @pytest.mark.parametrize(
     "name",
-    ["../evil.xml", "ppt/../evil.xml", "/absolute.xml", "C:/absolute.xml"],
+    [
+        "../evil.xml",
+        "ppt/../evil.xml",
+        "/absolute.xml",
+        "C:/absolute.xml",
+        "word/./document.xml",
+        "word//document.xml",
+    ],
 )
 def test_unsafe_member_paths_fail_closed(name: str):
     from markitdown.twoways import OOXMLPackageError

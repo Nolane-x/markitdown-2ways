@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from io import BytesIO
-from pathlib import PurePosixPath
 import re
 from typing import BinaryIO, Mapping
 from zipfile import BadZipFile, ZipFile, ZipInfo
@@ -45,8 +44,10 @@ def _fail(reason: str, message: str, **details: object) -> None:
 def _validate_name(name: str) -> None:
     if not name or "\\" in name or name.startswith("/") or _DRIVE_RE.match(name):
         _fail("unsafe_member_path", "OOXML package contains an unsafe member path.", member=name)
-    path = PurePosixPath(name)
-    if any(part in {"..", ""} for part in path.parts):
+    parts = name.split("/")
+    if any(part in {".", ".."} for part in parts) or any(
+        part == "" for part in parts[:-1]
+    ):
         _fail("unsafe_member_path", "OOXML package contains an unsafe member path.", member=name)
 
 

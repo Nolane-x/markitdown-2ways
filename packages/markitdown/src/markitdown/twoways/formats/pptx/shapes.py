@@ -68,11 +68,13 @@ def build_shape_node(
     z_order: int,
     is_title: bool,
     picture_shape_type: Any,
+    parent_id: str | None = None,
 ) -> tuple[Node, dict[str, Any], NativePayload | None]:
     locator = shape_locator(shape, part_uri=part_uri, z_order=z_order)
     geometry = _geometry(shape)
     common = {
         "canvas_id": canvas_id,
+        "parent_id": parent_id,
         "geometry": geometry,
         "native_locator": locator,
         "provenance": _provenance(shape, slide_index=slide_index, part_uri=part_uri),
@@ -242,3 +244,74 @@ def build_note_node(
             "pptx:patch_text_compatible": text_patch_compatible(shape),
         },
     )
+
+
+def build_shape_tree(
+    shape: Any,
+    *,
+    slide_index: int,
+    canvas_id: str,
+    part_uri: str,
+    z_order: int,
+    is_title: bool,
+    picture_shape_type: Any,
+    group_shape_type: Any,
+    parent_id: str | None = None,
+) -> tuple[Node, dict[str, Node], dict[str, Any], dict[str, NativePayload]]:
+    if shape.shape_type != group_shape_type:
+        node, resources, native_payload = build_shape_node(
+            shape,
+            slide_index=slide_index,
+            canvas_id=canvas_id,
+            part_uri=part_uri,
+            z_order=z_order,
+            is_title=is_title,
+            picture_shape_type=picture_shape_type,
+            parent_id=parent_id,
+        )
+        native_payloads = (
+            {} if native_payload is None else {native_payload.payload_id: native_payload}
+        )
+        return node, {node.node_id: node}, resources, native_payloads
+
+    locator = shape_locator(shape, part_uri=part_uri, z_order=z_order)
+    group_id = stable_node_id(locator, "group")
+    child_ids: list[str] = []
+    nodes: dict[str, Node] = {}
+    resources: dict[str, Any] = {}
+    native_payloads: dict[str, NativePayload] = {}
+
+    for child_z_order, child_shape in enumerate(shape.shapes):
+        child_root, child_nodes, child_resources, child_payloads = build_shape_tree(
+            child_shape,
+            slide_index=slide_index,
+            canvas_id=canvas_id,
+            part_uri=part_uri,
+            z_order=child_z_order,
+            is_title=False,
+            picture_shape_type=picture_shape_type,
+            group_shape_type=group_shape_type,
+            parent_id=group_id,
+        )
+        child_ids.append(child_root.node_id)
+        nodes.update(child_nodes)
+        resources.update(child_resources)
+        native_payloads.update(child_payloads)
+
+    group = Node(
+        node_id=group_id,
+        kind="group",
+        parent_id=parent_id,
+        children=tuple(child_ids),
+        order=z_order,
+        canvas_id=canvas_id,
+        geometry=_geometry(shape),
+        provenance=_provenance(shape, slide_index=slide_index, part_uri=part_uri),
+        native_locator=locator,
+        metadata={
+            "pptx:z_order": z_order,
+            "pptx:patch_capabilities": (),
+        },
+    )
+    nodes[group.node_id] = group
+    return group, nodes, resources, native_payloads

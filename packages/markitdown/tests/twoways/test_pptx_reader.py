@@ -136,3 +136,25 @@ def test_reader_extracts_tables_and_charts_as_read_only_semantic_nodes():
     assert chart.payload.series[0]["name"] == "Revenue"
     assert chart.payload.series[0]["values"] == (38.0, 42.0)
     assert chart.metadata["pptx:patch_capabilities"] == ()
+
+
+def test_reader_preserves_group_hierarchy_and_child_identity():
+    from markitdown.twoways import TextPayload
+    from markitdown.twoways.formats.pptx import read_pptx_ir
+    from ._pptx_fixtures import make_grouped_pptx_bytes
+
+    document = read_pptx_ir(BytesIO(make_grouped_pptx_bytes()))
+    groups = [node for node in document.nodes.values() if node.kind == "group"]
+    assert len(groups) == 1
+    group = groups[0]
+    assert group.parent_id is None
+    assert len(group.children) == 2
+    assert document.canvases[0].root_node_ids == (group.node_id,)
+
+    children = [document.nodes[node_id] for node_id in group.children]
+    assert all(child.parent_id == group.node_id for child in children)
+    assert [child.payload.text for child in children if isinstance(child.payload, TextPayload)] == [
+        "Grouped Revenue",
+        "38%",
+    ]
+    assert all(child.native_locator.part_uri == "/ppt/slides/slide1.xml" for child in children)

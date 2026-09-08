@@ -189,3 +189,81 @@ def test_end_to_end_notes_patch_changes_only_notes_slide_xml_member():
     presentation = Presentation(BytesIO(patched))
     assert presentation.slides[0].notes_slide.notes_text_frame.text == "Speaker note 42%"
     _assert_only_member_changed(source, patched, "ppt/notesSlides/notesSlide1.xml")
+
+
+def test_end_to_end_group_child_text_patch_preserves_group_and_sibling():
+    from markitdown.twoways.formats.pptx import patch_pptx, read_pptx_ir
+    from ._pptx_fixtures import make_grouped_pptx_bytes
+
+    source = make_grouped_pptx_bytes()
+    document = read_pptx_ir(BytesIO(source))
+    group = next(node for node in document.nodes.values() if node.kind == "group")
+    target = next(
+        document.nodes[node_id]
+        for node_id in group.children
+        if isinstance(document.nodes[node_id].payload, TextPayload)
+        and document.nodes[node_id].payload.text == "38%"
+    )
+    sibling = next(
+        document.nodes[node_id]
+        for node_id in group.children
+        if node_id != target.node_id
+    )
+
+    output = BytesIO()
+    patch_pptx(
+        document,
+        BytesIO(source),
+        output,
+        edits=(_edit(target, "replace_text", {"text": "42%"}),),
+    )
+    patched = output.getvalue()
+    reread = read_pptx_ir(BytesIO(patched))
+
+    assert reread.nodes[group.node_id].children == group.children
+    assert reread.nodes[target.node_id].payload.text == "42%"
+    assert node_semantic_digest(reread.nodes[sibling.node_id]) == node_semantic_digest(sibling)
+    _assert_only_member_changed(source, patched, "ppt/slides/slide1.xml")
+
+
+def test_verifier_rejects_unrelated_native_shape_mutation_inside_touched_slide():
+    from lxml import etree
+
+    from markitdown.twoways import RoundTripVerificationError
+    from markitdown.twoways.formats.pptx import patch_pptx, read_pptx_ir
+    from markitdown.twoways.formats.pptx.verify import verify_pptx_output
+    from markitdown.twoways.ooxml import OOXMLPackageLimits
+
+    source = make_pptx_bytes()
+    document = read_pptx_ir(BytesIO(source))
+    node = _text_node(document)
+    edit = _edit(node, "replace_text", {"text": "Revenue 42%"})
+    output = BytesIO()
+    patch_pptx(document, BytesIO(source), output, edits=(edit,))
+
+    with ZipFile(BytesIO(output.getvalue()), "r") as archive:
+        members = {name: archive.read(name) for name in archive.namelist()}
+    root = etree.fromstring(members["ppt/slides/slide1.xml"])
+    picture_cnvpr = root.xpath('.//*[local-name()="pic"]//*[local-name()="cNvPr"]')[0]
+    picture_cnvpr.set("name", "Tampered picture name")
+    members["ppt/slides/slide1.xml"] = etree.tostring(
+        root,
+        xml_declaration=True,
+        encoding="UTF-8",
+        standalone=True,
+    )
+    tampered_stream = BytesIO()
+    with ZipFile(tampered_stream, "w") as archive:
+        for name, payload in members.items():
+            archive.writestr(name, payload)
+
+    with pytest.raises(RoundTripVerificationError) as exc_info:
+        verify_pptx_output(
+            document,
+            source,
+            tampered_stream.getvalue(),
+            edits=(edit,),
+            touched_parts=("ppt/slides/slide1.xml",),
+            limits=OOXMLPackageLimits(),
+        )
+    assert exc_info.value.details["check"] == "native.unrelated_subtrees"

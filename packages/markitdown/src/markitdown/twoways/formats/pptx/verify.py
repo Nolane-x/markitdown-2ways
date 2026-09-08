@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from io import BytesIO
 from typing import Iterable
+from zipfile import ZipFile
 
 from ..._errors import RoundTripVerificationError
 from ..._results import FidelityEvidence, FidelityReport, FidelityStatus
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ir.semantics import node_semantic_digest, node_semantic_text
-from ...ooxml import OOXMLPackageLimits, snapshot_package
+from .locators import resolve_shape_element
+from ...ooxml import OOXMLPackageLimits, parse_xml_part, snapshot_package
 
 
 def _fail(check: str, message: str, *, expected=None, actual=None) -> None:
@@ -21,6 +23,82 @@ def _fail(check: str, message: str, *, expected=None, actual=None) -> None:
         },
     )
 
+
+
+def _edited_nodes_and_ancestors(
+    document: DocumentIR,
+    edited_ids: set[str],
+) -> set[str]:
+    excluded = set(edited_ids)
+    for node_id in tuple(edited_ids):
+        current = document.nodes.get(node_id)
+        while current is not None and current.parent_id is not None:
+            excluded.add(current.parent_id)
+            current = document.nodes.get(current.parent_id)
+    return excluded
+
+
+def _canonical_subtree(element) -> bytes:
+    from lxml import etree
+
+    return etree.tostring(element, method="c14n", with_comments=True)
+
+
+def _verify_unrelated_native_subtrees(
+    document: DocumentIR,
+    source_bytes: bytes,
+    output_bytes: bytes,
+    *,
+    touched_parts: tuple[str, ...],
+    edited_ids: set[str],
+) -> None:
+    touched_uris = {f"/{name.lstrip('/')}" for name in touched_parts}
+    if not touched_uris:
+        return
+    excluded = _edited_nodes_and_ancestors(document, edited_ids)
+    with ZipFile(BytesIO(source_bytes), "r") as before_zip, ZipFile(
+        BytesIO(output_bytes), "r"
+    ) as after_zip:
+        roots: dict[str, tuple[object, object]] = {}
+        for part_uri in sorted(touched_uris):
+            archive_name = part_uri.lstrip("/")
+            roots[part_uri] = (
+                parse_xml_part(before_zip.read(archive_name)),
+                parse_xml_part(after_zip.read(archive_name)),
+            )
+
+    changed: list[str] = []
+    for node_id, node in document.nodes.items():
+        locator = node.native_locator
+        if (
+            node_id in excluded
+            or locator is None
+            or locator.part_uri not in touched_uris
+        ):
+            continue
+        before_root, after_root = roots[locator.part_uri]
+        before_shape = resolve_shape_element(
+            before_root,
+            locator,
+            part_uri=locator.part_uri,
+            strict=True,
+        )
+        after_shape = resolve_shape_element(
+            after_root,
+            locator,
+            part_uri=locator.part_uri,
+            strict=True,
+        )
+        if _canonical_subtree(before_shape) != _canonical_subtree(after_shape):
+            changed.append(node_id)
+
+    if changed:
+        _fail(
+            "native.unrelated_subtrees",
+            "Unrelated PPTX native shape subtrees changed during patch.",
+            expected=[],
+            actual=sorted(changed),
+        )
 
 def verify_pptx_output(
     original_document: DocumentIR,
@@ -93,6 +171,14 @@ def verify_pptx_output(
                 actual=actual_value,
             )
 
+    _verify_unrelated_native_subtrees(
+        original_document,
+        source_bytes,
+        output_bytes,
+        touched_parts=touched_parts,
+        edited_ids=edited_ids,
+    )
+
     changed_unrelated: list[str] = []
     for node_id, node in original_document.nodes.items():
         if node_id in edited_ids:
@@ -129,6 +215,11 @@ def verify_pptx_output(
             status=FidelityStatus.PASSED,
             description="Requested edits read back with the expected semantic values.",
             affected_node_ids=tuple(sorted(edited_ids)),
+        ),
+        FidelityEvidence(
+            check_code="native.unrelated_subtrees",
+            status=FidelityStatus.PASSED,
+            description="Unedited native shape subtrees in touched parts remain canonically identical.",
         ),
         FidelityEvidence(
             check_code="semantic.unrelated_nodes",

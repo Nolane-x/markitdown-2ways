@@ -76,3 +76,24 @@ def make_pptx_bytes(*, metric: str = "38%", alt_text: str = "Revenue icon", note
     output = BytesIO()
     presentation.save(output)
     return output.getvalue()
+
+
+def make_grouped_pptx_bytes(*, metric: str = "38%") -> bytes:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+
+    label = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(2), Inches(0.6))
+    label.text = "Grouped Revenue"
+    metric_box = slide.shapes.add_textbox(Inches(1), Inches(1.8), Inches(2), Inches(0.6))
+    paragraph = metric_box.text_frame.paragraphs[0]
+    paragraph.clear()
+    run = paragraph.add_run()
+    run.text = metric
+    run.font.bold = True
+
+    group = slide.shapes.add_group_shape([label, metric_box])
+    group.name = "Revenue Group"
+
+    output = BytesIO()
+    presentation.save(output)
+    return output.getvalue()

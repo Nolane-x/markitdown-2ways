@@ -16,7 +16,7 @@ from ...readers.base import DocumentIRReader
 from ...ooxml import snapshot_package
 from .locators import slide_locator
 from .model import PptxReadOptions
-from .shapes import build_note_node, build_shape_node
+from .shapes import build_note_node, build_shape_tree
 
 
 
@@ -84,7 +84,7 @@ def read_pptx_ir(
         built: list[tuple[int, str]] = []
 
         for z_order, shape in enumerate(slide.shapes):
-            node, node_resources, native_payload = build_shape_node(
+            node, subtree_nodes, node_resources, subtree_payloads = build_shape_tree(
                 shape,
                 slide_index=slide_index,
                 canvas_id=canvas_id,
@@ -92,11 +92,11 @@ def read_pptx_ir(
                 z_order=z_order,
                 is_title=title_shape is not None and shape == title_shape,
                 picture_shape_type=MSO_SHAPE_TYPE.PICTURE,
+                group_shape_type=MSO_SHAPE_TYPE.GROUP,
             )
-            nodes[node.node_id] = node
+            nodes.update(subtree_nodes)
             resources.update(node_resources)
-            if native_payload is not None:
-                native_payloads[native_payload.payload_id] = native_payload
+            native_payloads.update(subtree_payloads)
             built.append((z_order, node.node_id))
 
         shape_by_id = {node_id: nodes[node_id] for _, node_id in built}

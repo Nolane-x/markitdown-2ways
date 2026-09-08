@@ -66,6 +66,14 @@ class RoundTripVerificationError(_NamedTwoWayError):
     default_code = "two_way.round_trip_verification"
 
 
+class MissingOptionalDependencyError(_NamedTwoWayError):
+    default_code = "two_way.missing_optional_dependency"
+
+
+class OOXMLPackageError(_NamedTwoWayError):
+    default_code = "two_way.ooxml_package"
+
+
 class MarkdownProjectionError(_NamedTwoWayError):
     default_code = "markdown.projection"
 

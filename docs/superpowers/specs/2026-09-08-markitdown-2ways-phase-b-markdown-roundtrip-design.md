@@ -18,7 +18,7 @@ It adds four capabilities:
 
 Phase B does **not** write PPTX/DOCX. It prepares edits that later native writers can apply.
 
-## 2. Why Markdown must remain a projection
+## 2. Why Markdown remains a projection
 
 Markdown cannot represent all information in Office/PDF documents: geometry, theme inheritance, shape identity, chart internals, native relationships, animations, masters, merged-table semantics, and arbitrary OOXML extensions.
 
@@ -30,62 +30,40 @@ DocumentIR ──► Markdown projection ──► human / AI edit
     └──────── typed EditOperations ◄───┘
 ```
 
-The edited Markdown is **not** promoted to canonical truth. The canonical source remains the original `DocumentIR` plus typed edits.
+The edited Markdown is **not** promoted to canonical truth. The canonical state remains the original `DocumentIR` plus typed edits.
 
-This preserves the Phase A rule that unknown/native information must survive even when Markdown cannot express it.
+Unknown/native information therefore survives even when Markdown cannot express it.
 
 ## 3. Approaches considered
 
 ### A. Inline identity comments only
-
-Example:
 
 ```md
 <!-- m2w:node id="n12" -->
 Revenue increased 38%.
 ```
 
-Advantages:
+Advantages: one portable file, invisible markers in rendered Markdown, good LLM ergonomics.
 
-- one portable file;
-- easy for LLMs to preserve;
-- comments are invisible in normal Markdown rendering.
-
-Weaknesses:
-
-- comments can be deleted, duplicated, or moved;
-- no strong binding to the originating document by themselves;
-- difficult to prove whether an apparently valid marker belongs to stale content.
+Weaknesses: markers can be deleted, duplicated, moved, or copied from stale projections; comments alone do not strongly bind the file to one source IR.
 
 ### B. Sidecar manifest only
 
-Keep clean Markdown plus a separate offset/range map.
+Keep clean Markdown plus offsets/ranges in a separate file.
 
-Advantages:
+Advantages: completely clean Markdown and arbitrarily rich metadata.
 
-- completely clean Markdown;
-- metadata can be arbitrarily rich.
-
-Weaknesses:
-
-- ordinary text edits invalidate offsets quickly;
-- Markdown and sidecar can become separated;
-- poor copy/paste and LLM workflow ergonomics.
+Weaknesses: text edits invalidate offsets quickly; sidecar and Markdown can separate; copy/paste workflows are fragile.
 
 ### C. Hybrid markers + projection manifest — selected
 
-The selected design combines:
+The selected design combines small inline identity markers with a deterministic manifest carrying source/document/block digests.
 
-- small inline markers for stable local identity;
-- a deterministic in-memory/serializable projection manifest with source digests and block records.
-
-This gives readable Markdown while allowing the importer to fail closed when markers are stale, duplicated, missing, or reassigned.
+This gives readable Markdown while allowing the importer to **fail closed** when identity evidence is stale, duplicated, missing, moved incorrectly, or inconsistent.
 
 The manifest is a derived artifact, not part of canonical `DocumentIR` schema `0.1.0`.
 
 ## 4. Module boundaries
-
-New Phase B code lives under:
 
 ```text
 markitdown/twoways/markdown/
@@ -100,18 +78,16 @@ markitdown/twoways/markdown/
 
 Responsibilities:
 
-- `model.py` — projection mode/options/result, manifest and block-record dataclasses.
-- `projection.py` — orchestrates deterministic IR traversal and projection.
-- `rendering.py` — node-kind-specific clean Markdown rendering.
-- `identity.py` — marker grammar, encoder/parser, marker validation.
-- `importer.py` — parses edited identity Markdown and produces typed edits.
-- `semantic_reader.py` — ordinary Markdown → fresh semantic `DocumentIR` for rebuild use.
+- `model.py` — projection options/results, manifest/block records, import results/diagnostics.
+- `projection.py` — validates IR, traverses it deterministically, orchestrates rendering.
+- `rendering.py` — node-kind-specific Markdown rendering and semantic block models.
+- `identity.py` — canonical marker grammar, marker encoding/parsing and anti-spoofing rules.
+- `importer.py` — validates edited identity Markdown and produces typed edits.
+- `semantic_reader.py` — ordinary Markdown → fresh semantic `DocumentIR` for rebuild workflows.
 
-No format-specific Office dependency is allowed in these modules.
+No Office-format dependency is allowed in these modules.
 
 ## 5. Public API
-
-Phase B adds the following stable APIs to `markitdown.twoways`:
 
 ```python
 class MarkdownProjectionMode(str, Enum):
@@ -131,6 +107,12 @@ class MarkdownProjection:
     markdown: str
     manifest: ProjectionManifest
 
+@dataclass(frozen=True)
+class MarkdownImportResult:
+    edits: tuple[EditOperation, ...]
+    unchanged_node_ids: tuple[str, ...]
+    diagnostics: tuple[MarkdownImportDiagnostic, ...]
+
 
 def project_markdown(
     document: DocumentIR,
@@ -145,7 +127,12 @@ def import_identity_markdown(
     original_document: DocumentIR,
     manifest: ProjectionManifest,
     strict: bool = True,
-) -> tuple[EditOperation, ...]: ...
+) -> MarkdownImportResult: ...
+
+
+def projection_manifest_bytes(manifest: ProjectionManifest) -> bytes: ...
+
+def projection_manifest_digest(manifest: ProjectionManifest) -> str: ...
 
 
 def read_markdown_ir(
@@ -156,13 +143,9 @@ def read_markdown_ir(
 ) -> DocumentIR: ...
 ```
 
-The manifest is returned in both clean and identity modes so callers can inspect projection coverage and diagnostics. Only identity mode is eligible for reliable re-import.
+The manifest is returned for both modes to expose projection coverage/diagnostics. **Only `IDENTITY` projections may be passed to `import_identity_markdown`; clean-mode manifests are rejected with `MarkdownIdentityError`.**
 
 ## 6. Projection manifest
-
-`ProjectionManifest` is deterministic and serializable independently from the IR.
-
-Conceptual contract:
 
 ```python
 @dataclass(frozen=True)
@@ -176,11 +159,9 @@ class ProjectionManifest:
     diagnostics: tuple[ProjectionDiagnostic, ...]
 ```
 
-Initial format version:
+Initial `format_version` is exactly `1`.
 
-`1`
-
-`ProjectionBlock`:
+`ProjectionBlock` fields:
 
 ```text
 projection_id
@@ -195,13 +176,17 @@ editable_capabilities
 rendered_digest
 ```
 
-`projection_id` is deterministic from document id, node id and ordinal. No UUID, time, filesystem path or environment value is used.
+Digest fields inside dataclasses are lowercase 64-character SHA-256 hex strings. Marker text prefixes them with `sha256:` for human/debug clarity.
+
+`projection_id` is deterministic from document id, node id and ordinal. No UUID, clock, environment path or hash-map ordering is used.
+
+`projection_manifest_bytes()` uses deterministic UTF-8 JSON with sorted keys and stable separators, following the same determinism principles as Phase A canonical serialization.
 
 The manifest never stores native binary data.
 
 ## 7. Identity marker grammar
 
-Markers are one-line HTML comments so standard Markdown renderers hide them.
+Markers are one-line HTML comments so normal Markdown renderers hide engine metadata.
 
 Document header:
 
@@ -217,75 +202,86 @@ Block marker:
 
 Rules:
 
-- marker keys are ASCII lowercase;
+- marker keys are lowercase ASCII;
 - values are quoted and escaped by one canonical encoder;
-- one physical line only;
-- unknown marker keys are rejected in strict mode and preserved as diagnostics in permissive mode;
+- marker occupies exactly one physical line;
+- unknown engine-marker keys are errors in strict mode and diagnostics in permissive mode;
 - duplicate keys are invalid;
-- duplicate `pid` or `node` assignments are invalid for independently editable blocks;
-- malformed `m2w:` comments are errors, not silently treated as user prose;
-- ordinary unrelated HTML comments remain ordinary Markdown content.
+- duplicate `pid` is always invalid;
+- independently editable nodes may have at most one editable projection block;
+- malformed comments beginning with exact prefix `<!-- m2w:` are engine-integrity errors, never ordinary user comments;
+- unrelated HTML comments remain ordinary content.
 
-The importer does not trust node ids merely because they appear in a marker. It verifies them against the supplied manifest and original document.
+The importer never trusts a marker merely because its node id exists. It verifies marker → manifest → original IR consistency.
 
-## 8. Source semantic digests
+### 7.1 Anti-spoof escaping
 
-Each independently editable projected block gets a semantic digest.
+User semantic text that contains a line which would begin with exact engine prefix `<!-- m2w:` is rendered with the leading `<` entity-escaped:
 
-The digest is computed from a canonical semantic view rather than raw Markdown formatting.
+```md
+&lt;!-- m2w:block ... -->
+```
 
-For text nodes, initial digest material is:
+Normal Markdown rendering still presents the user's literal text, while the identity scanner cannot mistake it for an engine marker.
+
+The importer reverses only this renderer-owned anti-spoof transform inside the semantic block parser; it does not globally decode arbitrary HTML.
+
+## 8. Semantic and native digests
+
+Every independently editable block receives `source_semantic_digest`.
+
+For text/note nodes the initial semantic digest covers a canonical semantic view containing:
 
 ```text
 node kind
 semantic role
-normalized text payload
-ordered paragraph/run textual content
+normalized plain text
+ordered paragraph textual content
+ordered run textual content
+portable rich-text flags represented by Phase B renderer
 ```
 
-It intentionally excludes geometry and presentation style so harmless layout/style differences do not invalidate a text edit workflow.
+Geometry and presentation-specific style are excluded.
 
-Native locator digest is stored separately in the manifest and can later be transferred into `EditPrecondition.expected_native_locator_digest` for PPTX patch writers.
+A separate `native_locator_digest` is computed from the canonical Phase A `NativeLocator` representation when present. That digest is propagated to `EditPrecondition.expected_native_locator_digest` so future PPTX patch writers can verify they are changing the intended native object.
 
 ## 9. Deterministic traversal
 
-Projection order must never depend on mapping iteration.
+Projection order must not depend on dictionary iteration.
 
-Traversal order:
+Order:
 
-1. canvases by explicit `Canvas.index`;
-2. each canvas's `root_node_ids` order;
-3. children in each node's explicit `children` order;
-4. document-level roots not already reached, in `root_node_ids` order;
-5. orphan/non-rendered nodes do not silently appear; they generate projection diagnostics.
+1. canvases sorted by explicit `Canvas.index`;
+2. each canvas's `root_node_ids` in stored order;
+3. each node's `children` in stored order;
+4. document-level roots not already reached, in `DocumentIR.root_node_ids` order;
+5. unreferenced/orphan nodes are not silently rendered and create projection diagnostics.
 
-A visited set prevents accidental duplicate rendering when malformed data is supplied, but Phase A validation runs before projection and invalid graphs fail before rendering.
+Phase A validation runs before projection. Invalid graphs fail before rendering.
 
-## 10. Rendering model by node kind
+## 10. Rendering by node kind
 
 ### 10.1 Text
 
-Text is the primary editable Phase B content.
+Text is the main editable content.
 
-Semantic roles map to Markdown when known:
+Known roles map to Markdown:
 
 - title → `#`
-- section headings → appropriate `##`…`######`
-- list semantic data → Markdown list syntax when structurally representable
+- section headings → `##` through `######`
+- ordered/unordered list structure → list syntax when representable
 - ordinary text → paragraphs
-- code-like role → fenced code block only when explicitly declared; never infer code solely from punctuation.
+- explicitly code-like content → fenced code block
 
-Rich formatting in runs is projected conservatively:
+Portable rich-run projection supports only flags Phase B can parse deterministically, initially bold, italic and inline-code where explicitly represented.
 
-- bold → `**...**`
-- italic → `*...*`
-- code → backticks when explicitly represented
+Unsupported typography is omitted from Markdown but remains untouched in IR.
 
-Unsupported typography is omitted from clean Markdown but preserved in IR.
+**Identity-import rule:** semantic text changes may become `replace_text`; formatting-only changes to bold/italic/code are **not silently ignored**. Until an explicit safe `set_text_style` mapping is implemented and tested, a formatting-only difference is `markdown.edit.read_only`/`markdown.edit.unsupported` and fails in strict mode.
 
 ### 10.2 Notes
 
-Notes are rendered when enabled:
+When enabled:
 
 ```md
 ### Notes
@@ -293,11 +289,9 @@ Notes are rendered when enabled:
 ...
 ```
 
-In identity mode notes receive their own block marker and may support `replace_text`.
+Identity mode gives notes their own marker and `replace_text` capability.
 
 ### 10.3 Images
-
-Images render as:
 
 ```md
 ![alt text](m2w-resource:<resource_id>)
@@ -305,19 +299,19 @@ Images render as:
 
 No local path is invented.
 
-Initial identity import capability is `set_alt_text` only. Changing the resource URI is not accepted as `replace_resource` in Phase B v1 because arbitrary replacement bytes/resources are not carried in Markdown.
+Phase B v1 allows only `set_alt_text`. Changing `m2w-resource:` is read-only/unsupported because Markdown does not carry replacement bytes or a validated replacement `Resource` object.
 
 ### 10.4 Tables
 
-If the table is rectangular with no row/column spans and cells can be represented as plain text, render a GitHub-style Markdown table.
+A rectangular table with no spans/nested rich structure may render as a GitHub-style Markdown table.
 
-If fidelity would be lost (merged cells, nested nodes, rich cell structure), render a readable HTML table or a compact placeholder according to projection options and add a manifest diagnostic.
+Merged or structurally complex tables render as readable HTML or a compact placeholder according to options, plus a projection diagnostic.
 
-Phase B v1 treats the table as non-editable unless a future cell-identity representation is explicitly added. It must never pretend a lossy Markdown table can safely round-trip complex native table structure.
+All table projections are read-only in Phase B v1. A user edit to table content does not become `update_table_cells` until cell-level identity is designed explicitly.
 
 ### 10.5 Charts
 
-Render a semantic summary when available:
+Semantic data may render as a readable summary, for example:
 
 ```md
 ### Chart: Revenue
@@ -326,80 +320,78 @@ Render a semantic summary when available:
 - Q2: 14
 ```
 
-Chart projections are read-only in Phase B v1.
+Charts are read-only in Phase B v1.
 
 ### 10.6 Group
 
-Groups are structural containers. They emit no wrapper text by default; children render in order.
+Groups are structural and emit no wrapper content; children render in order.
 
 ### 10.7 Shape
 
-A shape with meaningful textual child/content delegates to that text representation. Decorative shape-only information is not emitted.
+Text-bearing shapes delegate to their semantic text child/payload. Decorative shape-only information is not emitted.
 
 ### 10.8 Unknown native
 
-Clean mode omits it by default.
+Clean mode omits unknown-native content by default.
 
-Identity mode may emit a non-editable invisible marker plus optional readable placeholder when `include_unknown_placeholders=True`.
+Identity mode may emit a non-editable invisible marker and, when requested, a readable placeholder.
 
-Unknown-native content is never converted into a destructive removal simply because Markdown cannot display it.
+Unknown native content is never converted to deletion merely because Markdown cannot represent it.
 
 ## 11. Projection normalization
 
-The renderer owns one canonical textual normalization policy:
+Canonical projection rules:
 
-- internal newline: `\n`;
+- newline is `\n`;
 - no trailing spaces;
-- maximum two consecutive blank lines between blocks;
-- final document ends with exactly one newline unless empty;
-- Unicode is preserved, not ASCII-escaped;
-- user text containing strings resembling `m2w:` comments is escaped/handled so it cannot impersonate engine markers.
+- at most two consecutive blank lines between projected blocks;
+- exactly one final newline unless output is empty;
+- Unicode remains UTF-8, never ASCII-escaped;
+- renderer applies anti-spoof escaping from section 7.1;
+- pipe/backtick/emphasis characters are escaped only through deterministic renderer functions for the corresponding node kind.
 
-This normalization is deterministic across Python hash seeds.
+Same IR + same options must produce byte-identical Markdown across runs and Python hash seeds.
 
 ## 12. Importer trust model
 
-`import_identity_markdown` requires all three:
+`import_identity_markdown()` requires:
 
 1. edited identity Markdown;
-2. the original `DocumentIR`;
-3. its matching `ProjectionManifest`.
+2. originating `DocumentIR`;
+3. matching identity `ProjectionManifest`.
 
-It verifies before producing edits:
+Before edit generation it verifies:
 
-- header format version supported;
-- header `doc` matches original document id;
-- source document digest matches the supplied original IR;
-- manifest's source digest matches original IR;
-- each marker exists in manifest;
-- marker node id/kind/digest matches its manifest block;
-- no duplicate projection id;
-- no illegal reuse of node id;
-- editable capabilities authorize the detected edit type.
+- manifest mode is `identity`;
+- supported header/manifest format version;
+- header document id matches original IR;
+- header source digest matches original IR canonical digest;
+- manifest source digest matches original IR;
+- every engine block marker resolves to exactly one manifest record;
+- marker pid/node/kind/source digest equals manifest evidence;
+- referenced node exists in original IR and its current semantic digest matches manifest source digest;
+- duplicate pid/node constraints hold;
+- declared editable capability authorizes detected change.
 
-A mismatch fails closed in strict mode.
+Any integrity mismatch fails closed in strict mode.
 
-## 13. Block extraction
+## 13. Block extraction and semantic comparison
 
-A block begins immediately after an `m2w:block` marker and extends until the next recognized engine block marker or end of projection.
+A block begins immediately after `m2w:block` and ends immediately before the next recognized engine block marker or end of document.
 
-Document header is not part of user-editable text.
+The document header is not editable content.
 
-The importer compares **semantic parsed content**, not raw byte text, so harmless Markdown normalization does not necessarily become an edit.
+Importer parses renderer-emitted Markdown into a semantic block model and compares semantics rather than raw bytes. Therefore the following may be no-ops when semantic content is identical:
 
-Examples that should not create a text edit when semantics are unchanged:
-
-- one vs two blank lines around the paragraph;
+- one vs two surrounding blank lines;
 - final newline changes;
-- canonical equivalent Markdown emitted by the parser.
+- renderer-equivalent escaping.
 
-Changes in actual text do create edits.
+Actual text changes create edits. Rich-format-only changes are detected separately and are unsupported/read-only unless explicitly mapped.
 
 ## 14. Typed edit generation
 
-### 14.1 Replace text
-
-For an editable text/note block whose semantic text changed:
+### 14.1 `replace_text`
 
 ```python
 EditOperation(
@@ -416,29 +408,27 @@ EditOperation(
 )
 ```
 
-Operation ids are deterministic from projection id, edit type and resulting semantic digest.
+Operation id is SHA-256-derived deterministically from projection id, edit type and resulting semantic digest.
 
-### 14.2 Image alt text
+### 14.2 `set_alt_text`
 
-Changed image alt text generates `set_alt_text` with expected old alt text.
+Changing only image alt text produces `set_alt_text` with expected old alt text and locator precondition where available.
 
-### 14.3 No implicit remove
+### 14.3 No implicit removal
 
-Deleting an entire marked block does **not** automatically mean `remove_node` in Phase B v1.
+Deleting a marked block is ambiguous and **does not** mean `remove_node`. Strict mode raises `markdown.block.missing`.
 
-A missing block is ambiguous: the marker may have been accidentally deleted. Strict mode raises an import integrity error. Explicit node removal needs a future deliberate syntax/operation affordance.
+### 14.4 No implicit addition
 
-### 14.4 No implicit add
+Substantive unmarked content inserted outside known blocks is not attached heuristically. Strict identity import raises `markdown.block.unanchored_content`.
 
-Unmarked prose inserted between known blocks is not silently attached to a random node.
+Node addition belongs to semantic Markdown rebuild mode or a future explicit identity add syntax.
 
-In strict identity import it is reported as unanchored content and fails if semantically substantive.
+### 14.5 Stable edit ordering
 
-Adding new nodes belongs either to semantic Markdown rebuild mode or a future explicit identity add-block syntax.
+Edits are returned in original projection-block order, not discovery hash order or edit-type order.
 
-## 15. Import result and diagnostics
-
-Rather than returning only edits internally, the importer uses:
+## 15. Import result and diagnostic codes
 
 ```python
 @dataclass(frozen=True)
@@ -448,11 +438,9 @@ class MarkdownImportResult:
     diagnostics: tuple[MarkdownImportDiagnostic, ...]
 ```
 
-The public convenience function may return the result object directly; the earlier tuple-only signature is superseded by this richer contract.
+Diagnostics contain stable code, severity, optional projection/node id and structured details. They contain no generated timestamp.
 
-Diagnostics carry stable codes, severity, projection/node id, and structured details. No timestamp is generated.
-
-Initial failure/diagnostic codes include:
+Initial codes:
 
 ```text
 markdown.marker.malformed
@@ -463,6 +451,7 @@ markdown.marker.metadata_mismatch
 markdown.header.missing
 markdown.header.document_mismatch
 markdown.header.source_digest_mismatch
+markdown.manifest.mode_mismatch
 markdown.block.missing
 markdown.block.unanchored_content
 markdown.edit.unsupported
@@ -470,11 +459,7 @@ markdown.edit.read_only
 markdown.semantic.parse_error
 ```
 
-Integrity failures use typed `TwoWayError` subclasses rather than generic `ValueError`.
-
-## 16. New error types
-
-Phase B adds:
+## 16. Error hierarchy additions
 
 ```text
 MarkdownProjectionError
@@ -483,23 +468,19 @@ MarkdownIdentityError
 MarkdownSemanticParseError
 ```
 
-All inherit `TwoWayError`, expose stable codes, and carry structured details.
+All inherit `TwoWayError`, have stable codes and structured details.
 
-Existing Phase A error types remain unchanged.
+Phase A errors remain unchanged.
 
 ## 17. Semantic Markdown reader
 
 `read_markdown_ir()` is deliberately separate from identity import.
 
-Identity import asks:
+Identity import answers: **what changed relative to this existing rich document?**
 
-> What changed relative to this existing rich document?
+Semantic reader answers: **build a new semantic document from this Markdown.**
 
-Semantic Markdown reader asks:
-
-> Build a new semantic document from this Markdown.
-
-It creates a fresh flow-oriented `DocumentIR`:
+It creates:
 
 ```text
 DocumentIR
@@ -508,54 +489,56 @@ DocumentIR
   nodes = headings / paragraphs / lists / code / images / simple tables
 ```
 
-It does not invent physical geometry.
+It never invents physical geometry.
 
-Node ids are deterministic from caller-supplied document identity plus structural position/content. If no reproducible identity is supplied, Phase A's non-reproducible id path is used and diagnostics record that fact.
+With caller-supplied reproducible document identity, node ids derive deterministically from identity + structural position + semantic content. Without a reproducible seed, the Phase A non-reproducible identity path is used and diagnostics record this.
 
-## 18. Markdown parsing strategy
+Links/images are inert semantic references; no network/local file access occurs.
 
-Phase B should avoid introducing a heavy mandatory Markdown parser unless tests demonstrate a need.
+## 18. Parsing strategy
 
-Selected implementation strategy:
+Phase B does not add a heavy mandatory Markdown dependency unless implementation tests prove one is necessary.
 
-- identity marker scanning uses a dedicated strict line parser;
-- engine-emitted Markdown is parsed by a small deterministic parser covering the exact subset the renderer itself emits;
-- semantic reader initially supports a conservative CommonMark-like subset;
-- HTML/table support may use existing MarkItDown dependencies only if already mandatory and dependency direction remains clean.
+Selected strategy:
 
-The important invariant is: the importer must parse everything the identity renderer emits. It does not need to interpret every Markdown extension on earth in Phase B.
+- strict dedicated line parser for `m2w:` engine markers;
+- deterministic semantic parser for the exact subset emitted by our renderer;
+- conservative CommonMark-like subset for `read_markdown_ir()`;
+- existing mandatory MarkItDown dependencies may be reused only when dependency direction stays lightweight and deterministic.
 
-Unsupported constructs produce diagnostics or semantic-reader fallback text rather than corrupt structure.
+The required invariant is: **the importer can parse every construct the identity renderer itself emits.** It does not need universal Markdown-extension support in Phase B.
 
-## 19. Security and robustness
+Unsupported semantic-reader constructs degrade to inert/plain semantic text with diagnostics rather than corrupting graph structure.
+
+## 19. Security and resource limits
 
 Markdown is untrusted input.
 
-Phase B performs no:
+No importer/reader side effect may:
 
-- network fetch;
-- local file read from Markdown links;
-- script execution;
-- HTML execution;
-- data URI decoding into arbitrary memory blobs;
-- plugin invocation as a side effect of identity import.
+- fetch network resources;
+- open arbitrary linked local files;
+- execute script/HTML;
+- decode arbitrary data URIs into resources;
+- invoke plugins;
+- resolve Office relationships.
 
-Links and HTML are inert text/data at this stage.
+Links/HTML are inert data.
 
-Size/complexity guards should exist for:
+Configurable deterministic limits cover:
 
-- marker count;
+- maximum Markdown input bytes;
+- maximum marker count;
 - maximum marker line length;
-- maximum total Markdown bytes accepted by identity importer when caller provides a configured limit;
-- pathological nesting in the semantic reader.
+- maximum semantic nesting depth/block count.
 
-Defaults must be generous enough for real documents but deterministic and configurable.
+Limit violations raise typed errors with stable codes.
 
-## 20. Fidelity model
+## 20. Projection fidelity
 
-Projection fidelity is reported separately from writer fidelity.
+Projection fidelity is separate from native writer fidelity.
 
-Suggested projection tiers:
+Initial conceptual tiers:
 
 ```text
 semantic-complete
@@ -563,138 +546,137 @@ semantic-partial
 readable-only
 ```
 
-Examples:
+Pure textual material may be semantic-complete. Complex tables/charts are semantic-partial. Unknown-native content may be readable-only/unprojected with diagnostics.
 
-- pure text document → semantic-complete;
-- complex PPTX table/chart rendered as summaries → semantic-partial;
-- unknown native object with no semantic projection → readable-only for that block/diagnostic.
-
-Projection fidelity never claims that Markdown preserves visual/layout fidelity.
+Markdown projection never claims visual/layout fidelity.
 
 ## 21. Determinism requirements
 
-For the same valid IR and options:
+For same valid IR + options:
 
 ```text
 project_markdown(ir).markdown
+projection_manifest_bytes(manifest)
 ```
 
-must be byte-identical across repeated runs and Python hash seeds.
+must be byte-identical across repeated runs and hash seeds.
 
-The manifest canonical representation must also be byte-identical.
+Same edited Markdown + original IR + manifest must produce identical ordered edits and operation ids.
 
-Identity import of the same edited Markdown, original IR and manifest must produce edit operations in the same order with identical deterministic operation ids.
+No timestamp, random UUID or environment-dependent path.
 
-No timestamps, random ids or environment paths.
+## 22. Required tests
 
-## 22. Tests
-
-Phase B adds focused tests under:
+Tests live under:
 
 ```text
 packages/markitdown/tests/twoways/markdown/
 ```
 
-Required categories:
-
 ### Clean projection
 
-- title/paragraph/list/note rendering;
-- image resource URI and alt text;
-- simple table rendering;
+- title/heading/paragraph/list/note rendering;
+- image alt/resource URI;
+- simple table;
 - group traversal order;
-- chart semantic summary;
-- unknown-native omission/placeholder option;
-- Unicode and escaping.
+- chart summary;
+- unknown-native omission/placeholder;
+- Unicode/escaping.
 
 ### Identity projection
 
-- deterministic header and block markers;
-- stable manifest records;
-- marker grammar canonical encoding;
-- user content cannot spoof engine markers;
+- deterministic header/block markers;
+- stable manifest records and manifest bytes;
+- marker canonical encoding/parsing;
+- exact `m2w:` user text cannot spoof markers;
 - repeated projection byte equality;
-- hash-seed determinism.
+- different `PYTHONHASHSEED` equality.
 
 ### Identity import
 
-- unchanged Markdown → zero edits;
-- text change → one `replace_text`;
-- alt change → one `set_alt_text`;
-- whitespace-only semantic no-op → zero edits;
+- unchanged identity Markdown → zero edits;
+- text change → one deterministic `replace_text`;
+- alt change → one deterministic `set_alt_text`;
+- harmless whitespace normalization → zero edits;
+- formatting-only difference → unsupported/read-only, never silent no-op;
+- resource URI change → unsupported/read-only;
 - duplicate marker → fail closed;
 - missing marker/block → fail closed;
+- clean-mode manifest → fail closed;
 - stale document digest → fail closed;
-- marker/node mismatch → fail closed;
-- substantive unanchored text → fail closed;
-- read-only table/chart edit → fail closed;
-- deterministic operation ids/order.
+- marker/node/source digest mismatch → fail closed;
+- substantive unanchored content → fail closed;
+- table/chart edit → fail closed;
+- deterministic edit order/id.
 
 ### Semantic reader
 
-- headings and paragraphs become flow nodes;
-- list order preserved;
-- image remains an inert resource reference/link descriptor;
+- headings/paragraphs become flow nodes;
+- ordered/unordered list order retained;
+- inert image/link representation;
 - no geometry invented;
-- Unicode preserved;
-- same seed/source yields deterministic ids.
+- Unicode retained;
+- deterministic ids with same seed;
+- no filesystem/network access.
 
-### Regression gates
+### Regression
 
-All Phase A tests remain unchanged and green.
+All Phase A tests stay unchanged and green.
 
 ## 23. Quality gates
 
 Phase B is complete only when:
 
-1. every Phase A focused test still passes unchanged;
+1. all Phase A focused tests pass unchanged;
 2. all Phase B tests pass;
 3. clean projection is deterministic;
-4. identity projection + manifest are deterministic;
-5. identity importer is fail-closed for stale/ambiguous markers;
-6. unchanged identity Markdown produces no edits;
-7. supported edits carry semantic/native preconditions;
-8. importer performs no network/filesystem access;
-9. public `markitdown.twoways` import remains lightweight;
-10. no Office-specific dependency appears in Markdown modules;
-11. Python 3.10 syntax/type compatibility is preserved;
-12. GitHub full workflow matrix is reported separately from local focused verification and is never claimed green without run evidence.
+4. identity projection and manifest serialization are deterministic;
+5. identity importer fails closed for stale/ambiguous identity evidence;
+6. unchanged identity Markdown produces zero edits;
+7. supported edits carry semantic and available native-locator preconditions;
+8. formatting-only/read-only mutations cannot disappear silently;
+9. importer/reader performs no network or linked-filesystem access;
+10. `markitdown.twoways` public import remains lightweight;
+11. Markdown modules import no Office-specific library;
+12. Python 3.10 syntax/type compatibility is retained;
+13. GitHub workflow matrix status is reported separately and is never claimed green without actual run evidence.
 
-## 24. Explicit Phase B non-goals
+## 24. Explicit non-goals for v1
 
-Phase B v1 does not:
+Phase B does not:
 
-- recreate PPTX/DOCX;
-- apply native OOXML patches;
-- round-trip geometry through Markdown;
-- edit charts via Markdown;
-- safely edit complex/merged tables;
-- infer node deletion from a missing marker;
-- infer node creation from unmarked prose;
+- generate/rewrite PPTX or DOCX;
+- patch OOXML;
+- round-trip geometry via Markdown;
+- edit charts;
+- edit complex/merged tables;
+- map arbitrary Markdown styling to Office style operations;
+- infer deletion from missing markers;
+- infer addition from unanchored prose;
 - fetch linked images/files;
-- execute embedded HTML;
+- execute HTML;
 - promise visual fidelity.
 
-These restrictions are intentional because a reversible system must refuse ambiguous edits instead of inventing destructive meaning.
+These are intentional safety/fidelity boundaries: ambiguous edits are refused rather than guessed.
 
 ## 25. Phase C handoff
 
-Once Phase B is green, PPTX-native work may rely on:
+Once Phase B is verified:
 
 ```text
 PPTX reader
    ↓
 DocumentIR
    ↓
-identity Markdown
+identity Markdown + manifest
    ↓
-AI/human edit
+AI / human edit
    ↓
 MarkdownImportResult
    ↓
-EditOperation + preconditions
+EditOperation + semantic/native preconditions
    ↓
 PPTX minimal-patch writer
 ```
 
-Phase C therefore does not need to understand Markdown. It consumes typed edits against validated IR/native locators, keeping format-specific patch logic isolated from human/LLM text interaction.
+Phase C therefore consumes typed edits and native locators. It does not need to understand Markdown, keeping native OOXML mutation isolated from the human/LLM text layer.

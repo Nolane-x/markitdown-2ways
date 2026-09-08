@@ -128,9 +128,9 @@ The patch writer must not reconstruct run properties. Existing `w:rPr`, hyperlin
 
 Hyperlink text remains part of the enclosing paragraph text payload. The reader records, as inert metadata, the hyperlink wrapper range and relationship id or anchor.
 
-Text replacement is allowed when it can be distributed across the existing text nodes while preserving wrapper boundaries. The URL/anchor itself is never changed in v1.
+Text replacement is allowed only when the character-level diff can be assigned without crossing native hyperlink-context boundaries. Each existing `w:t` belongs either to ordinary paragraph context or to one specific hyperlink context (`r:id` or anchor). The patcher may modify text within one or more contexts independently, but it must not move characters across those boundaries or reconstruct a hyperlink wrapper. The URL/anchor itself is never changed in v1.
 
-A requested edit that requires creating, deleting, splitting, joining, or retargeting hyperlink relationships is rejected as unsupported.
+A requested edit that requires moving text into or out of a hyperlink, creating/deleting/splitting/joining a hyperlink wrapper, or retargeting a relationship is rejected as unsupported.
 
 ### 5.6 Tables
 
@@ -164,9 +164,9 @@ The structural path is safe because v1 does not support paragraph insertion, del
 
 Paragraph node IDs are deterministic hashes of:
 
-`part_uri \0 paragraph-identity \0 text`
+`part_uri \0 paragraph-identity \0 node-kind`
 
-The source package SHA is not included, so text edits do not change the logical node id.
+where `node-kind` is the constant semantic kind (for example `text`), **not the paragraph content**. The source package SHA and semantic text are both excluded, so editing text does not change the logical node id.
 
 ### 6.2 Picture identity
 
@@ -202,7 +202,7 @@ A failed check raises a typed fail-closed error before output bytes are written.
 
 `replace_text` operates on the semantic text of one paragraph/story node.
 
-The patcher obtains the ordered existing visible `w:t` nodes, including those nested in preserved hyperlink wrappers. It computes a deterministic character-level replacement and redistributes the resulting text over those existing `w:t` elements without deleting/recreating their enclosing `w:r` elements.
+The patcher obtains the ordered existing visible `w:t` nodes and groups them by native text context: ordinary paragraph text or one exact hyperlink wrapper. It computes a deterministic character-level diff between old and new semantic text, proves that every changed span can be mapped without crossing context boundaries, and redistributes each accepted changed span only over the existing `w:t` elements of its original context without deleting/recreating their enclosing `w:r` elements.
 
 For ordinary replacement/insertion/deletion within a paragraph:
 

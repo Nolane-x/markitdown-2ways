@@ -138,16 +138,25 @@ def build_picture_nodes(
     nodes: list[Node] = []
     resources: dict[str, Resource] = {}
     diagnostics: list[Diagnostic] = []
-    for picture_index, docpr in enumerate(paragraph_element.xpath('.//*[local-name()="docPr"]')):
+    for picture_index, docpr in enumerate(
+        paragraph_element.xpath('.//*[local-name()="docPr"]')
+    ):
         docpr_id = docpr.get("id")
         relationship_id = _picture_relationship_id(docpr)
         relationship = relationships.get(relationship_id) if relationship_id else None
-        if not docpr_id or relationship is None or relationship.external or not relationship.resolved_target:
+        if (
+            not docpr_id
+            or relationship is None
+            or relationship.external
+            or not relationship.resolved_target
+        ):
             diagnostics.append(
                 Diagnostic(
                     code="docx.picture.unresolved",
                     severity="warning",
-                    message="DOCX picture could not be resolved to one package resource.",
+                    message=(
+                        "DOCX picture could not be resolved to one package resource."
+                    ),
                     canvas_id=canvas_id,
                     details={"part_uri": part_uri, "docpr_id": docpr_id},
                 )
@@ -160,7 +169,9 @@ def build_picture_nodes(
                 Diagnostic(
                     code="docx.picture.resource_missing",
                     severity="warning",
-                    message="DOCX picture relationship target is missing from the package.",
+                    message=(
+                        "DOCX picture relationship target is missing from the package."
+                    ),
                     canvas_id=canvas_id,
                     details={"target": relationship.resolved_target},
                 )

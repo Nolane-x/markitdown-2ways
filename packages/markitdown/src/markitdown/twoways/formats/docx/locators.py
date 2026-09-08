@@ -9,7 +9,9 @@ from ...ir.provenance import NativeLocator
 _BACKEND = "docx-ooxml"
 
 
-def paragraph_locator(part_uri: str, *, paragraph_index: int, path: str) -> NativeLocator:
+def paragraph_locator(
+    part_uri: str, *, paragraph_index: int, path: str
+) -> NativeLocator:
     return NativeLocator(
         backend=_BACKEND,
         part_uri=part_uri,
@@ -120,7 +122,9 @@ def _indexed_child(
     return candidates[raw_index]
 
 
-def resolve_paragraph_element(root: Any, locator: NativeLocator, *, part_uri: str) -> Any:
+def resolve_paragraph_element(
+    root: Any, locator: NativeLocator, *, part_uri: str
+) -> Any:
     _validate_part(locator, part_uri)
     return _indexed_child(
         root,

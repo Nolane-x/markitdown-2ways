@@ -44,7 +44,10 @@ def test_extract_payload_preserves_runs_styles_and_hyperlink_context():
 
     linked = extract_paragraph_payload(_paragraph(1), _locator(1))
     assert linked.text == "Visit OpenAI today"
-    contexts = [run.native_locator.attributes["hyperlink_relationship_id"] for run in linked.paragraphs[0].runs]
+    contexts = [
+        run.native_locator.attributes["hyperlink_relationship_id"]
+        for run in linked.paragraphs[0].runs
+    ]
     assert contexts[0] is None
     assert contexts[1]
     assert contexts[2] is None
@@ -56,10 +59,16 @@ def test_patch_formatted_runs_changes_only_text_carrier():
     from markitdown.twoways.formats.docx.text import patch_paragraph_text
 
     paragraph = _paragraph(0)
-    before_rpr = [etree.tostring(item) for item in paragraph.xpath('./*[local-name()="r"]/*[local-name()="rPr"]')]
+    before_rpr = [
+        etree.tostring(item)
+        for item in paragraph.xpath('./*[local-name()="r"]/*[local-name()="rPr"]')
+    ]
     patch_paragraph_text(paragraph, old_text="Revenue 38%", new_text="Revenue 42%")
     assert "".join(paragraph.xpath('.//*[local-name()="t"]/text()')) == "Revenue 42%"
-    after_rpr = [etree.tostring(item) for item in paragraph.xpath('./*[local-name()="r"]/*[local-name()="rPr"]')]
+    after_rpr = [
+        etree.tostring(item)
+        for item in paragraph.xpath('./*[local-name()="r"]/*[local-name()="rPr"]')
+    ]
     assert after_rpr == before_rpr
 
 
@@ -71,10 +80,19 @@ def test_patch_hyperlink_label_preserves_wrapper_and_relationship():
     paragraph = _paragraph(1)
     hyperlink = paragraph.xpath('./*[local-name()="hyperlink"]')[0]
     before = etree.tostring(hyperlink).replace(b"OpenAI", b"")
-    relationship_id = hyperlink.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
-    patch_paragraph_text(paragraph, old_text="Visit OpenAI today", new_text="Visit OpenUI today")
+    relationship_id = hyperlink.get(
+        "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+    )
+    patch_paragraph_text(
+        paragraph, old_text="Visit OpenAI today", new_text="Visit OpenUI today"
+    )
     hyperlink = paragraph.xpath('./*[local-name()="hyperlink"]')[0]
-    assert hyperlink.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id") == relationship_id
+    assert (
+        hyperlink.get(
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+        )
+        == relationship_id
+    )
     assert "".join(hyperlink.xpath('.//*[local-name()="t"]/text()')) == "OpenUI"
     assert etree.tostring(hyperlink).replace(b"OpenUI", b"") == before
 
@@ -84,7 +102,9 @@ def test_patch_rejects_cross_context_edit():
 
     paragraph = _paragraph(1)
     with pytest.raises(UnsupportedEditError) as exc:
-        patch_paragraph_text(paragraph, old_text="Visit OpenAI today", new_text="Visit tomorrow")
+        patch_paragraph_text(
+            paragraph, old_text="Visit OpenAI today", new_text="Visit tomorrow"
+        )
     assert exc.value.details["reason"] == "hyperlink_context_boundary"
 
 

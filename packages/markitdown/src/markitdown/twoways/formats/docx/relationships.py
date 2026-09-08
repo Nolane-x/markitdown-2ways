@@ -42,7 +42,9 @@ def resolve_relationship_target(part_uri: str, target: str) -> str:
     return f"/{resolved}"
 
 
-def relationships_for_part(source_bytes: bytes, part_uri: str) -> Mapping[str, DocxRelationship]:
+def relationships_for_part(
+    source_bytes: bytes, part_uri: str
+) -> Mapping[str, DocxRelationship]:
     rels_name = _rels_member_name(part_uri)
     with ZipFile(BytesIO(source_bytes), "r") as archive:
         try:
@@ -61,7 +63,9 @@ def relationships_for_part(source_bytes: bytes, part_uri: str) -> Mapping[str, D
             continue
         target_mode = element.get("TargetMode")
         external = (target_mode or "").lower() == "external"
-        resolved_target = None if external else resolve_relationship_target(part_uri, target)
+        resolved_target = (
+            None if external else resolve_relationship_target(part_uri, target)
+        )
         result[relationship_id] = DocxRelationship(
             relationship_id=relationship_id,
             relationship_type=relationship_type,

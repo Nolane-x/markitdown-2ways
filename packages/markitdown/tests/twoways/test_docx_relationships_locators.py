@@ -22,13 +22,17 @@ def test_relationships_parse_external_hyperlink_and_image_target():
     relationships = relationships_for_part(build_docx_fixture(), "/word/document.xml")
     external = [item for item in relationships.values() if item.external]
     assert any(item.target == "https://openai.com/" for item in external)
-    images = [item for item in relationships.values() if "image" in item.relationship_type]
+    images = [
+        item for item in relationships.values() if "image" in item.relationship_type
+    ]
     assert len(images) == 1
     assert images[0].resolved_target.startswith("/word/media/")
 
 
 def test_resolve_relationship_target_rejects_escape():
-    from markitdown.twoways.formats.docx.relationships import resolve_relationship_target
+    from markitdown.twoways.formats.docx.relationships import (
+        resolve_relationship_target,
+    )
 
     assert (
         resolve_relationship_target("/word/document.xml", "media/image1.png")
@@ -50,7 +54,10 @@ def test_paragraph_locator_resolves_exact_part_and_node_id_is_text_independent()
     locator = paragraph_locator(
         "/word/document.xml",
         paragraph_index=0,
-        path="/*[local-name()='document']/*[local-name()='body']/*[local-name()='p'][1]",
+        path=(
+            "/*[local-name()='document']/*[local-name()='body']"
+            "/*[local-name()='p'][1]"
+        ),
     )
     node_id = stable_docx_node_id(locator, "text")
     resolved = resolve_paragraph_element(root, locator, part_uri="/word/document.xml")
@@ -74,11 +81,18 @@ def test_picture_locator_requires_unique_docpr():
         relationship_id=None,
         path="//*[local-name()='docPr' and @id='1']",
     )
-    assert resolve_picture_docpr(root, locator, part_uri="/word/document.xml").get("descr") == "Green status pixel"
+    assert (
+        resolve_picture_docpr(root, locator, part_uri="/word/document.xml").get(
+            "descr"
+        )
+        == "Green status pixel"
+    )
 
     duplicate = parse_xml_part(
-        b'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
-        b'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">'
+        b'<w:document xmlns:w="http://schemas.openxmlformats.org/'
+        b'wordprocessingml/2006/main" '
+        b'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/'
+        b'wordprocessingDrawing">'
         b'<w:body><wp:docPr id="1"/><wp:docPr id="1"/></w:body></w:document>'
     )
     with pytest.raises(AmbiguousNativeLocatorError):
@@ -92,7 +106,10 @@ def test_docx_edit_preconditions_are_fail_closed():
     from markitdown.twoways.formats.docx import read_docx_ir
     from markitdown.twoways.formats.docx.patch import validate_edit_preconditions
     from markitdown.twoways.ir.edits import EditOperation, EditPrecondition
-    from markitdown.twoways.ir.semantics import native_locator_digest, node_semantic_digest
+    from markitdown.twoways.ir.semantics import (
+        native_locator_digest,
+        node_semantic_digest,
+    )
 
     document = read_docx_ir(BytesIO(build_docx_fixture()))
     node = document.nodes[document.canvases[0].root_node_ids[0]]

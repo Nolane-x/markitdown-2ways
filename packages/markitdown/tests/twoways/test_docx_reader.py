@@ -37,7 +37,9 @@ def test_reader_builds_source_authority_body_order_and_metadata():
     assert document.metadata.author == "Nolane"
     assert document.canvases[0].canvas_id == "docx-body"
 
-    body_nodes = [document.nodes[node_id] for node_id in document.canvases[0].root_node_ids]
+    body_nodes = [
+        document.nodes[node_id] for node_id in document.canvases[0].root_node_ids
+    ]
     assert [node.kind for node in body_nodes] == ["text", "text", "table", "image"]
     assert body_nodes[0].payload.text == "Revenue 38%"
     assert body_nodes[1].payload.text == "Visit OpenAI today"
@@ -47,7 +49,9 @@ def test_reader_preserves_run_styles_hyperlink_context_and_table_semantics():
     from markitdown.twoways.formats.docx import read_docx_ir
 
     document = read_docx_ir(BytesIO(build_docx_fixture()))
-    body_nodes = [document.nodes[node_id] for node_id in document.canvases[0].root_node_ids]
+    body_nodes = [
+        document.nodes[node_id] for node_id in document.canvases[0].root_node_ids
+    ]
     first = body_nodes[0]
     assert isinstance(first.payload, TextPayload)
     assert first.payload.paragraphs[0].runs[0].style.direct["bold"] is True
@@ -63,7 +67,12 @@ def test_reader_preserves_run_styles_hyperlink_context_and_table_semantics():
     table = body_nodes[2]
     assert isinstance(table.payload, TablePayload)
     assert (table.payload.rows, table.payload.columns) == (2, 2)
-    assert [cell.text for cell in table.payload.cells] == ["Metric", "Value", "Revenue", "38%"]
+    assert [cell.text for cell in table.payload.cells] == [
+        "Metric",
+        "Value",
+        "Revenue",
+        "38%",
+    ]
     assert table.metadata["docx:patch_capabilities"] == ()
 
 
@@ -71,7 +80,11 @@ def test_reader_builds_header_footer_canvases_and_picture_resource():
     from markitdown.twoways.formats.docx import read_docx_ir
 
     document = read_docx_ir(BytesIO(build_docx_fixture()))
-    assert [canvas.kind for canvas in document.canvases] == ["document", "header", "footer"]
+    assert [canvas.kind for canvas in document.canvases] == [
+        "document",
+        "header",
+        "footer",
+    ]
     header = document.nodes[document.canvases[1].root_node_ids[0]]
     footer = document.nodes[document.canvases[2].root_node_ids[0]]
     assert header.payload.text == "Confidential Header"
@@ -96,7 +109,9 @@ def test_reader_node_ids_survive_text_only_source_change():
     before = read_docx_ir(BytesIO(source))
     after = read_docx_ir(BytesIO(changed))
 
-    before_body = [before.nodes[node_id] for node_id in before.canvases[0].root_node_ids]
+    before_body = [
+        before.nodes[node_id] for node_id in before.canvases[0].root_node_ids
+    ]
     after_body = [after.nodes[node_id] for node_id in after.canvases[0].root_node_ids]
     assert before_body[0].node_id == after_body[0].node_id
     before_image = next(node for node in before.nodes.values() if node.kind == "image")

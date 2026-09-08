@@ -4,7 +4,11 @@ from ..._errors import PatchPreconditionError
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ir.nodes import Node
-from ...ir.semantics import native_locator_digest, node_semantic_digest, node_semantic_text
+from ...ir.semantics import (
+    native_locator_digest,
+    node_semantic_digest,
+    node_semantic_text,
+)
 
 
 def _fail(reason: str, *, edit: EditOperation, actual: object) -> None:

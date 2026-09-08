@@ -5,6 +5,9 @@ from hashlib import sha256
 import json
 from typing import Any, Mapping
 
+from .._errors import PatchPreconditionError
+from .document import DocumentIR
+from .edits import EditOperation
 from .nodes import ChartPayload, ImagePayload, Node, TablePayload, TextPayload
 
 
@@ -83,3 +86,46 @@ def node_semantic_digest(node: Node) -> str:
 
 def native_locator_digest(node: Node) -> str | None:
     return None if node.native_locator is None else stable_digest(node.native_locator)
+
+def validate_edit_preconditions(
+    document: DocumentIR,
+    node: Node,
+    edit: EditOperation,
+    *,
+    format_label: str,
+) -> None:
+    def fail(reason: str, actual: object) -> None:
+        raise PatchPreconditionError(
+            f"{format_label} edit precondition failed.",
+            details={
+                "reason": reason,
+                "operation_id": edit.operation_id,
+                "target_node_id": edit.target_node_id,
+                "actual": actual,
+            },
+        )
+
+    if edit.target_node_id != node.node_id or node.node_id not in document.nodes:
+        fail("target_mismatch", node.node_id)
+    precondition = edit.precondition
+    if precondition is None:
+        return
+    checks = (
+        (
+            "semantic_digest",
+            precondition.expected_semantic_digest,
+            node_semantic_digest,
+        ),
+        (
+            "native_locator_digest",
+            precondition.expected_native_locator_digest,
+            native_locator_digest,
+        ),
+        ("old_value", precondition.expected_old_value, node_semantic_text),
+    )
+    for reason, expected, getter in checks:
+        if expected is not None:
+            actual = getter(node)
+            if actual != expected:
+                fail(reason, actual)
+

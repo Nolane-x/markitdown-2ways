@@ -14,6 +14,7 @@ from ...ir.document import (
 from ...ir.serialization import validate_document
 from ...readers.base import DocumentIRReader
 from ...ooxml import snapshot_package
+from ...ooxml.package import read_binary_stream
 from .locators import slide_locator
 from .model import PptxReadOptions
 from .shapes import build_note_node, build_shape_tree
@@ -30,13 +31,6 @@ def _require_pptx():
             details={"feature": "pptx", "dependencies": ["python-pptx", "lxml"]},
         ) from exc
     return Presentation, MSO_SHAPE_TYPE
-
-
-def _read_all(file_stream: BinaryIO) -> bytes:
-    data = file_stream.read()
-    if not isinstance(data, bytes):
-        raise TypeError("PPTX input stream must yield bytes")
-    return data
 
 
 def _presentation_relationship_id(presentation: Any, slide: Any) -> str | None:
@@ -64,7 +58,7 @@ def read_pptx_ir(
 ) -> DocumentIR:
     options = options or PptxReadOptions()
     Presentation, MSO_SHAPE_TYPE = _require_pptx()
-    source_bytes = _read_all(file_stream)
+    source_bytes = read_binary_stream(file_stream, stream_label="PPTX input")
     snapshot_package(source_bytes, limits=options.limits)
 
     presentation = Presentation(BytesIO(source_bytes))

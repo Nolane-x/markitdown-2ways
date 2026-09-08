@@ -11,8 +11,9 @@ from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ir.serialization import validate_document
 from ...ooxml import parse_xml_part, serialize_xml_part, snapshot_package, write_package
+from ...ooxml.package import read_binary_stream, validate_source_authority
 from ...writers.base import DocumentWriter, TargetInfo
-from ._writer_apply import _apply_edit, _read_all, _validate_source
+from ._writer_apply import _apply_edit
 from .model import DocxPatchOptions
 from .verify import verify_docx_output
 
@@ -27,8 +28,8 @@ def patch_docx(
 ) -> WriterResult:
     options = options or DocxPatchOptions()
     validate_document(document)
-    source_bytes = _read_all(source_stream)
-    _validate_source(document, source_bytes)
+    source_bytes = read_binary_stream(source_stream, stream_label="DOCX source")
+    validate_source_authority(document, source_bytes, expected_format="docx")
     snapshot = snapshot_package(source_bytes, limits=options.limits)
     edit_list = tuple(edits)
 

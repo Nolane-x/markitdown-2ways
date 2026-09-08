@@ -10,7 +10,8 @@ from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ir.semantics import node_semantic_digest, node_semantic_text
 from .locators import resolve_shape_element
-from ...ooxml import OOXMLPackageLimits, parse_xml_part, snapshot_package
+from ...ooxml import OOXMLPackageLimits, parse_xml_part
+from ...ooxml.package import inspect_package_preservation
 
 
 def _fail(check: str, message: str, *, expected=None, actual=None) -> None:
@@ -109,27 +110,25 @@ def verify_pptx_output(
     touched_parts: tuple[str, ...],
     limits: OOXMLPackageLimits,
 ) -> FidelityReport:
-    before = snapshot_package(source_bytes, limits=limits)
-    after = snapshot_package(output_bytes, limits=limits)
-    before_names = tuple(entry.name for entry in before.entries)
-    after_names = tuple(entry.name for entry in after.entries)
-    if before_names != after_names:
-        _fail("package.inventory", "PPTX package inventory changed during patch.", expected=before_names, actual=after_names)
-
-    touched = set(touched_parts)
-    after_by_name = after.entry_by_name
-    changed_untouched: list[str] = []
-    for entry in before.entries:
-        if entry.name in touched:
-            continue
-        if after_by_name[entry.name].uncompressed_sha256 != entry.uncompressed_sha256:
-            changed_untouched.append(entry.name)
-    if changed_untouched:
+    preservation = inspect_package_preservation(
+        source_bytes,
+        output_bytes,
+        touched_parts=touched_parts,
+        limits=limits,
+    )
+    if not preservation.inventory_matches:
+        _fail(
+            "package.inventory",
+            "PPTX package inventory changed during patch.",
+            expected=preservation.before_names,
+            actual=preservation.after_names,
+        )
+    if preservation.changed_untouched:
         _fail(
             "package.untouched_members",
             "Untouched PPTX package members changed during patch.",
             expected=[],
-            actual=changed_untouched,
+            actual=list(preservation.changed_untouched),
         )
 
     try:

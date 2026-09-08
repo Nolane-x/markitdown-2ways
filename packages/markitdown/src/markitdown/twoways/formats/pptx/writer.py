@@ -7,7 +7,6 @@ from zipfile import ZipFile
 
 from ..._errors import (
     PatchPreconditionError,
-    SourcePackageMismatchError,
     UnsupportedEditError,
 )
 from ..._results import FidelityEvidence, FidelityReport, FidelityStatus, WriterResult
@@ -17,6 +16,7 @@ from ...ir.nodes import ImagePayload, TextPayload
 from ...ir.semantics import node_semantic_text
 from ...ir.serialization import validate_document
 from ...ooxml import parse_xml_part, serialize_xml_part, snapshot_package, write_package
+from ...ooxml.package import read_binary_stream, validate_source_authority
 from ...writers.base import DocumentWriter, TargetInfo
 from .locators import resolve_shape_element
 from .model import PptxPatchOptions
@@ -25,30 +25,8 @@ from .text import patch_text_shape
 from .verify import verify_pptx_output
 
 
-def _read_all(stream: BinaryIO) -> bytes:
-    data = stream.read()
-    if not isinstance(data, bytes):
-        raise TypeError("PPTX source stream must yield bytes")
-    return data
-
-
 def _archive_name(part_uri: str) -> str:
     return part_uri.lstrip("/")
-
-
-def _validate_source(document: DocumentIR, source_bytes: bytes) -> None:
-    expected = document.source.sha256 if document.source is not None else None
-    actual = sha256(source_bytes).hexdigest()
-    if document.source is None or document.source.format != "pptx" or not expected:
-        raise SourcePackageMismatchError(
-            "DocumentIR does not contain an authoritative PPTX source digest.",
-            details={"reason": "missing_source_authority", "actual": actual},
-        )
-    if expected != actual:
-        raise SourcePackageMismatchError(
-            "Provided PPTX source does not match the DocumentIR source authority.",
-            details={"reason": "source_digest_mismatch", "expected": expected, "actual": actual},
-        )
 
 
 def _apply_edit(root: Any, document: DocumentIR, edit: EditOperation, *, part_uri: str) -> None:
@@ -126,8 +104,8 @@ def patch_pptx(
 ) -> WriterResult:
     options = options or PptxPatchOptions()
     validate_document(document)
-    source_bytes = _read_all(source_stream)
-    _validate_source(document, source_bytes)
+    source_bytes = read_binary_stream(source_stream, stream_label="PPTX source")
+    validate_source_authority(document, source_bytes, expected_format="pptx")
     snapshot = snapshot_package(source_bytes, limits=options.limits)
     edit_list = tuple(edits)
 

@@ -8,7 +8,8 @@ import re
 from typing import BinaryIO, Mapping
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
-from .._errors import OOXMLPackageError
+from .._errors import OOXMLPackageError, SourcePackageMismatchError
+from ..ir.document import DocumentIR
 from .limits import OOXMLPackageLimits
 
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
@@ -48,6 +49,13 @@ def _validate_name(name: str) -> None:
     if any(part in {"..", ""} for part in path.parts):
         _fail("unsafe_member_path", "OOXML package contains an unsafe member path.", member=name)
 
+
+
+def read_binary_stream(stream: BinaryIO, *, stream_label: str) -> bytes:
+    data = stream.read()
+    if not isinstance(data, bytes):
+        raise TypeError(f"{stream_label} stream must yield bytes")
+    return data
 
 def snapshot_package(
     source_bytes: bytes,
@@ -144,6 +152,71 @@ def snapshot_package(
             archive_comment=archive.comment,
         )
 
+
+
+@dataclass(frozen=True)
+class PackagePreservationInspection:
+    inventory_matches: bool
+    before_names: tuple[str, ...]
+    after_names: tuple[str, ...]
+    changed_untouched: tuple[str, ...]
+
+
+def validate_source_authority(
+    document: DocumentIR,
+    source_bytes: bytes,
+    *,
+    expected_format: str,
+) -> None:
+    label = expected_format.upper()
+    expected = document.source.sha256 if document.source is not None else None
+    actual = sha256(source_bytes).hexdigest()
+    if (
+        document.source is None
+        or document.source.format != expected_format
+        or not expected
+    ):
+        raise SourcePackageMismatchError(
+            f"DocumentIR does not contain an authoritative {label} source digest.",
+            details={"reason": "missing_source_authority", "actual": actual},
+        )
+    if expected != actual:
+        raise SourcePackageMismatchError(
+            f"Provided {label} source does not match the DocumentIR source authority.",
+            details={
+                "reason": "source_digest_mismatch",
+                "expected": expected,
+                "actual": actual,
+            },
+        )
+
+
+def inspect_package_preservation(
+    source_bytes: bytes,
+    output_bytes: bytes,
+    *,
+    touched_parts: tuple[str, ...],
+    limits: OOXMLPackageLimits | None = None,
+) -> PackagePreservationInspection:
+    before = snapshot_package(source_bytes, limits=limits)
+    after = snapshot_package(output_bytes, limits=limits)
+    before_names = tuple(entry.name for entry in before.entries)
+    after_names = tuple(entry.name for entry in after.entries)
+    touched = set(touched_parts)
+    after_by_name = after.entry_by_name
+    changed_untouched = tuple(
+        entry.name
+        for entry in before.entries
+        if entry.name not in touched
+        and entry.name in after_by_name
+        and after_by_name[entry.name].uncompressed_sha256 != entry.uncompressed_sha256
+    )
+    return PackagePreservationInspection(
+        inventory_matches=before_names == after_names,
+        before_names=before_names,
+        after_names=after_names,
+        changed_untouched=changed_untouched,
+    )
 
 def _clone_zip_info(info: ZipInfo) -> ZipInfo:
     clone = ZipInfo(filename=info.filename, date_time=info.date_time)

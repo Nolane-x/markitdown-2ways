@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from hashlib import sha256
 from typing import Any, BinaryIO
 
 from ..._errors import (
     PatchPreconditionError,
-    SourcePackageMismatchError,
     UnsupportedEditError,
 )
 from ...ir.document import DocumentIR
@@ -15,32 +13,6 @@ from ...ir.semantics import node_semantic_text
 from .locators import resolve_paragraph_element, resolve_picture_docpr
 from .patch import patch_picture_alt_text, validate_edit_preconditions
 from .text import patch_paragraph_text
-
-
-def _read_all(stream: BinaryIO) -> bytes:
-    data = stream.read()
-    if not isinstance(data, bytes):
-        raise TypeError("DOCX source stream must yield bytes")
-    return data
-
-
-def _validate_source(document: DocumentIR, source_bytes: bytes) -> None:
-    expected = document.source.sha256 if document.source is not None else None
-    actual = sha256(source_bytes).hexdigest()
-    if document.source is None or document.source.format != "docx" or not expected:
-        raise SourcePackageMismatchError(
-            "DocumentIR does not contain an authoritative DOCX source digest.",
-            details={"reason": "missing_source_authority", "actual": actual},
-        )
-    if expected != actual:
-        raise SourcePackageMismatchError(
-            "Provided DOCX source does not match the DocumentIR source authority.",
-            details={
-                "reason": "source_digest_mismatch",
-                "expected": expected,
-                "actual": actual,
-            },
-        )
 
 
 def _apply_edit(

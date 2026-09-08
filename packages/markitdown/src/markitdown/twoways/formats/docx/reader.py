@@ -6,6 +6,7 @@ from typing import Any, BinaryIO
 from ...ir.document import DocumentIR, SourceDescriptor
 from ...ir.serialization import validate_document
 from ...ooxml import snapshot_package
+from ...ooxml.package import read_binary_stream
 from ...readers.base import DocumentIRReader
 from ._reader_parts import (
     _FOOTER_REL_SUFFIX,
@@ -13,7 +14,6 @@ from ._reader_parts import (
     _build_part,
     _core_metadata,
     _main_part_uri,
-    _read_all,
     _read_members,
     _require_lxml,
 )
@@ -29,7 +29,7 @@ def read_docx_ir(
 ) -> DocumentIR:
     options = options or DocxReadOptions()
     _require_lxml()
-    source_bytes = _read_all(file_stream)
+    source_bytes = read_binary_stream(file_stream, stream_label="DOCX input")
     snapshot_package(source_bytes, limits=options.limits)
     members = _read_members(source_bytes)
     main_part = _main_part_uri(members)

@@ -8,7 +8,8 @@ from ..._results import FidelityEvidence, FidelityReport, FidelityStatus
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ir.semantics import node_semantic_digest, node_semantic_text
-from ...ooxml import OOXMLPackageLimits, snapshot_package
+from ...ooxml import OOXMLPackageLimits
+from ...ooxml.package import inspect_package_preservation
 from ._verify_native import (
     _fail,
     _verify_native_subtrees,
@@ -51,32 +52,25 @@ def verify_docx_output(
     touched_parts: tuple[str, ...],
     limits: OOXMLPackageLimits,
 ) -> FidelityReport:
-    before = snapshot_package(source_bytes, limits=limits)
-    after = snapshot_package(output_bytes, limits=limits)
-    before_names = tuple(entry.name for entry in before.entries)
-    after_names = tuple(entry.name for entry in after.entries)
-    if before_names != after_names:
+    preservation = inspect_package_preservation(
+        source_bytes,
+        output_bytes,
+        touched_parts=touched_parts,
+        limits=limits,
+    )
+    if not preservation.inventory_matches:
         _fail(
             "docx.package.inventory",
             "DOCX package inventory changed during patch.",
-            expected=before_names,
-            actual=after_names,
+            expected=preservation.before_names,
+            actual=preservation.after_names,
         )
-
-    touched = set(touched_parts)
-    after_by_name = after.entry_by_name
-    changed_untouched = [
-        entry.name
-        for entry in before.entries
-        if entry.name not in touched
-        and after_by_name[entry.name].uncompressed_sha256 != entry.uncompressed_sha256
-    ]
-    if changed_untouched:
+    if preservation.changed_untouched:
         _fail(
             "docx.package.untouched_members",
             "Untouched DOCX package members changed during patch.",
             expected=[],
-            actual=changed_untouched,
+            actual=list(preservation.changed_untouched),
         )
 
     reopen_evidence = _reopen_evidence(output_bytes)

@@ -143,6 +143,8 @@ The round-trip layer is designed around explicit proof rather than best-effort r
 - no-op patching preserves the original file byte-for-byte;
 - unrelated package members and native subtrees are verified after writes;
 - malformed or ambiguous OPC member paths fail closed;
+- duplicate relationship IDs inside one OOXML `.rels` part fail closed;
+- the same relationship ID may still appear independently in different `.rels` parts;
 - XML parsing disables DTD/entity/network resolution;
 - the 2Ways core does not perform network or subprocess I/O.
 

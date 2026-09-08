@@ -6,6 +6,7 @@ import posixpath
 from typing import Mapping
 from zipfile import ZipFile
 
+from ..._errors import OOXMLPackageError
 from ...ooxml import parse_xml_part
 
 
@@ -61,6 +62,16 @@ def relationships_for_part(
         target = element.get("Target")
         if not relationship_id or not relationship_type or target is None:
             continue
+        if relationship_id in result:
+            raise OOXMLPackageError(
+                "DOCX relationship part contains duplicate relationship IDs.",
+                details={
+                    "reason": "duplicate_relationship_id",
+                    "relationship_id": relationship_id,
+                    "part_uri": part_uri,
+                    "relationship_part": rels_name,
+                },
+            )
         target_mode = element.get("TargetMode")
         external = (target_mode or "").lower() == "external"
         resolved_target = (

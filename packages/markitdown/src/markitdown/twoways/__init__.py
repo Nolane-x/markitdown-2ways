@@ -8,6 +8,10 @@ facades/format adapters that need registration behavior.
 from ._errors import (
     AmbiguousNativeLocatorError,
     IRValidationError,
+    MarkdownIdentityError,
+    MarkdownImportError,
+    MarkdownProjectionError,
+    MarkdownSemanticParseError,
     PatchPreconditionError,
     ReaderNotFoundError,
     RoundTripVerificationError,
@@ -52,6 +56,20 @@ from .ir.serialization import (
     to_canonical_dict,
     validate_document,
 )
+
+from .markdown import (
+    MarkdownImportResult,
+    MarkdownProjection,
+    MarkdownProjectionMode,
+    MarkdownProjectionOptions,
+    ProjectionManifest,
+    import_identity_markdown,
+    project_markdown,
+    projection_manifest_bytes,
+    projection_manifest_digest,
+    read_markdown_ir,
+)
+
 from .readers import DocumentIRReader
 from .writers import DocumentWriter, TargetInfo
 
@@ -73,6 +91,10 @@ __all__ = [
     "FidelityStatus",
     "Geometry",
     "IRValidationError",
+    "MarkdownIdentityError",
+    "MarkdownImportError",
+    "MarkdownProjectionError",
+    "MarkdownSemanticParseError",
     "ImagePayload",
     "NativeLocator",
     "NativePayload",
@@ -98,6 +120,16 @@ __all__ = [
     "UnsupportedSchemaVersionError",
     "WriterNotFoundError",
     "WriterResult",
+    "read_markdown_ir",
+    "projection_manifest_digest",
+    "projection_manifest_bytes",
+    "project_markdown",
+    "import_identity_markdown",
+    "ProjectionManifest",
+    "MarkdownProjectionOptions",
+    "MarkdownProjectionMode",
+    "MarkdownProjection",
+    "MarkdownImportResult",
     "canonical_json_bytes",
     "canonical_json_digest",
     "decode_document",

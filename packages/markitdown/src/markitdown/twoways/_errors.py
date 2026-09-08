@@ -64,3 +64,19 @@ class PatchPreconditionError(_NamedTwoWayError):
 
 class RoundTripVerificationError(_NamedTwoWayError):
     default_code = "two_way.round_trip_verification"
+
+
+class MarkdownProjectionError(_NamedTwoWayError):
+    default_code = "markdown.projection"
+
+
+class MarkdownImportError(_NamedTwoWayError):
+    default_code = "markdown.import"
+
+
+class MarkdownIdentityError(_NamedTwoWayError):
+    default_code = "markdown.identity"
+
+
+class MarkdownSemanticParseError(_NamedTwoWayError):
+    default_code = "markdown.semantic_parse"

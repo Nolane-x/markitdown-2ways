@@ -111,7 +111,13 @@ def patch_pptx(
 
     if not edit_list:
         buffer = BytesIO()
-        write_package(snapshot, source_bytes, buffer, replacements={})
+        write_package(
+            snapshot,
+            source_bytes,
+            buffer,
+            replacements={},
+            limits=options.limits,
+        )
         output_bytes = buffer.getvalue()
         written = output.write(output_bytes)
         fidelity = FidelityReport(
@@ -176,7 +182,13 @@ def patch_pptx(
             replacements[archive_name] = serialize_xml_part(root)
 
     buffer = BytesIO()
-    write_package(snapshot, source_bytes, buffer, replacements=replacements)
+    write_package(
+        snapshot,
+        source_bytes,
+        buffer,
+        replacements=replacements,
+        limits=options.limits,
+    )
     output_bytes = buffer.getvalue()
     touched_parts = tuple(sorted(replacements))
 

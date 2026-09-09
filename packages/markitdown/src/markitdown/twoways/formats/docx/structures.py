@@ -10,26 +10,14 @@ from ...ir.document import Diagnostic
 from ...ir.nodes import ImagePayload, Node, TableCell, TablePayload, TextPayload
 from ...ir.provenance import NativeLocator, Provenance
 from ...ir.resources import Resource
+from ._text_extract import _r_value
 from .locators import paragraph_locator, picture_locator, stable_docx_node_id
 from .relationships import DocxRelationship
 from .text import extract_paragraph_payload, paragraph_patch_compatible
 
-_R_NAMESPACES = (
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-    "http://purl.oclc.org/ooxml/officeDocument/relationships",
-)
-
 
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
-
-
-def _relationship_attribute(element: Any, name: str) -> str | None:
-    for namespace in _R_NAMESPACES:
-        value = element.get(f"{{{namespace}}}{name}")
-        if value is not None:
-            return value
-    return None
 
 
 def _provenance(*, canvas_index: int, part_uri: str) -> tuple[Provenance, ...]:
@@ -132,7 +120,7 @@ def _picture_relationship_id(docpr: Any) -> str | None:
     blips = parent.xpath('.//*[local-name()="blip"]')
     if len(blips) != 1:
         return None
-    return _relationship_attribute(blips[0], "embed")
+    return _r_value(blips[0], "embed")
 
 
 def build_picture_nodes(

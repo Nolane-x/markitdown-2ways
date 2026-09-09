@@ -145,3 +145,13 @@ def test_main_part_discovery_rejects_missing_declared_member():
 
     with pytest.raises(ValueError, match="missing from the package"):
         _main_part_uri(members)
+
+
+def test_main_part_discovery_rejects_noncanonical_double_slash_part_name():
+    members = {
+        "[Content_Types].xml": _content_types("//word/document.xml"),
+        "word/document.xml": b"",
+    }
+
+    with pytest.raises(ValueError, match="PartName"):
+        _main_part_uri(members)

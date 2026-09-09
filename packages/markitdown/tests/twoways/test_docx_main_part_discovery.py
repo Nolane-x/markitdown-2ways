@@ -105,3 +105,43 @@ def test_main_part_discovery_rejects_suffix_spoofed_content_type():
 
     with pytest.raises(ValueError, match="does not expose a main document part"):
         _main_part_uri(members)
+
+
+def test_main_part_discovery_rejects_missing_main_part_name():
+    xml = (
+        f'<Types xmlns="{_CONTENT_TYPES_NS}">'
+        f'<Override ContentType="{_MAIN_CONTENT_TYPE}"/>'
+        "</Types>"
+    ).encode("utf-8")
+    members = {
+        "[Content_Types].xml": xml,
+        "word/document.xml": b"",
+    }
+
+    with pytest.raises(ValueError, match="PartName"):
+        _main_part_uri(members)
+
+
+def test_main_part_discovery_rejects_relative_main_part_name():
+    xml = (
+        f'<Types xmlns="{_CONTENT_TYPES_NS}">'
+        f'<Override PartName="word/custom.xml" '
+        f'ContentType="{_MAIN_CONTENT_TYPE}"/>'
+        "</Types>"
+    ).encode("utf-8")
+    members = {
+        "[Content_Types].xml": xml,
+        "word/custom.xml": b"",
+    }
+
+    with pytest.raises(ValueError, match="PartName"):
+        _main_part_uri(members)
+
+
+def test_main_part_discovery_rejects_missing_declared_member():
+    members = {
+        "[Content_Types].xml": _content_types("/word/missing.xml"),
+    }
+
+    with pytest.raises(ValueError, match="missing from the package"):
+        _main_part_uri(members)

@@ -8,22 +8,40 @@ from ...ir.nodes import Paragraph, TextPayload, TextRun
 from ...ir.provenance import NativeLocator
 from ...ir.style import Style
 
-_R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+_R_NAMESPACES = (
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+    "http://purl.oclc.org/ooxml/officeDocument/relationships",
+)
+_W_NAMESPACES = (
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+    "http://purl.oclc.org/ooxml/wordprocessingml/main",
+)
 
 
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
-def _w_attr(name: str) -> str:
-    return f"{{{_W_NS}}}{name}"
+def _attribute_value(element: Any, name: str, namespaces: tuple[str, ...]) -> str | None:
+    for namespace in namespaces:
+        value = element.get(f"{{{namespace}}}{name}")
+        if value is not None:
+            return value
+    return None
+
+
+def _w_value(element: Any, name: str) -> str | None:
+    return _attribute_value(element, name, _W_NAMESPACES)
+
+
+def _r_value(element: Any, name: str) -> str | None:
+    return _attribute_value(element, name, _R_NAMESPACES)
 
 
 def _bool_property(element: Any | None) -> bool | None:
     if element is None:
         return None
-    value = element.get(_w_attr("val"))
+    value = _w_value(element, "val")
     if value is None:
         return True
     return value.lower() not in {"0", "false", "off", "no"}
@@ -44,21 +62,23 @@ def _run_style(run_element: Any) -> Style | None:
         direct["italic"] = italic
     underline = children.get("u")
     if underline is not None:
-        direct["underline"] = underline.get(_w_attr("val"), "single")
+        value = _w_value(underline, "val")
+        direct["underline"] = "single" if value is None else value
     size = children.get("sz")
-    if size is not None and size.get(_w_attr("val")):
+    size_value = _w_value(size, "val") if size is not None else None
+    if size_value:
         try:
-            direct["font_size_pt"] = int(size.get(_w_attr("val"))) / 2.0
+            direct["font_size_pt"] = int(size_value) / 2.0
         except (TypeError, ValueError):
             pass
     fonts = children.get("rFonts")
     if fonts is not None:
-        family = fonts.get(_w_attr("ascii")) or fonts.get(_w_attr("hAnsi"))
+        family = _w_value(fonts, "ascii") or _w_value(fonts, "hAnsi")
         if family:
             direct["font_family"] = family
     color = children.get("color")
     if color is not None:
-        value = color.get(_w_attr("val"))
+        value = _w_value(color, "val")
         if value and value.lower() != "auto":
             direct["color"] = f"#{value}"
     return Style(direct=direct) if direct else None
@@ -120,7 +140,7 @@ def _collect_carriers(paragraph_element: Any) -> list[_Carrier]:
             context_index += 1
             continue
         if name == "hyperlink":
-            relationship_id = child.get(f"{{{_R_NS}}}id")
+            relationship_id = _r_value(child, "id")
             if not relationship_id:
                 raise UnsupportedEditError(
                     "DOCX hyperlink is not relationship-bound.",
@@ -209,12 +229,13 @@ def extract_paragraph_payload(
         for child in ppr:
             name = _local_name(child.tag)
             if name == "jc":
-                alignment = child.get(_w_attr("val"))
+                alignment = _w_value(child, "val")
             elif name == "numPr":
                 levels = [item for item in child if _local_name(item.tag) == "ilvl"]
-                if levels and levels[0].get(_w_attr("val")) is not None:
+                level_value = _w_value(levels[0], "val") if levels else None
+                if level_value is not None:
                     try:
-                        list_level = int(levels[0].get(_w_attr("val")))
+                        list_level = int(level_value)
                     except (TypeError, ValueError):
                         list_level = None
     return TextPayload(

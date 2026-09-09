@@ -45,14 +45,13 @@ def _validate_relationship_ids(source_bytes: bytes) -> None:
             for element in root:
                 if not isinstance(element.tag, str):
                     continue
-                if element.tag.rsplit("}", 1)[-1] != "Relationship":
-                    continue
                 if element.tag != _RELATIONSHIP_TAG:
                     raise OOXMLPackageError(
-                        "OOXML relationship uses an invalid namespace.",
+                        "OOXML relationship part contains an unexpected element.",
                         details={
                             "reason": "malformed_relationship_part",
                             "relationship_part": info.filename,
+                            "element": element.tag,
                         },
                     )
                 for attribute in ("Id", "Type", "Target"):

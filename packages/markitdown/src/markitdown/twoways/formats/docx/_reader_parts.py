@@ -40,6 +40,7 @@ def _read_members(source_bytes: bytes) -> dict[str, bytes]:
 
 def _main_part_uri(members: dict[str, bytes]) -> str:
     root = parse_xml_part(members["[Content_Types].xml"])
+    candidates: list[str] = []
     for element in root:
         if not isinstance(element.tag, str):
             continue
@@ -49,7 +50,12 @@ def _main_part_uri(members: dict[str, bytes]) -> str:
         if content_type.endswith(_MAIN_CONTENT_TYPE_SUFFIX):
             part_name = element.get("PartName")
             if part_name:
-                return part_name
+                candidates.append(part_name)
+    distinct = tuple(dict.fromkeys(candidates))
+    if len(distinct) > 1:
+        raise ValueError("DOCX package exposes multiple main document parts")
+    if distinct:
+        return distinct[0]
     if "word/document.xml" in members:
         return "/word/document.xml"
     raise ValueError("DOCX package does not expose a main document part")

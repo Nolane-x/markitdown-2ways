@@ -64,6 +64,18 @@ def relationships_for_part(
         target = element.get("Target")
         if not relationship_id or not relationship_type or target is None:
             continue
+        target_mode = element.get("TargetMode")
+        if target_mode not in {None, "Internal", "External"}:
+            raise OOXMLPackageError(
+                "DOCX relationship has an invalid TargetMode.",
+                details={
+                    "reason": "malformed_relationship",
+                    "attribute": "TargetMode",
+                    "value": target_mode,
+                    "part_uri": part_uri,
+                    "relationship_part": rels_name,
+                },
+            )
         if relationship_id in result:
             raise OOXMLPackageError(
                 "DOCX relationship part contains duplicate relationship IDs.",
@@ -74,8 +86,7 @@ def relationships_for_part(
                     "relationship_part": rels_name,
                 },
             )
-        target_mode = element.get("TargetMode")
-        external = (target_mode or "").lower() == "external"
+        external = target_mode == "External"
         resolved_target = (
             None if external else resolve_relationship_target(part_uri, target)
         )

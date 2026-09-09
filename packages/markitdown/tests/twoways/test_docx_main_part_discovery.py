@@ -155,3 +155,21 @@ def test_main_part_discovery_rejects_noncanonical_double_slash_part_name():
 
     with pytest.raises(ValueError, match="PartName"):
         _main_part_uri(members)
+
+
+def test_main_part_discovery_rejects_conflicting_duplicate_override():
+    xml = (
+        f'<Types xmlns="{_CONTENT_TYPES_NS}">'
+        f'<Override PartName="/word/document.xml" '
+        f'ContentType="{_MAIN_CONTENT_TYPE}"/>'
+        '<Override PartName="/word/document.xml" '
+        'ContentType="application/octet-stream"/>'
+        "</Types>"
+    ).encode("utf-8")
+    members = {
+        "[Content_Types].xml": xml,
+        "word/document.xml": b"",
+    }
+
+    with pytest.raises(ValueError, match="conflicting"):
+        _main_part_uri(members)

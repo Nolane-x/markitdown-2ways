@@ -80,3 +80,20 @@ def test_foreign_style_elements_do_not_override_wordprocessing_style():
     assert style is not None
     assert style.direct["bold"] is False
     assert "underline" not in style.direct
+
+
+def test_foreign_paragraph_properties_do_not_override_wordprocessing_semantics():
+    paragraph = parse_xml_part(
+        (
+            f'<w:p xmlns:w="{_STRICT_W_NS}" xmlns:x="urn:not-word">'
+            '<w:pPr><w:jc w:val="center"/><x:jc/>'
+            '<x:numPr><w:ilvl w:val="3"/></x:numPr></w:pPr>'
+            '<w:r><w:t>X</w:t></w:r></w:p>'
+        ).encode("utf-8")
+    )
+
+    payload = extract_paragraph_payload(paragraph, _locator())
+    paragraph_payload = payload.paragraphs[0]
+
+    assert paragraph_payload.alignment == "center"
+    assert paragraph_payload.list_level is None

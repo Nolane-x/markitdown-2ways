@@ -12,16 +12,37 @@ from .package import (
 from .xml import parse_xml_part, serialize_xml_part
 
 
+_RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+_RELATIONSHIPS_TAG = f"{{{_RELATIONSHIPS_NS}}}Relationships"
+_RELATIONSHIP_TAG = f"{{{_RELATIONSHIPS_NS}}}Relationship"
+
+
 def _validate_relationship_ids(source_bytes: bytes) -> None:
     with ZipFile(BytesIO(source_bytes), "r") as archive:
         for info in archive.infolist():
             if not info.filename.lower().endswith(".rels"):
                 continue
             root = parse_xml_part(archive.read(info))
+            if root.tag != _RELATIONSHIPS_TAG:
+                raise OOXMLPackageError(
+                    "OOXML relationship part uses an invalid namespace.",
+                    details={
+                        "reason": "malformed_relationship_part",
+                        "relationship_part": info.filename,
+                    },
+                )
             seen: set[str] = set()
             for element in root:
                 if element.tag.rsplit("}", 1)[-1] != "Relationship":
                     continue
+                if element.tag != _RELATIONSHIP_TAG:
+                    raise OOXMLPackageError(
+                        "OOXML relationship uses an invalid namespace.",
+                        details={
+                            "reason": "malformed_relationship_part",
+                            "relationship_part": info.filename,
+                        },
+                    )
                 for attribute in ("Id", "Type", "Target"):
                     if not element.get(attribute):
                         raise OOXMLPackageError(

@@ -55,6 +55,7 @@ def _main_part_uri(members: dict[str, bytes]) -> str:
     if root.tag != _CONTENT_TYPES_TAG:
         raise ValueError("DOCX Content Types namespace is invalid")
     candidates: list[str] = []
+    override_types: dict[str, str] = {}
     for element in root:
         if not isinstance(element.tag, str):
             continue
@@ -62,9 +63,14 @@ def _main_part_uri(members: dict[str, bytes]) -> str:
             continue
         if element.tag != _OVERRIDE_TAG:
             raise ValueError("DOCX Override namespace is invalid")
+        part_name = element.get("PartName")
         content_type = element.get("ContentType") or ""
+        if part_name:
+            previous = override_types.get(part_name)
+            if previous is not None and previous != content_type:
+                raise ValueError("DOCX Content Types contains conflicting Overrides")
+            override_types[part_name] = content_type
         if content_type == _MAIN_CONTENT_TYPE:
-            part_name = element.get("PartName")
             if not part_name:
                 raise ValueError("DOCX main document Override is missing PartName")
             if not part_name.startswith("/") or part_name.startswith("//"):

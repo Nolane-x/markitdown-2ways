@@ -11,6 +11,7 @@ from ..._errors import OOXMLPackageError
 from ...ooxml import parse_xml_part
 
 _RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+_RELATIONSHIPS_TAG = f"{{{_RELATIONSHIPS_NS}}}Relationships"
 _RELATIONSHIP_TAG = f"{{{_RELATIONSHIPS_NS}}}Relationship"
 
 
@@ -56,7 +57,26 @@ def relationships_for_part(
             data = archive.read(rels_name)
         except KeyError:
             return {}
-    root = parse_xml_part(data)
+    try:
+        root = parse_xml_part(data)
+    except SyntaxError as exc:
+        raise OOXMLPackageError(
+            "DOCX relationship part contains malformed XML.",
+            details={
+                "reason": "malformed_relationship_part",
+                "part_uri": part_uri,
+                "relationship_part": rels_name,
+            },
+        ) from exc
+    if root.tag != _RELATIONSHIPS_TAG:
+        raise OOXMLPackageError(
+            "DOCX relationship part uses an invalid namespace.",
+            details={
+                "reason": "malformed_relationship_part",
+                "part_uri": part_uri,
+                "relationship_part": rels_name,
+            },
+        )
     result: dict[str, DocxRelationship] = {}
     for element in root:
         if not isinstance(element.tag, str):
@@ -71,11 +91,20 @@ def relationships_for_part(
                     "element": element.tag,
                 },
             )
+        for attribute in ("Id", "Type", "Target"):
+            if not element.get(attribute):
+                raise OOXMLPackageError(
+                    "DOCX relationship is missing a required attribute.",
+                    details={
+                        "reason": "malformed_relationship",
+                        "attribute": attribute,
+                        "part_uri": part_uri,
+                        "relationship_part": rels_name,
+                    },
+                )
         relationship_id = element.get("Id")
         relationship_type = element.get("Type")
         target = element.get("Target")
-        if not relationship_id or not relationship_type or target is None:
-            continue
         target_mode = element.get("TargetMode")
         if target_mode not in {None, "Internal", "External"}:
             raise OOXMLPackageError(

@@ -100,7 +100,13 @@ def patch_docx(
             replacements[archive_name] = serialize_xml_part(root)
 
     buffer = BytesIO()
-    write_package(snapshot, source_bytes, buffer, replacements=replacements)
+    write_package(
+        snapshot,
+        source_bytes,
+        buffer,
+        replacements=replacements,
+        limits=options.limits,
+    )
     output_bytes = buffer.getvalue()
     touched_parts = tuple(sorted(replacements))
     if options.verify_output:

@@ -128,3 +128,45 @@ def test_patch_empty_paragraph_rejects_insert_without_style_context():
     with pytest.raises(UnsupportedEditError) as exc:
         patch_paragraph_text(paragraph, old_text="", new_text="new")
     assert exc.value.details["reason"] == "no_style_context"
+
+
+@pytest.mark.parametrize(
+    "xml",
+    [
+        (
+            b'<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+            b'xmlns:x="urn:not-word"><x:r><x:t>X</x:t></x:r></w:p>'
+        ),
+        (
+            b'<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+            b'xmlns:x="urn:not-word"><w:r><x:t>X</x:t></w:r></w:p>'
+        ),
+        (
+            b'<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+            b'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+            b'xmlns:x="urn:not-word"><x:hyperlink r:id="rId1">'
+            b'<w:r><w:t>X</w:t></w:r></x:hyperlink></w:p>'
+        ),
+    ],
+)
+def test_patch_rejects_foreign_namespace_text_carriers(xml: bytes):
+    from markitdown.twoways.formats.docx.text import patch_paragraph_text
+
+    paragraph = parse_xml_part(xml)
+    with pytest.raises(UnsupportedEditError) as exc:
+        patch_paragraph_text(paragraph, old_text="X", new_text="Y")
+    assert exc.value.details["reason"] in {
+        "unsupported_text_structure",
+        "unsupported_hyperlink_structure",
+    }
+
+
+def test_patch_accepts_strict_wordprocessing_text_carrier():
+    from markitdown.twoways.formats.docx.text import patch_paragraph_text
+
+    paragraph = parse_xml_part(
+        b'<w:p xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main">'
+        b'<w:r><w:t>X</w:t></w:r></w:p>'
+    )
+    patch_paragraph_text(paragraph, old_text="X", new_text="Y")
+    assert "".join(paragraph.xpath('.//*[local-name()="t"]/text()')) == "Y"

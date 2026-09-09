@@ -63,3 +63,20 @@ def test_strict_picture_relationship_id_is_preserved():
     docpr = inline.xpath('.//*[local-name()="docPr"]')[0]
 
     assert _picture_relationship_id(docpr) == "rId9"
+
+
+def test_foreign_style_elements_do_not_override_wordprocessing_style():
+    paragraph = parse_xml_part(
+        (
+            f'<w:p xmlns:w="{_STRICT_W_NS}" xmlns:x="urn:not-word">'
+            '<w:r><w:rPr><w:b w:val="0"/><x:b/><x:u/></w:rPr>'
+            '<w:t>X</w:t></w:r></w:p>'
+        ).encode("utf-8")
+    )
+
+    payload = extract_paragraph_payload(paragraph, _locator())
+    style = payload.paragraphs[0].runs[0].style
+
+    assert style is not None
+    assert style.direct["bold"] is False
+    assert "underline" not in style.direct

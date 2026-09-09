@@ -65,13 +65,19 @@ def _main_part_uri(members: dict[str, bytes]) -> str:
         content_type = element.get("ContentType") or ""
         if content_type == _MAIN_CONTENT_TYPE:
             part_name = element.get("PartName")
-            if part_name:
-                candidates.append(part_name)
+            if not part_name:
+                raise ValueError("DOCX main document Override is missing PartName")
+            if not part_name.startswith("/"):
+                raise ValueError("DOCX main document PartName must be absolute")
+            candidates.append(part_name)
     distinct = tuple(dict.fromkeys(candidates))
     if len(distinct) > 1:
         raise ValueError("DOCX package exposes multiple main document parts")
     if distinct:
-        return distinct[0]
+        part_uri = distinct[0]
+        if part_uri.lstrip("/") not in members:
+            raise ValueError("DOCX main document part is missing from the package")
+        return part_uri
     if "word/document.xml" in members:
         return "/word/document.xml"
     raise ValueError("DOCX package does not expose a main document part")

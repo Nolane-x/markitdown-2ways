@@ -8,8 +8,8 @@ class OOXMLPackageLimits:
     max_members: int = 10_000
     max_member_uncompressed_bytes: int = 64 * 1024 * 1024
     max_total_uncompressed_bytes: int = 512 * 1024 * 1024
-    max_xml_part_bytes: int = 64 * 1024 * 1024
     max_compression_ratio: float = 200.0
+    max_xml_part_bytes: int = 64 * 1024 * 1024
 
     def __post_init__(self) -> None:
         if self.max_members < 1:

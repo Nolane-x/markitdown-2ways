@@ -1,4 +1,5 @@
 from io import BytesIO
+from urllib.parse import urlsplit
 from zipfile import ZipFile
 
 from .._errors import OOXMLPackageError
@@ -72,6 +73,21 @@ def _validate_relationship_ids(source_bytes: bytes) -> None:
                             "reason": "malformed_relationship",
                             "attribute": "TargetMode",
                             "value": target_mode,
+                            "relationship_part": info.filename,
+                        },
+                    )
+                target = element.get("Target")
+                if target_mode in {None, "Internal"} and (
+                    target.startswith("/")
+                    or "\\" in target
+                    or urlsplit(target).scheme
+                ):
+                    raise OOXMLPackageError(
+                        "OOXML internal relationship target must be relative.",
+                        details={
+                            "reason": "malformed_relationship",
+                            "attribute": "Target",
+                            "value": target,
                             "relationship_part": info.filename,
                         },
                     )

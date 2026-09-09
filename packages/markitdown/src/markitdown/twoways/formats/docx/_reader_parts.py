@@ -41,6 +41,8 @@ def _read_members(source_bytes: bytes) -> dict[str, bytes]:
 def _main_part_uri(members: dict[str, bytes]) -> str:
     root = parse_xml_part(members["[Content_Types].xml"])
     for element in root:
+        if not isinstance(element.tag, str):
+            continue
         if element.tag.rsplit("}", 1)[-1] != "Override":
             continue
         content_type = element.get("ContentType") or ""
@@ -60,6 +62,8 @@ def _core_metadata(members: dict[str, bytes]) -> DocumentMetadata:
     root = parse_xml_part(data)
     values: dict[str, str] = {}
     for element in root.iter():
+        if not isinstance(element.tag, str):
+            continue
         name = element.tag.rsplit("}", 1)[-1]
         if name in {"title", "subject", "creator", "language"} and element.text:
             values[name] = element.text
@@ -112,6 +116,8 @@ def _build_part(
     table_index = 0
     order = 0
     for child in container:
+        if not isinstance(child.tag, str):
+            continue
         name = child.tag.rsplit("}", 1)[-1]
         if name == "sectPr":
             continue

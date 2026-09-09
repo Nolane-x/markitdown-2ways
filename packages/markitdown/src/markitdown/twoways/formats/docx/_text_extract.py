@@ -259,9 +259,9 @@ def extract_paragraph_payload(
         ppr = ppr_nodes[0]
         for child in ppr:
             name = _local_name(child.tag)
-            if name == "jc":
+            if name == "jc" and _is_w_element(child, "jc"):
                 alignment = _w_value(child, "val")
-            elif name == "numPr":
+            elif name == "numPr" and _is_w_element(child, "numPr"):
                 levels = [item for item in child if _is_w_element(item, "ilvl")]
                 level_value = _w_value(levels[0], "val") if levels else None
                 if level_value is not None:

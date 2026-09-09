@@ -51,12 +51,12 @@ def _validate_name(name: str) -> None:
         _fail("unsafe_member_path", "OOXML package contains an unsafe member path.", member=name)
 
 
-
 def read_binary_stream(stream: BinaryIO, *, stream_label: str) -> bytes:
     data = stream.read()
     if not isinstance(data, bytes):
         raise TypeError(f"{stream_label} stream must yield bytes")
     return data
+
 
 def snapshot_package(
     source_bytes: bytes,
@@ -165,7 +165,6 @@ def snapshot_package(
         )
 
 
-
 @dataclass(frozen=True)
 class PackagePreservationInspection:
     inventory_matches: bool
@@ -230,6 +229,7 @@ def inspect_package_preservation(
         changed_untouched=changed_untouched,
     )
 
+
 def _clone_zip_info(info: ZipInfo) -> ZipInfo:
     clone = ZipInfo(filename=info.filename, date_time=info.date_time)
     clone.compress_type = info.compress_type
@@ -248,12 +248,51 @@ def _clone_zip_info(info: ZipInfo) -> ZipInfo:
     return clone
 
 
+def _validate_output_limits(
+    snapshot: OOXMLPackageSnapshot,
+    replacements: Mapping[str, bytes],
+    limits: OOXMLPackageLimits,
+) -> None:
+    total = 0
+    for entry in snapshot.entries:
+        replacement = replacements.get(entry.name)
+        size = len(replacement) if replacement is not None else entry.uncompressed_size
+        if size > limits.max_member_uncompressed_bytes:
+            _fail(
+                "member_too_large",
+                "OOXML output member exceeds the configured size limit.",
+                member=entry.name,
+                size=size,
+                limit=limits.max_member_uncompressed_bytes,
+            )
+        if (
+            entry.name.lower().endswith((".xml", ".rels"))
+            and size > limits.max_xml_part_bytes
+        ):
+            _fail(
+                "xml_part_too_large",
+                "OOXML output XML part exceeds the configured XML-part size limit.",
+                member=entry.name,
+                size=size,
+                limit=limits.max_xml_part_bytes,
+            )
+        total += size
+        if total > limits.max_total_uncompressed_bytes:
+            _fail(
+                "package_too_large",
+                "OOXML output package exceeds the configured total size limit.",
+                size=total,
+                limit=limits.max_total_uncompressed_bytes,
+            )
+
+
 def write_package(
     snapshot: OOXMLPackageSnapshot,
     source_bytes: bytes,
     output: BinaryIO,
     *,
     replacements: Mapping[str, bytes],
+    limits: OOXMLPackageLimits | None = None,
 ) -> int:
     if sha256(source_bytes).hexdigest() != snapshot.source_sha256:
         _fail("source_digest_mismatch", "OOXML package snapshot does not match source bytes.")
@@ -269,6 +308,8 @@ def write_package(
             "Sparse OOXML writer cannot add new members in this phase.",
             members=unknown,
         )
+    if limits is not None:
+        _validate_output_limits(snapshot, replacements, limits)
 
     source = ZipFile(BytesIO(source_bytes), "r")
     with source, ZipFile(output, "w") as target:

@@ -64,6 +64,17 @@ def _validate_relationship_ids(source_bytes: bytes) -> None:
                                 "relationship_part": info.filename,
                             },
                         )
+                target_mode = element.get("TargetMode")
+                if target_mode not in {None, "Internal", "External"}:
+                    raise OOXMLPackageError(
+                        "OOXML relationship has an invalid TargetMode.",
+                        details={
+                            "reason": "malformed_relationship",
+                            "attribute": "TargetMode",
+                            "value": target_mode,
+                            "relationship_part": info.filename,
+                        },
+                    )
                 relationship_id = element.get("Id")
                 if relationship_id in seen:
                     raise OOXMLPackageError(

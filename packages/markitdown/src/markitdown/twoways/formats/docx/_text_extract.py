@@ -60,7 +60,11 @@ def _run_style(run_element: Any) -> Style | None:
         return None
     rpr = rpr_nodes[0]
     direct: dict[str, object] = {}
-    children = {_local_name(child.tag): child for child in rpr}
+    children = {
+        _local_name(child.tag): child
+        for child in rpr
+        if isinstance(child.tag, str) and _is_w_element(child, _local_name(child.tag))
+    }
     bold = _bool_property(children.get("b"))
     italic = _bool_property(children.get("i"))
     if bold is not None:

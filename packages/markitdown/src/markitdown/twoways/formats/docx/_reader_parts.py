@@ -67,7 +67,7 @@ def _main_part_uri(members: dict[str, bytes]) -> str:
             part_name = element.get("PartName")
             if not part_name:
                 raise ValueError("DOCX main document Override is missing PartName")
-            if not part_name.startswith("/"):
+            if not part_name.startswith("/") or part_name.startswith("//"):
                 raise ValueError("DOCX main document PartName must be absolute")
             candidates.append(part_name)
     distinct = tuple(dict.fromkeys(candidates))

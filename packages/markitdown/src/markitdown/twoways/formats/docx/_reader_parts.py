@@ -14,7 +14,9 @@ from .structures import build_paragraph_node, build_picture_nodes, build_table_n
 _CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
 _CONTENT_TYPES_TAG = f"{{{_CONTENT_TYPES_NS}}}Types"
 _OVERRIDE_TAG = f"{{{_CONTENT_TYPES_NS}}}Override"
-_MAIN_CONTENT_TYPE_SUFFIX = "wordprocessingml.document.main+xml"
+_MAIN_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+)
 _HEADER_REL_SUFFIX = "/header"
 _FOOTER_REL_SUFFIX = "/footer"
 
@@ -54,7 +56,7 @@ def _main_part_uri(members: dict[str, bytes]) -> str:
         if element.tag != _OVERRIDE_TAG:
             raise ValueError("DOCX Override namespace is invalid")
         content_type = element.get("ContentType") or ""
-        if content_type.endswith(_MAIN_CONTENT_TYPE_SUFFIX):
+        if content_type == _MAIN_CONTENT_TYPE:
             part_name = element.get("PartName")
             if part_name:
                 candidates.append(part_name)

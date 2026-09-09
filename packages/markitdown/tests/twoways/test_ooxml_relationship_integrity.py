@@ -101,3 +101,19 @@ def test_snapshot_rejects_wrong_relationship_namespace(rels: bytes):
         snapshot_package(output.getvalue())
 
     assert exc.value.details["reason"] == "malformed_relationship_part"
+
+
+def test_snapshot_normalizes_malformed_relationship_xml_error():
+    output = BytesIO()
+    with ZipFile(output, "w") as archive:
+        archive.writestr(
+            "word/_rels/document.xml.rels",
+            b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
+            b'relationships"><Relationship Id="rId1"></Relationships>',
+        )
+
+    with pytest.raises(OOXMLPackageError) as exc:
+        snapshot_package(output.getvalue())
+
+    assert exc.value.details["reason"] == "malformed_relationship_part"
+    assert exc.value.details["relationship_part"] == "word/_rels/document.xml.rels"

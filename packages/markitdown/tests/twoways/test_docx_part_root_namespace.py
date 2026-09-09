@@ -75,3 +75,67 @@ def test_build_part_accepts_known_wordprocessing_document_namespaces(
     assert nodes == {}
     assert resources == {}
     assert diagnostics == []
+
+
+def test_build_part_rejects_foreign_document_body_namespace():
+    xml = (
+        f'<w:document xmlns:w="{_TRANSITIONAL_W_NS}" xmlns:x="urn:not-word">'
+        "<x:body/>"
+        "</w:document>"
+    ).encode("utf-8")
+    source_bytes, members = _source("/word/document.xml", xml)
+
+    with pytest.raises(ValueError, match="body namespace"):
+        _build_part(
+            source_bytes=source_bytes,
+            members=members,
+            part_uri="/word/document.xml",
+            kind="document",
+            canvas_index=0,
+            ordinal=0,
+            relationship_id=None,
+        )
+
+
+def test_build_part_rejects_foreign_core_block_namespace():
+    xml = (
+        f'<w:document xmlns:w="{_TRANSITIONAL_W_NS}" xmlns:x="urn:not-word">'
+        "<w:body><x:p/></w:body>"
+        "</w:document>"
+    ).encode("utf-8")
+    source_bytes, members = _source("/word/document.xml", xml)
+
+    with pytest.raises(ValueError, match="block namespace"):
+        _build_part(
+            source_bytes=source_bytes,
+            members=members,
+            part_uri="/word/document.xml",
+            kind="document",
+            canvas_index=0,
+            ordinal=0,
+            relationship_id=None,
+        )
+
+
+def test_build_part_ignores_foreign_non_core_extension_block():
+    xml = (
+        f'<w:document xmlns:w="{_TRANSITIONAL_W_NS}" xmlns:x="urn:not-word">'
+        "<w:body><x:extension/></w:body>"
+        "</w:document>"
+    ).encode("utf-8")
+    source_bytes, members = _source("/word/document.xml", xml)
+
+    canvas, nodes, resources, diagnostics = _build_part(
+        source_bytes=source_bytes,
+        members=members,
+        part_uri="/word/document.xml",
+        kind="document",
+        canvas_index=0,
+        ordinal=0,
+        relationship_id=None,
+    )
+
+    assert canvas.kind == "document"
+    assert nodes == {}
+    assert resources == {}
+    assert diagnostics == []

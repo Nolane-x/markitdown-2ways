@@ -74,3 +74,30 @@ def test_snapshot_rejects_missing_required_relationship_attributes(
 
     assert exc.value.details["reason"] == "malformed_relationship"
     assert exc.value.details["attribute"] == missing_attribute
+
+
+@pytest.mark.parametrize(
+    "rels",
+    [
+        (
+            b'<Relationships xmlns="urn:not-opc">'
+            b'<Relationship Id="rId1" Type="image" Target="media/image1.png"/>'
+            b'</Relationships>'
+        ),
+        (
+            b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
+            b'relationships" xmlns:x="urn:not-opc">'
+            b'<x:Relationship Id="rId1" Type="image" Target="media/image1.png"/>'
+            b'</Relationships>'
+        ),
+    ],
+)
+def test_snapshot_rejects_wrong_relationship_namespace(rels: bytes):
+    output = BytesIO()
+    with ZipFile(output, "w") as archive:
+        archive.writestr("word/_rels/document.xml.rels", rels)
+
+    with pytest.raises(OOXMLPackageError) as exc:
+        snapshot_package(output.getvalue())
+
+    assert exc.value.details["reason"] == "malformed_relationship_part"

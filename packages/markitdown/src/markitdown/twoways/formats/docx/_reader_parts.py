@@ -17,6 +17,30 @@ _OVERRIDE_TAG = f"{{{_CONTENT_TYPES_NS}}}Override"
 _MAIN_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
 )
+_TRANSITIONAL_W_NS = (
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+)
+_STRICT_W_NS = "http://purl.oclc.org/ooxml/wordprocessingml/main"
+_PART_ROOT_TAGS = {
+    "document": frozenset(
+        {
+            f"{{{_TRANSITIONAL_W_NS}}}document",
+            f"{{{_STRICT_W_NS}}}document",
+        }
+    ),
+    "header": frozenset(
+        {
+            f"{{{_TRANSITIONAL_W_NS}}}hdr",
+            f"{{{_STRICT_W_NS}}}hdr",
+        }
+    ),
+    "footer": frozenset(
+        {
+            f"{{{_TRANSITIONAL_W_NS}}}ftr",
+            f"{{{_STRICT_W_NS}}}ftr",
+        }
+    ),
+}
 _HEADER_REL_SUFFIX = "/header"
 _FOOTER_REL_SUFFIX = "/footer"
 
@@ -101,6 +125,12 @@ def _root_prefix(root: Any) -> str:
     return f"/*[local-name()='{name}']"
 
 
+def _validate_part_root(root: Any, kind: str) -> None:
+    expected_tags = _PART_ROOT_TAGS.get(kind)
+    if expected_tags is None or root.tag not in expected_tags:
+        raise ValueError("DOCX WordprocessingML root namespace is invalid")
+
+
 def _build_part(
     *,
     source_bytes: bytes,
@@ -113,6 +143,7 @@ def _build_part(
 ) -> tuple[Canvas, dict[str, Any], dict[str, Any], list[Any]]:
     member_name = part_uri.lstrip("/")
     root = parse_xml_part(members[member_name])
+    _validate_part_root(root, kind)
     relationships = relationships_for_part(source_bytes, part_uri)
     canvas_id = _part_canvas_id(kind, ordinal)
     nodes: dict[str, Any] = {}

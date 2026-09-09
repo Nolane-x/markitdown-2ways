@@ -42,6 +42,8 @@ def _validate_relationship_ids(source_bytes: bytes) -> None:
                 )
             seen: set[str] = set()
             for element in root:
+                if not isinstance(element.tag, str):
+                    continue
                 if element.tag.rsplit("}", 1)[-1] != "Relationship":
                     continue
                 if element.tag != _RELATIONSHIP_TAG:

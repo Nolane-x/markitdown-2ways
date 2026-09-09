@@ -22,6 +22,13 @@ def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
+def _is_w_element(element: Any, name: str) -> bool:
+    tag = getattr(element, "tag", None)
+    return isinstance(tag, str) and any(
+        tag == f"{{{namespace}}}{name}" for namespace in _W_NAMESPACES
+    )
+
+
 def _attribute_value(element: Any, name: str, namespaces: tuple[str, ...]) -> str | None:
     for namespace in namespaces:
         value = element.get(f"{{{namespace}}}{name}")
@@ -48,7 +55,7 @@ def _bool_property(element: Any | None) -> bool | None:
 
 
 def _run_style(run_element: Any) -> Style | None:
-    rpr_nodes = [child for child in run_element if _local_name(child.tag) == "rPr"]
+    rpr_nodes = [child for child in run_element if _is_w_element(child, "rPr")]
     if not rpr_nodes:
         return None
     rpr = rpr_nodes[0]
@@ -94,11 +101,11 @@ class _Carrier:
 
 
 def _run_text_node(run_element: Any) -> Any | None:
-    text_nodes = [child for child in run_element if _local_name(child.tag) == "t"]
+    text_nodes = [child for child in run_element if _is_w_element(child, "t")]
     unsupported = [
         child
         for child in run_element
-        if _local_name(child.tag) not in {"rPr", "t"}
+        if not (_is_w_element(child, "rPr") or _is_w_element(child, "t"))
     ]
     if unsupported:
         raise UnsupportedEditError(
@@ -117,14 +124,29 @@ def _run_text_node(run_element: Any) -> Any | None:
 
 
 def _collect_carriers(paragraph_element: Any) -> list[_Carrier]:
+    if not _is_w_element(paragraph_element, "p"):
+        raise UnsupportedEditError(
+            "DOCX paragraph is not in a supported WordprocessingML namespace.",
+            details={"reason": "unsupported_text_structure", "element": "p"},
+        )
     carriers: list[_Carrier] = []
     run_index = 0
     context_index = 0
     for child in paragraph_element:
         name = _local_name(child.tag)
         if name == "pPr":
+            if not _is_w_element(child, "pPr"):
+                raise UnsupportedEditError(
+                    "DOCX paragraph contains unsupported native structure.",
+                    details={"reason": "unsupported_text_structure", "element": name},
+                )
             continue
         if name == "r":
+            if not _is_w_element(child, "r"):
+                raise UnsupportedEditError(
+                    "DOCX paragraph contains unsupported native structure.",
+                    details={"reason": "unsupported_text_structure", "element": name},
+                )
             text_node = _run_text_node(child)
             if text_node is not None:
                 carriers.append(
@@ -140,6 +162,11 @@ def _collect_carriers(paragraph_element: Any) -> list[_Carrier]:
             context_index += 1
             continue
         if name == "hyperlink":
+            if not _is_w_element(child, "hyperlink"):
+                raise UnsupportedEditError(
+                    "DOCX hyperlink uses an unsupported native namespace.",
+                    details={"reason": "unsupported_hyperlink_structure"},
+                )
             relationship_id = _r_value(child, "id")
             if not relationship_id:
                 raise UnsupportedEditError(
@@ -149,7 +176,7 @@ def _collect_carriers(paragraph_element: Any) -> list[_Carrier]:
             hyperlink_context_index = context_index
             for hyperlink_child in child:
                 hyperlink_name = _local_name(hyperlink_child.tag)
-                if hyperlink_name != "r":
+                if hyperlink_name != "r" or not _is_w_element(hyperlink_child, "r"):
                     raise UnsupportedEditError(
                         "DOCX hyperlink contains unsupported native structure.",
                         details={
@@ -220,7 +247,7 @@ def extract_paragraph_payload(
     )
     text = "".join(run.text for run in runs)
     ppr_nodes = [
-        child for child in paragraph_element if _local_name(child.tag) == "pPr"
+        child for child in paragraph_element if _is_w_element(child, "pPr")
     ]
     alignment = None
     list_level = None
@@ -231,7 +258,7 @@ def extract_paragraph_payload(
             if name == "jc":
                 alignment = _w_value(child, "val")
             elif name == "numPr":
-                levels = [item for item in child if _local_name(item.tag) == "ilvl"]
+                levels = [item for item in child if _is_w_element(item, "ilvl")]
                 level_value = _w_value(levels[0], "val") if levels else None
                 if level_value is not None:
                     try:

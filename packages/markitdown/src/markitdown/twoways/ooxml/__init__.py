@@ -22,9 +22,17 @@ def _validate_relationship_ids(source_bytes: bytes) -> None:
             for element in root:
                 if element.tag.rsplit("}", 1)[-1] != "Relationship":
                     continue
+                for attribute in ("Id", "Type", "Target"):
+                    if not element.get(attribute):
+                        raise OOXMLPackageError(
+                            "OOXML relationship is missing a required attribute.",
+                            details={
+                                "reason": "malformed_relationship",
+                                "attribute": attribute,
+                                "relationship_part": info.filename,
+                            },
+                        )
                 relationship_id = element.get("Id")
-                if not relationship_id:
-                    continue
                 if relationship_id in seen:
                     raise OOXMLPackageError(
                         "OOXML relationship part contains duplicate relationship IDs.",

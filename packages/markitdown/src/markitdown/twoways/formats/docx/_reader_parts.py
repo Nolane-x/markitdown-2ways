@@ -11,6 +11,9 @@ from ...ooxml import parse_xml_part
 from .relationships import relationships_for_part
 from .structures import build_paragraph_node, build_picture_nodes, build_table_node
 
+_CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
+_CONTENT_TYPES_TAG = f"{{{_CONTENT_TYPES_NS}}}Types"
+_OVERRIDE_TAG = f"{{{_CONTENT_TYPES_NS}}}Override"
 _MAIN_CONTENT_TYPE_SUFFIX = "wordprocessingml.document.main+xml"
 _HEADER_REL_SUFFIX = "/header"
 _FOOTER_REL_SUFFIX = "/footer"
@@ -40,12 +43,16 @@ def _read_members(source_bytes: bytes) -> dict[str, bytes]:
 
 def _main_part_uri(members: dict[str, bytes]) -> str:
     root = parse_xml_part(members["[Content_Types].xml"])
+    if root.tag != _CONTENT_TYPES_TAG:
+        raise ValueError("DOCX Content Types namespace is invalid")
     candidates: list[str] = []
     for element in root:
         if not isinstance(element.tag, str):
             continue
         if element.tag.rsplit("}", 1)[-1] != "Override":
             continue
+        if element.tag != _OVERRIDE_TAG:
+            raise ValueError("DOCX Override namespace is invalid")
         content_type = element.get("ContentType") or ""
         if content_type.endswith(_MAIN_CONTENT_TYPE_SUFFIX):
             part_name = element.get("PartName")

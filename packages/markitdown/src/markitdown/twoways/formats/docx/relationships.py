@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from io import BytesIO
 import posixpath
 from typing import Mapping
+from urllib.parse import urlsplit
 from zipfile import ZipFile
 
 from ..._errors import OOXMLPackageError
@@ -34,7 +35,7 @@ def _rels_member_name(part_uri: str) -> str:
 def resolve_relationship_target(part_uri: str, target: str) -> str:
     if not target or "\\" in target:
         raise ValueError("relationship target must be a safe relative package path")
-    if "://" in target or target.startswith("/"):
+    if urlsplit(target).scheme or target.startswith("/"):
         raise ValueError("internal relationship target must be relative")
     base_dir = posixpath.dirname(part_uri.lstrip("/"))
     resolved = posixpath.normpath(posixpath.join(base_dir, target))

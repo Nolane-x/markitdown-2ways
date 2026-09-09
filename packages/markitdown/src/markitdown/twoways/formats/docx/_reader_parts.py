@@ -147,6 +147,7 @@ def _build_part(
     member_name = part_uri.lstrip("/")
     root = parse_xml_part(members[member_name])
     _validate_part_root(root, kind)
+    root_namespace = root.tag[1:].split("}", 1)[0]
     relationships = relationships_for_part(source_bytes, part_uri)
     canvas_id = _part_canvas_id(kind, ordinal)
     nodes: dict[str, Any] = {}
@@ -156,9 +157,15 @@ def _build_part(
     prefix = _root_prefix(root)
     container = root
     if kind == "document":
-        bodies = root.xpath('./*[local-name()="body"]')
+        bodies = [
+            child
+            for child in root
+            if isinstance(child.tag, str) and child.tag.rsplit("}", 1)[-1] == "body"
+        ]
         if len(bodies) != 1:
             raise ValueError("DOCX main document must contain one body")
+        if bodies[0].tag != f"{{{root_namespace}}}body":
+            raise ValueError("DOCX WordprocessingML body namespace is invalid")
         container = bodies[0]
 
     paragraph_index = 0
@@ -168,6 +175,8 @@ def _build_part(
         if not isinstance(child.tag, str):
             continue
         name = child.tag.rsplit("}", 1)[-1]
+        if name in {"sectPr", "p", "tbl"} and child.tag != f"{{{root_namespace}}}{name}":
+            raise ValueError("DOCX WordprocessingML block namespace is invalid")
         if name == "sectPr":
             continue
         if name == "p":

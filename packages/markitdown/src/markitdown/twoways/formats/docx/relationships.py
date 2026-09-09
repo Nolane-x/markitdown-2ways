@@ -10,6 +10,9 @@ from zipfile import ZipFile
 from ..._errors import OOXMLPackageError
 from ...ooxml import parse_xml_part
 
+_RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+_RELATIONSHIP_TAG = f"{{{_RELATIONSHIPS_NS}}}Relationship"
+
 
 @dataclass(frozen=True)
 class DocxRelationship:
@@ -58,8 +61,16 @@ def relationships_for_part(
     for element in root:
         if not isinstance(element.tag, str):
             continue
-        if element.tag.rsplit("}", 1)[-1] != "Relationship":
-            continue
+        if element.tag != _RELATIONSHIP_TAG:
+            raise OOXMLPackageError(
+                "DOCX relationship part contains an unexpected element.",
+                details={
+                    "reason": "malformed_relationship_part",
+                    "part_uri": part_uri,
+                    "relationship_part": rels_name,
+                    "element": element.tag,
+                },
+            )
         relationship_id = element.get("Id")
         relationship_type = element.get("Type")
         target = element.get("Target")

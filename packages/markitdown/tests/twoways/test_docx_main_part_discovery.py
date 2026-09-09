@@ -88,3 +88,20 @@ def test_main_part_discovery_rejects_foreign_override_namespace():
 
     with pytest.raises(ValueError, match="Override namespace"):
         _main_part_uri(members)
+
+
+def test_main_part_discovery_rejects_suffix_spoofed_content_type():
+    spoofed_content_type = "application/x-wordprocessingml.document.main+xml"
+    xml = (
+        f'<Types xmlns="{_CONTENT_TYPES_NS}">'
+        f'<Override PartName="/word/evil.xml" '
+        f'ContentType="{spoofed_content_type}"/>'
+        "</Types>"
+    ).encode("utf-8")
+    members = {
+        "[Content_Types].xml": xml,
+        "word/evil.xml": b"",
+    }
+
+    with pytest.raises(ValueError, match="does not expose a main document part"):
+        _main_part_uri(members)

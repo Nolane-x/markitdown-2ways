@@ -44,3 +44,33 @@ def test_relationship_ids_are_scoped_to_each_relationship_part():
 
     snapshot = snapshot_package(output.getvalue())
     assert len(snapshot.entries) == 2
+
+
+@pytest.mark.parametrize("missing_attribute", ["Id", "Type", "Target"])
+def test_snapshot_rejects_missing_required_relationship_attributes(
+    missing_attribute: str,
+):
+    attributes = {
+        "Id": "rId1",
+        "Type": "image",
+        "Target": "media/image1.png",
+    }
+    del attributes[missing_attribute]
+    rendered = " ".join(
+        f'{name}="{value}"' for name, value in attributes.items()
+    )
+    rels = (
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
+        'relationships">'
+        f"<Relationship {rendered}/>"
+        "</Relationships>"
+    ).encode("utf-8")
+    output = BytesIO()
+    with ZipFile(output, "w") as archive:
+        archive.writestr("word/_rels/document.xml.rels", rels)
+
+    with pytest.raises(OOXMLPackageError) as exc:
+        snapshot_package(output.getvalue())
+
+    assert exc.value.details["reason"] == "malformed_relationship"
+    assert exc.value.details["attribute"] == missing_attribute

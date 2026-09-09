@@ -55,6 +55,8 @@ def relationships_for_part(
     root = parse_xml_part(data)
     result: dict[str, DocxRelationship] = {}
     for element in root:
+        if not isinstance(element.tag, str):
+            continue
         if element.tag.rsplit("}", 1)[-1] != "Relationship":
             continue
         relationship_id = element.get("Id")

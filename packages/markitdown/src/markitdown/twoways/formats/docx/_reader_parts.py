@@ -17,30 +17,13 @@ _OVERRIDE_TAG = f"{{{_CONTENT_TYPES_NS}}}Override"
 _MAIN_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
 )
-_TRANSITIONAL_W_NS = (
-    "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+_WORDPROCESSING_NAMESPACES = frozenset(
+    {
+        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        "http://purl.oclc.org/ooxml/wordprocessingml/main",
+    }
 )
-_STRICT_W_NS = "http://purl.oclc.org/ooxml/wordprocessingml/main"
-_PART_ROOT_TAGS = {
-    "document": frozenset(
-        {
-            f"{{{_TRANSITIONAL_W_NS}}}document",
-            f"{{{_STRICT_W_NS}}}document",
-        }
-    ),
-    "header": frozenset(
-        {
-            f"{{{_TRANSITIONAL_W_NS}}}hdr",
-            f"{{{_STRICT_W_NS}}}hdr",
-        }
-    ),
-    "footer": frozenset(
-        {
-            f"{{{_TRANSITIONAL_W_NS}}}ftr",
-            f"{{{_STRICT_W_NS}}}ftr",
-        }
-    ),
-}
+_PART_ROOT_NAMES = {"document": "document", "header": "hdr", "footer": "ftr"}
 _HEADER_REL_SUFFIX = "/header"
 _FOOTER_REL_SUFFIX = "/footer"
 
@@ -126,8 +109,16 @@ def _root_prefix(root: Any) -> str:
 
 
 def _validate_part_root(root: Any, kind: str) -> None:
-    expected_tags = _PART_ROOT_TAGS.get(kind)
-    if expected_tags is None or root.tag not in expected_tags:
+    expected_name = _PART_ROOT_NAMES.get(kind)
+    tag = root.tag
+    if not isinstance(tag, str) or not tag.startswith("{") or "}" not in tag:
+        raise ValueError("DOCX WordprocessingML root namespace is invalid")
+    namespace, local_name = tag[1:].split("}", 1)
+    if (
+        expected_name is None
+        or local_name != expected_name
+        or namespace not in _WORDPROCESSING_NAMESPACES
+    ):
         raise ValueError("DOCX WordprocessingML root namespace is invalid")
 
 

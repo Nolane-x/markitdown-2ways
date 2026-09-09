@@ -48,3 +48,9 @@ def test_non_xml_member_is_not_subject_to_xml_part_limit():
 def test_xml_part_limit_must_be_positive():
     with pytest.raises(ValueError, match="max_xml_part_bytes"):
         OOXMLPackageLimits(max_xml_part_bytes=0)
+
+
+def test_legacy_positional_limit_order_is_preserved():
+    limits = OOXMLPackageLimits(10, 100, 100, 2.0)
+    assert limits.max_compression_ratio == 2.0
+    assert limits.max_xml_part_bytes == 64 * 1024 * 1024

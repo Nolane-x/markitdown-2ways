@@ -109,6 +109,17 @@ def snapshot_package(
                     size=info.file_size,
                     limit=limits.max_member_uncompressed_bytes,
                 )
+            if (
+                name.lower().endswith((".xml", ".rels"))
+                and info.file_size > limits.max_xml_part_bytes
+            ):
+                _fail(
+                    "xml_part_too_large",
+                    "OOXML XML part exceeds the configured XML-part size limit.",
+                    member=name,
+                    size=info.file_size,
+                    limit=limits.max_xml_part_bytes,
+                )
             total += info.file_size
             if total > limits.max_total_uncompressed_bytes:
                 _fail(

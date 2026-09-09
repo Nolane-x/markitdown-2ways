@@ -22,7 +22,16 @@ def _validate_relationship_ids(source_bytes: bytes) -> None:
         for info in archive.infolist():
             if not info.filename.lower().endswith(".rels"):
                 continue
-            root = parse_xml_part(archive.read(info))
+            try:
+                root = parse_xml_part(archive.read(info))
+            except SyntaxError as exc:
+                raise OOXMLPackageError(
+                    "OOXML relationship part contains malformed XML.",
+                    details={
+                        "reason": "malformed_relationship_part",
+                        "relationship_part": info.filename,
+                    },
+                ) from exc
             if root.tag != _RELATIONSHIPS_TAG:
                 raise OOXMLPackageError(
                     "OOXML relationship part uses an invalid namespace.",

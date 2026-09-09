@@ -58,3 +58,33 @@ def test_main_part_discovery_preserves_single_override_and_fallback():
 
     assert _main_part_uri(override_members) == "/word/custom.xml"
     assert _main_part_uri(fallback_members) == "/word/document.xml"
+
+
+def test_main_part_discovery_rejects_wrong_content_types_root_namespace():
+    xml = (
+        '<Types xmlns="urn:not-opc">'
+        f'<Override PartName="/word/evil.xml" ContentType="{_MAIN_CONTENT_TYPE}"/>'
+        "</Types>"
+    ).encode("utf-8")
+    members = {
+        "[Content_Types].xml": xml,
+        "word/evil.xml": b"",
+    }
+
+    with pytest.raises(ValueError, match="Content Types namespace"):
+        _main_part_uri(members)
+
+
+def test_main_part_discovery_rejects_foreign_override_namespace():
+    xml = (
+        f'<Types xmlns="{_CONTENT_TYPES_NS}" xmlns:x="urn:not-opc">'
+        f'<x:Override PartName="/word/evil.xml" ContentType="{_MAIN_CONTENT_TYPE}"/>'
+        "</Types>"
+    ).encode("utf-8")
+    members = {
+        "[Content_Types].xml": xml,
+        "word/evil.xml": b"",
+    }
+
+    with pytest.raises(ValueError, match="Override namespace"):
+        _main_part_uri(members)

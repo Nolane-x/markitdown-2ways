@@ -80,8 +80,8 @@ def test_rich_inline_string_is_read_only_to_preserve_runs() -> None:
     rich_xml = SHEET1.replace(
         '<c r="B2" t="inlineStr"><is><t>East</t></is></c>',
         '<c r="B2" t="inlineStr"><is>'
-        '<r><rPr><b/></rPr><t>Ea</t></r><r><t>st</t></r>'
-        '</is></c>',
+        "<r><rPr><b/></rPr><t>Ea</t></r><r><t>st</t></r>"
+        "</is></c>",
     )
     grid = read_worksheet_grid(
         parse_xml_part(rich_xml.encode()),

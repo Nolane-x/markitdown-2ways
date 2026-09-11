@@ -1,0 +1,31 @@
+name: tmp-phase-f-black-rich
+
+on:
+  push:
+    branches:
+      - nolane/phase-f-full-parity-kernel-xlsx
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: nolane/phase-f-full-parity-kernel-xlsx
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - run: python -m pip install black==23.7.0
+      - run: black packages/markitdown/tests/twoways/test_xlsx_cells.py
+      - name: Commit formatting if needed
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add packages/markitdown/tests/twoways/test_xlsx_cells.py
+          git commit -m 'style: format rich xlsx regression'
+          git push origin HEAD:nolane/phase-f-full-parity-kernel-xlsx

@@ -12,7 +12,7 @@ from ..._errors import (
 from ..._results import FidelityEvidence, FidelityReport, FidelityStatus, WriterResult
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
-from ...ir.nodes import ImagePayload, TextPayload
+from ...ir.nodes import ImagePayload, TablePayload, TextPayload
 from ...ir.semantics import node_semantic_text
 from ...ir.serialization import validate_document
 from ...ooxml import parse_xml_part, serialize_xml_part, snapshot_package, write_package
@@ -21,6 +21,7 @@ from ...writers.base import DocumentWriter, TargetInfo
 from .locators import resolve_shape_element
 from .model import PptxPatchOptions
 from .patch import patch_picture_alt_text, validate_edit_preconditions
+from .table import patch_pptx_table_cells
 from .text import patch_text_shape
 from .verify import verify_pptx_output
 
@@ -96,8 +97,33 @@ def _apply_edit(
         patch_picture_alt_text(shape_element, new_alt_text=new_alt)
         return
 
+    if edit.type == "update_table_cells":
+        if not isinstance(node.payload, TablePayload):
+            raise UnsupportedEditError(
+                "update_table_cells requires a PPTX table node.",
+                details={"reason": "wrong_node_kind", "target_node_id": node.node_id},
+            )
+        capabilities = node.metadata.get("pptx:patch_capabilities", ())
+        if (
+            not isinstance(capabilities, (tuple, list, set, frozenset))
+            or "update_table_cells" not in capabilities
+        ):
+            raise UnsupportedEditError(
+                "PPTX table structure is read-only in Phase E.",
+                details={
+                    "reason": "unsupported_table_structure",
+                    "target_node_id": node.node_id,
+                },
+            )
+        patch_pptx_table_cells(
+            shape_element,
+            node.payload,
+            edit.payload.get("cells"),
+        )
+        return
+
     raise UnsupportedEditError(
-        "PPTX patch writer does not support this edit type in Phase C v1.",
+        "PPTX patch writer does not support this edit type.",
         details={"reason": "unsupported_edit_type", "edit_type": edit.type},
     )
 
@@ -171,7 +197,7 @@ def patch_pptx(
         ) and part_uri.endswith(".xml")
         if not allowed_part:
             raise UnsupportedEditError(
-                "Phase C v1 patches only PPTX slide or notes-slide XML parts.",
+                "PPTX patching supports only slide or notes-slide XML parts.",
                 details={"reason": "unsupported_part", "part_uri": part_uri},
             )
         edits_by_part.setdefault(part_uri, []).append(edit)

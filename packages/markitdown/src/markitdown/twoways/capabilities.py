@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
+from types import MappingProxyType
 from typing import Any
 
+from .ir.document import DocumentIR
 from .ir.nodes import Node
 
 
@@ -62,6 +65,57 @@ class NodeCapabilityProfile:
             operation=operation,
             state=self.default_state,
             reason_code="capability.unspecified",
+        )
+
+
+@dataclass(frozen=True)
+class CapabilityReasonSummary:
+    reason_code: str
+    count: int
+
+    def __post_init__(self) -> None:
+        if not self.reason_code:
+            raise ValueError("reason_code must be non-empty")
+        if self.count < 1:
+            raise ValueError("reason summary count must be positive")
+
+
+@dataclass(frozen=True)
+class CapabilityReport:
+    total_nodes: int
+    writable_nodes: int
+    read_only_nodes: int
+    derived_nodes: int
+    writable_by_operation: Mapping[str, int] = field(default_factory=dict)
+    reason_counts: Mapping[str, int] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        counts = (
+            self.total_nodes,
+            self.writable_nodes,
+            self.read_only_nodes,
+            self.derived_nodes,
+        )
+        if any(value < 0 for value in counts):
+            raise ValueError("capability report counts must be non-negative")
+        if self.writable_nodes + self.read_only_nodes + self.derived_nodes != self.total_nodes:
+            raise ValueError("capability report node counts must sum to total_nodes")
+        object.__setattr__(
+            self,
+            "writable_by_operation",
+            MappingProxyType(dict(sorted(self.writable_by_operation.items()))),
+        )
+        object.__setattr__(
+            self,
+            "reason_counts",
+            MappingProxyType(dict(sorted(self.reason_counts.items()))),
+        )
+
+    @property
+    def reasons(self) -> tuple[CapabilityReasonSummary, ...]:
+        return tuple(
+            CapabilityReasonSummary(reason_code=code, count=count)
+            for code, count in self.reason_counts.items()
         )
 
 
@@ -127,3 +181,43 @@ def encode_capabilities(
             item["reason_code"] = decision.reason_code
         encoded.append(item)
     return tuple(encoded)
+
+
+def build_capability_report(document: DocumentIR) -> CapabilityReport:
+    writable_nodes = 0
+    read_only_nodes = 0
+    derived_nodes = 0
+    writable_by_operation: Counter[str] = Counter()
+    reason_counts: Counter[str] = Counter()
+
+    for node_id in sorted(document.nodes):
+        profile = capabilities_for_node(document.nodes[node_id])
+        decisions = profile.decisions
+
+        if not decisions:
+            read_only_nodes += 1
+            reason_counts["capability.unspecified"] += 1
+            continue
+
+        states = {decision.state for decision in decisions}
+        if CapabilityState.WRITABLE in states:
+            writable_nodes += 1
+        elif CapabilityState.DERIVED in states:
+            derived_nodes += 1
+        else:
+            read_only_nodes += 1
+
+        for decision in decisions:
+            if decision.state is CapabilityState.WRITABLE:
+                writable_by_operation[decision.operation] += 1
+            if decision.reason_code is not None:
+                reason_counts[decision.reason_code] += 1
+
+    return CapabilityReport(
+        total_nodes=len(document.nodes),
+        writable_nodes=writable_nodes,
+        read_only_nodes=read_only_nodes,
+        derived_nodes=derived_nodes,
+        writable_by_operation=dict(writable_by_operation),
+        reason_counts=dict(reason_counts),
+    )

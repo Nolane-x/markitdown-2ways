@@ -4,14 +4,17 @@ from io import BytesIO
 
 import pytest
 
-from markitdown.twoways._errors import SourcePackageMismatchError
+from markitdown.twoways._errors import (
+    SourcePackageMismatchError,
+    UnsupportedEditError,
+)
 from markitdown.twoways.formats.xlsx.reader import read_xlsx_ir
 from markitdown.twoways.formats.xlsx.writer import patch_xlsx
 from markitdown.twoways.ir.document import DocumentIR, SourceDescriptor
 from markitdown.twoways.ir.edits import EditOperation
 from markitdown.twoways.ir.nodes import TablePayload
 
-from ._xlsx_fixtures import make_xlsx, read_member
+from ._xlsx_fixtures import SHARED_STRINGS, make_xlsx, read_member
 
 
 def _document_and_sheet() -> tuple[bytes, DocumentIR, str]:
@@ -82,6 +85,34 @@ def test_xlsx_writer_patches_only_target_sheet_and_re_reads_semantics() -> None:
     assert result.metadata["touched_parts"] == ("xl/worksheets/sheet1.xml",)
     assert result.fidelity.claimed_tier == "high"
     assert not result.fidelity.warnings
+
+
+def test_xlsx_writer_rejects_rich_shared_string_target() -> None:
+    rich_shared_strings = SHARED_STRINGS.replace(
+        "<si><t>North</t></si>",
+        "<si><r><rPr><b/></rPr><t>Nor</t></r><r><t>th</t></r></si>",
+    )
+    source = make_xlsx(
+        replacements={"xl/sharedStrings.xml": rich_shared_strings},
+    )
+    document = read_xlsx_ir(BytesIO(source))
+    sheet_id = document.canvases[0].root_node_ids[0]
+    edit = EditOperation(
+        operation_id="rich-shared-edit",
+        type="update_sheet_cells",
+        target_node_id=sheet_id,
+        payload={
+            "cells": [
+                {"row": 0, "column": 0, "old_value": "North", "value": "South"}
+            ]
+        },
+    )
+
+    with pytest.raises(
+        UnsupportedEditError,
+        match="read-only",
+    ):
+        patch_xlsx(document, BytesIO(source), BytesIO(), edits=(edit,))
 
 
 def test_xlsx_writer_is_deterministic_for_edit_order() -> None:

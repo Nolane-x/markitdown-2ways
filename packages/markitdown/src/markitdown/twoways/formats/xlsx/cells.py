@@ -75,14 +75,15 @@ def _descendant_text(container: Any, namespace: str) -> str:
     return "".join(values)
 
 
-def _is_plain_inline_string(container: Any, namespace: str) -> bool:
+def _is_plain_string_container(container: Any, namespace: str) -> bool:
     children = [child for child in container if isinstance(child.tag, str)]
     return len(children) == 1 and children[0].tag == f"{{{namespace}}}t"
 
 
-def read_shared_strings(root: Any) -> tuple[str, ...]:
+def read_shared_string_table(root: Any) -> tuple[tuple[str, ...], frozenset[int]]:
     namespace = _root_namespace(root, "sst")
     values: list[str] = []
+    rich_indexes: set[int] = set()
     for element in root:
         if not isinstance(element.tag, str):
             continue
@@ -90,8 +91,16 @@ def read_shared_strings(root: Any) -> tuple[str, ...]:
             continue
         if element.tag != f"{{{namespace}}}si":
             raise ValueError("mixed SpreadsheetML namespace in shared strings")
+        index = len(values)
         values.append(_descendant_text(element, namespace))
-    return tuple(values)
+        if not _is_plain_string_container(element, namespace):
+            rich_indexes.add(index)
+    return tuple(values), frozenset(rich_indexes)
+
+
+def read_shared_strings(root: Any) -> tuple[str, ...]:
+    values, _ = read_shared_string_table(root)
+    return values
 
 
 def _single_direct_child(element: Any, namespace: str, local: str) -> Any | None:
@@ -169,6 +178,7 @@ def _cell_value(
     cell: Any,
     namespace: str,
     shared_strings: tuple[str, ...],
+    rich_shared_string_indexes: frozenset[int],
 ) -> tuple[object, str | None, str | None, bool, bool]:
     cell_type = cell.get("t")
     value_element = _single_direct_child(cell, namespace, "v")
@@ -189,11 +199,12 @@ def _cell_value(
         if index < 0 or index >= len(shared_strings):
             raise ValueError("shared-string index is out of range")
         value: object = shared_strings[index]
+        rich_text = index in rich_shared_string_indexes
     elif cell_type == "inlineStr":
         if inline_element is None or value_element is not None:
             raise ValueError("inline-string cell has invalid value structure")
         value = _descendant_text(inline_element, namespace)
-        rich_text = not _is_plain_inline_string(inline_element, namespace)
+        rich_text = not _is_plain_string_container(inline_element, namespace)
     elif cell_type == "b":
         if raw_value not in {"0", "1"}:
             raise ValueError("boolean cell value must be 0 or 1")
@@ -223,6 +234,7 @@ def read_worksheet_grid(
     root: Any,
     *,
     shared_strings: tuple[str, ...] = (),
+    rich_shared_string_indexes: frozenset[int] = frozenset(),
 ) -> XlsxWorksheetGrid:
     namespace = _root_namespace(root, "worksheet")
     merged = _merged_addresses(root, namespace)
@@ -279,6 +291,7 @@ def read_worksheet_grid(
                 cell_element,
                 namespace,
                 shared_strings,
+                rich_shared_string_indexes,
             )
             raw_style = cell_element.get("s")
             style_id = None

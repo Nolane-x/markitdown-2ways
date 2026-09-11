@@ -7,6 +7,8 @@ from markitdown.twoways.ooxml import parse_xml_part
 
 _STRICT_W_NS = "http://purl.oclc.org/ooxml/wordprocessingml/main"
 _STRICT_R_NS = "http://purl.oclc.org/ooxml/officeDocument/relationships"
+_STRICT_WP_NS = "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing"
+_STRICT_A_NS = "http://purl.oclc.org/ooxml/drawingml/main"
 
 
 def _locator():
@@ -54,7 +56,7 @@ def test_strict_hyperlink_relationship_id_is_preserved():
 def test_strict_picture_relationship_id_is_preserved():
     inline = parse_xml_part(
         (
-            '<wp:inline xmlns:wp="urn:wp" xmlns:a="urn:a" '
+            f'<wp:inline xmlns:wp="{_STRICT_WP_NS}" xmlns:a="{_STRICT_A_NS}" '
             f'xmlns:r="{_STRICT_R_NS}">'
             '<wp:docPr id="1"/><a:graphic><a:blip r:embed="rId9"/></a:graphic>'
             "</wp:inline>"

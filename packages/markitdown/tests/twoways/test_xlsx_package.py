@@ -103,3 +103,25 @@ def test_rejects_reused_sheet_relationship_authority() -> None:
         discover_xlsx_parts(make_xlsx(replacements={"xl/workbook.xml": workbook}))
 
     assert exc_info.value.details["reason"] == "duplicate_sheet_relationship"
+
+
+def test_rejects_distinct_relationships_that_alias_one_worksheet_part() -> None:
+    workbook = WORKBOOK.replace('r:id="rId2"', 'r:id="rId4"')
+    rels = WORKBOOK_RELS.replace(
+        "</Relationships>",
+        '<Relationship Id="rId4" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+        'Target="worksheets/sheet1.xml"/></Relationships>',
+    )
+
+    with pytest.raises(OOXMLPackageError) as exc_info:
+        discover_xlsx_parts(
+            make_xlsx(
+                replacements={
+                    "xl/workbook.xml": workbook,
+                    "xl/_rels/workbook.xml.rels": rels,
+                }
+            )
+        )
+
+    assert exc_info.value.details["reason"] == "duplicate_worksheet_target"

@@ -31,7 +31,11 @@ def _rendered_digest(markdown: str) -> str:
 
 
 def _normalize_document(parts: list[str]) -> str:
-    normalized = [normalize_markdown_block(part) for part in parts if normalize_markdown_block(part)]
+    normalized = [
+        normalize_markdown_block(part)
+        for part in parts
+        if normalize_markdown_block(part)
+    ]
     if not normalized:
         return ""
     return "\n\n".join(normalized).rstrip() + "\n"
@@ -51,16 +55,35 @@ def project_markdown(
     visited: set[str] = set()
     ordinal = 0
 
-    has_title_node = any((node.semantic_role or "").lower() == "title" for node in document.nodes.values())
+    has_title_node = any(
+        (node.semantic_role or "").lower() == "title"
+        for node in document.nodes.values()
+    )
     if options.mode is MarkdownProjectionMode.IDENTITY:
-        parts.append(encode_projection_header(version="1", document_id=document.document_id, source_digest=source_digest))
-        if options.include_document_title and document.metadata.title and not has_title_node:
-            diagnostics.append(ProjectionDiagnostic(
-                code="markdown.projection.document_title_omitted",
-                severity="info",
-                message="Document metadata title was omitted in identity mode because it has no stable node identity.",
-            ))
-    elif options.include_document_title and document.metadata.title and not has_title_node:
+        parts.append(
+            encode_projection_header(
+                version="1",
+                document_id=document.document_id,
+                source_digest=source_digest,
+            )
+        )
+        if (
+            options.include_document_title
+            and document.metadata.title
+            and not has_title_node
+        ):
+            diagnostics.append(
+                ProjectionDiagnostic(
+                    code="markdown.projection.document_title_omitted",
+                    severity="info",
+                    message="Document metadata title was omitted in identity mode because it has no stable node identity.",
+                )
+            )
+    elif (
+        options.include_document_title
+        and document.metadata.title
+        and not has_title_node
+    ):
         parts.append(f"# {document.metadata.title}")
 
     def visit(node_id: str) -> None:
@@ -76,12 +99,14 @@ def project_markdown(
         rendered = render_node(node, options)
         if rendered is None:
             if node.kind == "unknown_native":
-                diagnostics.append(ProjectionDiagnostic(
-                    code="markdown.projection.unknown_native_omitted",
-                    severity="info",
-                    message="Unknown native content was preserved in IR and omitted from Markdown.",
-                    node_id=node.node_id,
-                ))
+                diagnostics.append(
+                    ProjectionDiagnostic(
+                        code="markdown.projection.unknown_native_omitted",
+                        severity="info",
+                        message="Unknown native content was preserved in IR and omitted from Markdown.",
+                        node_id=node.node_id,
+                    )
+                )
             for child_id in node.children:
                 visit(child_id)
             return
@@ -102,12 +127,14 @@ def project_markdown(
         )
         blocks.append(block)
         if options.mode is MarkdownProjectionMode.IDENTITY:
-            parts.append(encode_block_marker(
-                projection_id=pid,
-                node_id=node.node_id,
-                kind=node.kind,
-                source_digest=semantic_digest,
-            ))
+            parts.append(
+                encode_block_marker(
+                    projection_id=pid,
+                    node_id=node.node_id,
+                    kind=node.kind,
+                    source_digest=semantic_digest,
+                )
+            )
         parts.append(rendered.markdown)
         ordinal += 1
         for child_id in node.children:
@@ -120,12 +147,14 @@ def project_markdown(
         if root_id not in visited:
             visit(root_id)
     for node_id in sorted(set(document.nodes) - visited):
-        diagnostics.append(ProjectionDiagnostic(
-            code="markdown.projection.orphan_node",
-            severity="warning",
-            message="Node was not reachable through explicit document/canvas order and was not projected.",
-            node_id=node_id,
-        ))
+        diagnostics.append(
+            ProjectionDiagnostic(
+                code="markdown.projection.orphan_node",
+                severity="warning",
+                message="Node was not reachable through explicit document/canvas order and was not projected.",
+                node_id=node_id,
+            )
+        )
 
     markdown = _normalize_document(parts)
     manifest = ProjectionManifest(

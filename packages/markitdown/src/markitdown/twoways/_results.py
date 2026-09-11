@@ -11,13 +11,15 @@ class FidelityStatus(str, Enum):
     NOT_APPLICABLE = "not-applicable"
 
 
-FIDELITY_TIERS = frozenset({
-    "exact-preserve",
-    "high",
-    "semantic",
-    "reconstructed",
-    "unknown",
-})
+FIDELITY_TIERS = frozenset(
+    {
+        "exact-preserve",
+        "high",
+        "semantic",
+        "reconstructed",
+        "unknown",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -33,7 +35,11 @@ class FidelityEvidence:
     def __post_init__(self) -> None:
         if not self.check_code:
             raise ValueError("check_code must be non-empty")
-        status = self.status if isinstance(self.status, FidelityStatus) else FidelityStatus(self.status)
+        status = (
+            self.status
+            if isinstance(self.status, FidelityStatus)
+            else FidelityStatus(self.status)
+        )
         object.__setattr__(self, "status", status)
         object.__setattr__(self, "affected_node_ids", tuple(self.affected_node_ids))
 
@@ -49,7 +55,9 @@ class FidelityReport:
         if self.claimed_tier not in FIDELITY_TIERS:
             raise ValueError(f"unsupported fidelity tier: {self.claimed_tier}")
         object.__setattr__(self, "evidence", tuple(self.evidence))
-        object.__setattr__(self, "unsupported_features", tuple(self.unsupported_features))
+        object.__setattr__(
+            self, "unsupported_features", tuple(self.unsupported_features)
+        )
         object.__setattr__(self, "warnings", tuple(self.warnings))
         if self.claimed_tier == "exact-preserve":
             failed_required = [
@@ -82,5 +90,7 @@ class WriterResult:
         if self.bytes_written < 0:
             raise ValueError("bytes_written must be non-negative")
         object.__setattr__(self, "warnings", tuple(self.warnings))
-        object.__setattr__(self, "unsupported_operations", tuple(self.unsupported_operations))
+        object.__setattr__(
+            self, "unsupported_operations", tuple(self.unsupported_operations)
+        )
         object.__setattr__(self, "metadata", dict(self.metadata))

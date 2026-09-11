@@ -14,9 +14,7 @@ _RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationship
 
 def _package(child_xml: str) -> bytes:
     rels = (
-        f'<Relationships xmlns="{_RELATIONSHIPS_NS}">'
-        f"{child_xml}"
-        "</Relationships>"
+        f'<Relationships xmlns="{_RELATIONSHIPS_NS}">' f"{child_xml}" "</Relationships>"
     ).encode("utf-8")
     output = BytesIO()
     with ZipFile(output, "w") as archive:

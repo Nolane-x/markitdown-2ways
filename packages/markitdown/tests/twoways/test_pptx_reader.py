@@ -33,7 +33,10 @@ def test_reader_captures_source_slides_geometry_and_valid_ir():
     assert document.source.format == "pptx"
     assert document.source.sha256 == sha256(source).hexdigest()
     assert document.source.size_bytes == len(source)
-    assert document.source.preserved_source_ref == f"pptx:sha256:{sha256(source).hexdigest()}"
+    assert (
+        document.source.preserved_source_ref
+        == f"pptx:sha256:{sha256(source).hexdigest()}"
+    )
     assert len(document.canvases) == 2
     assert [canvas.kind for canvas in document.canvases] == ["slide", "slide"]
     assert document.canvases[0].unit == "emu"
@@ -122,13 +125,26 @@ def test_reader_extracts_tables_and_charts_as_read_only_semantic_nodes():
     from markitdown.twoways.formats.pptx import read_pptx_ir
 
     document = read_pptx_ir(BytesIO(make_pptx_bytes()))
-    table = next(node for node in document.nodes.values() if isinstance(node.payload, TablePayload))
-    chart = next(node for node in document.nodes.values() if isinstance(node.payload, ChartPayload))
+    table = next(
+        node
+        for node in document.nodes.values()
+        if isinstance(node.payload, TablePayload)
+    )
+    chart = next(
+        node
+        for node in document.nodes.values()
+        if isinstance(node.payload, ChartPayload)
+    )
 
     assert table.kind == "table"
     assert table.payload.rows == 2
     assert table.payload.columns == 2
-    assert [cell.text for cell in table.payload.cells] == ["Region", "Revenue", "APAC", "42"]
+    assert [cell.text for cell in table.payload.cells] == [
+        "Region",
+        "Revenue",
+        "APAC",
+        "42",
+    ]
     assert table.metadata["pptx:patch_capabilities"] == ()
 
     assert chart.kind == "chart"
@@ -153,8 +169,14 @@ def test_reader_preserves_group_hierarchy_and_child_identity():
 
     children = [document.nodes[node_id] for node_id in group.children]
     assert all(child.parent_id == group.node_id for child in children)
-    assert [child.payload.text for child in children if isinstance(child.payload, TextPayload)] == [
+    assert [
+        child.payload.text
+        for child in children
+        if isinstance(child.payload, TextPayload)
+    ] == [
         "Grouped Revenue",
         "38%",
     ]
-    assert all(child.native_locator.part_uri == "/ppt/slides/slide1.xml" for child in children)
+    assert all(
+        child.native_locator.part_uri == "/ppt/slides/slide1.xml" for child in children
+    )

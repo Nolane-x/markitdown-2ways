@@ -31,13 +31,17 @@ def _json_value(value: Any, *, path: str = "$") -> Any:
             field_value = getattr(value, field_info.name)
             if field_value is None:
                 continue
-            result[field_info.name] = _json_value(field_value, path=f"{path}.{field_info.name}")
+            result[field_info.name] = _json_value(
+                field_value, path=f"{path}.{field_info.name}"
+            )
         return result
     if isinstance(value, ABCMapping):
         result: dict[str, Any] = {}
         for key in sorted(value, key=str):
             if not isinstance(key, str):
-                raise TypeError(f"mapping key at {path} must be str, got {type(key).__name__}")
+                raise TypeError(
+                    f"mapping key at {path} must be str, got {type(key).__name__}"
+                )
             result[key] = _json_value(value[key], path=f"{path}.{key}")
         return result
     if isinstance(value, (tuple, list)):
@@ -48,7 +52,9 @@ def _json_value(value: Any, *, path: str = "$") -> Any:
         raise ValueError(f"non-finite float is not allowed in canonical JSON at {path}")
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
-    raise TypeError(f"unsupported canonical JSON value at {path}: {type(value).__name__}")
+    raise TypeError(
+        f"unsupported canonical JSON value at {path}: {type(value).__name__}"
+    )
 
 
 def to_canonical_dict(document: DocumentIR) -> dict[str, Any]:
@@ -124,7 +130,10 @@ def _decode_type(annotation: Any, value: Any, strict: bool, path: str) -> Any:
     if origin is tuple:
         values = _array(value, path)
         item_type = args[0] if args else Any
-        return tuple(_decode_type(item_type, item, strict, f"{path}[{i}]") for i, item in enumerate(values))
+        return tuple(
+            _decode_type(item_type, item, strict, f"{path}[{i}]")
+            for i, item in enumerate(values)
+        )
 
     if origin in (dict, ABCMapping, Mapping):
         raw = _mapping(value, path)
@@ -132,13 +141,20 @@ def _decode_type(annotation: Any, value: Any, strict: bool, path: str) -> Any:
         value_type = args[1] if len(args) > 1 else Any
         if key_type not in (str, Any):
             raise TypeError(f"unsupported mapping key type at {path}: {key_type}")
-        return {key: _decode_type(value_type, item, strict, f"{path}.{key}") for key, item in raw.items()}
+        return {
+            key: _decode_type(value_type, item, strict, f"{path}.{key}")
+            for key, item in raw.items()
+        }
 
     if isinstance(annotation, type) and is_dataclass(annotation):
         return _decode_dataclass(annotation, value, strict, path)
 
     if annotation in (str, int, float, bool):
-        if annotation is float and isinstance(value, (int, float)) and not isinstance(value, bool):
+        if (
+            annotation is float
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+        ):
             # Preserve the JSON numeric representation (e.g. 10 vs 10.0) so
             # encode/decode/encode remains byte-identical. Dataclasses do not
             # coerce runtime numeric types, and both forms satisfy the portable
@@ -178,7 +194,9 @@ def _decode_dataclass(cls: type[Any], value: Any, strict: bool, path: str) -> An
             continue
         child_path = f"{path}.{name}"
         if cls is Node and name == "payload":
-            kwargs[name] = _decode_node_payload(str(raw.get("kind", "")), raw[name], strict, child_path)
+            kwargs[name] = _decode_node_payload(
+                str(raw.get("kind", "")), raw[name], strict, child_path
+            )
             continue
         kwargs[name] = _decode_type(hints.get(name, Any), raw[name], strict, child_path)
     return cls(**kwargs)

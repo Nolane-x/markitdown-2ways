@@ -20,7 +20,6 @@ from .model import PptxReadOptions
 from .shapes import build_note_node, build_shape_tree
 
 
-
 def _require_pptx():
     try:
         from pptx import Presentation
@@ -63,8 +62,12 @@ def read_pptx_ir(
 
     presentation = Presentation(BytesIO(source_bytes))
     source_digest = sha256(source_bytes).hexdigest()
-    filename = getattr(stream_info, "filename", None) if stream_info is not None else None
-    mimetype = getattr(stream_info, "mimetype", None) if stream_info is not None else None
+    filename = (
+        getattr(stream_info, "filename", None) if stream_info is not None else None
+    )
+    mimetype = (
+        getattr(stream_info, "mimetype", None) if stream_info is not None else None
+    )
 
     canvases: list[Canvas] = []
     nodes: dict[str, Any] = {}
@@ -99,8 +102,16 @@ def read_pptx_ir(
             for _, node_id in sorted(
                 built,
                 key=lambda item: (
-                    int(shape_by_id[item[1]].geometry.y if shape_by_id[item[1]].geometry else 0),
-                    int(shape_by_id[item[1]].geometry.x if shape_by_id[item[1]].geometry else 0),
+                    int(
+                        shape_by_id[item[1]].geometry.y
+                        if shape_by_id[item[1]].geometry
+                        else 0
+                    ),
+                    int(
+                        shape_by_id[item[1]].geometry.x
+                        if shape_by_id[item[1]].geometry
+                        else 0
+                    ),
                     item[0],
                 ),
             )
@@ -173,6 +184,8 @@ class PptxIRReader(DocumentIRReader):
             "application/vnd.openxmlformats-officedocument.presentationml"
         )
 
-    def read(self, file_stream: BinaryIO, stream_info: Any, **kwargs: Any) -> DocumentIR:
+    def read(
+        self, file_stream: BinaryIO, stream_info: Any, **kwargs: Any
+    ) -> DocumentIR:
         options = kwargs.pop("options", None)
         return read_pptx_ir(file_stream, stream_info, options=options)

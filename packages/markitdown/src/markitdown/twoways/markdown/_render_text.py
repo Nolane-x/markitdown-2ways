@@ -33,8 +33,7 @@ def render_text(
     if payload.paragraphs:
         rendered_paragraphs = [
             "".join(
-                _run_markdown(run.text, run.style, options)
-                for run in paragraph.runs
+                _run_markdown(run.text, run.style, options) for run in paragraph.runs
             )
             for paragraph in payload.paragraphs
         ]

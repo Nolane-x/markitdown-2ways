@@ -140,9 +140,7 @@ def _picture_relationship_id(docpr: Any) -> str | None:
     if parent is None:
         return None
     blips = [
-        element
-        for element in parent.iter()
-        if _is_drawing_element(element, "blip")
+        element for element in parent.iter() if _is_drawing_element(element, "blip")
     ]
     if len(blips) != 1:
         return None
@@ -221,9 +219,7 @@ def build_picture_nodes(
             part_uri,
             docpr_id=docpr_id,
             relationship_id=relationship_id,
-            path=(
-                f"{paragraph_path}//*[local-name()='docPr' and @id='{docpr_id}']"
-            ),
+            path=(f"{paragraph_path}//*[local-name()='docPr' and @id='{docpr_id}']"),
         )
         node = Node(
             node_id=stable_docx_node_id(locator, "image"),

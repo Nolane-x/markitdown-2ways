@@ -15,7 +15,7 @@ def _package_with_duplicate_relationship_id() -> bytes:
         b'Target="../slideLayouts/slideLayout1.xml"/>'
         b'<Relationship Id="rId1" Type="layout" '
         b'Target="../slideLayouts/slideLayout1.xml"/>'
-        b'</Relationships>'
+        b"</Relationships>"
     )
     output = BytesIO()
     with ZipFile(output, "w") as archive:
@@ -35,7 +35,7 @@ def test_relationship_ids_are_scoped_to_each_relationship_part():
         b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
         b'relationships">'
         b'<Relationship Id="rId1" Type="layout" Target="target.xml"/>'
-        b'</Relationships>'
+        b"</Relationships>"
     )
     output = BytesIO()
     with ZipFile(output, "w") as archive:
@@ -56,9 +56,7 @@ def test_snapshot_rejects_missing_required_relationship_attributes(
         "Target": "media/image1.png",
     }
     del attributes[missing_attribute]
-    rendered = " ".join(
-        f'{name}="{value}"' for name, value in attributes.items()
-    )
+    rendered = " ".join(f'{name}="{value}"' for name, value in attributes.items())
     rels = (
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
         'relationships">'
@@ -82,13 +80,13 @@ def test_snapshot_rejects_missing_required_relationship_attributes(
         (
             b'<Relationships xmlns="urn:not-opc">'
             b'<Relationship Id="rId1" Type="image" Target="media/image1.png"/>'
-            b'</Relationships>'
+            b"</Relationships>"
         ),
         (
             b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
             b'relationships" xmlns:x="urn:not-opc">'
             b'<x:Relationship Id="rId1" Type="image" Target="media/image1.png"/>'
-            b'</Relationships>'
+            b"</Relationships>"
         ),
     ],
 )

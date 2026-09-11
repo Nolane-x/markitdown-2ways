@@ -145,7 +145,7 @@ def test_patch_empty_paragraph_rejects_insert_without_style_context():
             b'<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
             b'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
             b'xmlns:x="urn:not-word"><x:hyperlink r:id="rId1">'
-            b'<w:r><w:t>X</w:t></w:r></x:hyperlink></w:p>'
+            b"<w:r><w:t>X</w:t></w:r></x:hyperlink></w:p>"
         ),
     ],
 )
@@ -166,7 +166,7 @@ def test_patch_accepts_strict_wordprocessing_text_carrier():
 
     paragraph = parse_xml_part(
         b'<w:p xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main">'
-        b'<w:r><w:t>X</w:t></w:r></w:p>'
+        b"<w:r><w:t>X</w:t></w:r></w:p>"
     )
     patch_paragraph_text(paragraph, old_text="X", new_text="Y")
     assert "".join(paragraph.xpath('.//*[local-name()="t"]/text()')) == "Y"

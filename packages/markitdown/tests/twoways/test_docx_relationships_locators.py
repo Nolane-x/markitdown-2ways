@@ -82,9 +82,7 @@ def test_picture_locator_requires_unique_docpr():
         path="//*[local-name()='docPr' and @id='1']",
     )
     assert (
-        resolve_picture_docpr(root, locator, part_uri="/word/document.xml").get(
-            "descr"
-        )
+        resolve_picture_docpr(root, locator, part_uri="/word/document.xml").get("descr")
         == "Green status pixel"
     )
 

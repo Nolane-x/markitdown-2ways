@@ -11,18 +11,12 @@ _R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 @pytest.mark.parametrize(
     "xml",
     [
-        (
-            f'<w:p xmlns:w="{_W_NS}"><!--keep-->'
-            '<w:r><w:t>X</w:t></w:r></w:p>'
-        ),
-        (
-            f'<w:p xmlns:w="{_W_NS}"><w:r><!--keep-->'
-            '<w:t>X</w:t></w:r></w:p>'
-        ),
+        (f'<w:p xmlns:w="{_W_NS}"><!--keep-->' "<w:r><w:t>X</w:t></w:r></w:p>"),
+        (f'<w:p xmlns:w="{_W_NS}"><w:r><!--keep-->' "<w:t>X</w:t></w:r></w:p>"),
         (
             f'<w:p xmlns:w="{_W_NS}" xmlns:r="{_R_NS}">'
             '<w:hyperlink r:id="rId1"><!--keep-->'
-            '<w:r><w:t>X</w:t></w:r></w:hyperlink></w:p>'
+            "<w:r><w:t>X</w:t></w:r></w:hyperlink></w:p>"
         ),
     ],
 )

@@ -70,7 +70,7 @@ def test_foreign_style_elements_do_not_override_wordprocessing_style():
         (
             f'<w:p xmlns:w="{_STRICT_W_NS}" xmlns:x="urn:not-word">'
             '<w:r><w:rPr><w:b w:val="0"/><x:b/><x:u/></w:rPr>'
-            '<w:t>X</w:t></w:r></w:p>'
+            "<w:t>X</w:t></w:r></w:p>"
         ).encode("utf-8")
     )
 
@@ -88,7 +88,7 @@ def test_foreign_paragraph_properties_do_not_override_wordprocessing_semantics()
             f'<w:p xmlns:w="{_STRICT_W_NS}" xmlns:x="urn:not-word">'
             '<w:pPr><w:jc w:val="center"/><x:jc/>'
             '<x:numPr><w:ilvl w:val="3"/></x:numPr></w:pPr>'
-            '<w:r><w:t>X</w:t></w:r></w:p>'
+            "<w:r><w:t>X</w:t></w:r></w:p>"
         ).encode("utf-8")
     )
 

@@ -8,9 +8,9 @@ from .provenance import NativeLocator, Provenance
 from .style import Style
 
 
-INITIAL_NODE_KINDS = frozenset({
-    "text", "image", "table", "chart", "group", "shape", "note", "unknown_native"
-})
+INITIAL_NODE_KINDS = frozenset(
+    {"text", "image", "table", "chart", "group", "shape", "note", "unknown_native"}
+)
 
 
 @dataclass(frozen=True)
@@ -115,7 +115,15 @@ class UnknownNativePayload:
             raise ValueError("native_payload_ref must be non-empty")
 
 
-NodePayload = TextPayload | ImagePayload | TablePayload | ChartPayload | UnknownNativePayload | Mapping[str, Any] | None
+NodePayload = (
+    TextPayload
+    | ImagePayload
+    | TablePayload
+    | ChartPayload
+    | UnknownNativePayload
+    | Mapping[str, Any]
+    | None
+)
 
 
 @dataclass(frozen=True)

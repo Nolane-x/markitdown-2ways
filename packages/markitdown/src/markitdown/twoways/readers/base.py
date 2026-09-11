@@ -15,11 +15,13 @@ class DocumentIRReader(Protocol):
         file_stream: BinaryIO,
         stream_info: "StreamInfo",
         **kwargs: Any,
-    ) -> bool: ...
+    ) -> bool:
+        ...
 
     def read(
         self,
         file_stream: BinaryIO,
         stream_info: "StreamInfo",
         **kwargs: Any,
-    ) -> DocumentIR: ...
+    ) -> DocumentIR:
+        ...

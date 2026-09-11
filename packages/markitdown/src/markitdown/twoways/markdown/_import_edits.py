@@ -25,11 +25,18 @@ def generate_identity_edits(
     parsed_blocks = envelope.parsed_blocks
 
     for offset, (line_index, marker) in enumerate(parsed_blocks):
-        next_index = parsed_blocks[offset + 1][0] if offset + 1 < len(parsed_blocks) else len(envelope.lines)
-        block_text = "\n".join(envelope.lines[line_index + 1:next_index])
+        next_index = (
+            parsed_blocks[offset + 1][0]
+            if offset + 1 < len(parsed_blocks)
+            else len(envelope.lines)
+        )
+        block_text = "\n".join(envelope.lines[line_index + 1 : next_index])
         block = envelope.block_by_pid[marker.attributes["pid"]]
         original_node = original_document.nodes.get(block.node_id)
-        if original_node is None or source_semantic_digest(original_node) != block.source_semantic_digest:
+        if (
+            original_node is None
+            or source_semantic_digest(original_node) != block.source_semantic_digest
+        ):
             raise_identity(
                 "markdown.marker.metadata_mismatch",
                 "Original node semantic identity no longer matches the projection manifest.",
@@ -59,7 +66,9 @@ def generate_identity_edits(
                 )
             edits.append(
                 EditOperation(
-                    operation_id=operation_id(block.projection_id, "replace_text", new_text),
+                    operation_id=operation_id(
+                        block.projection_id, "replace_text", new_text
+                    ),
                     type="replace_text",
                     target_node_id=block.node_id,
                     precondition=EditPrecondition(
@@ -85,7 +94,9 @@ def generate_identity_edits(
                 )
             edits.append(
                 EditOperation(
-                    operation_id=operation_id(block.projection_id, "set_alt_text", new_alt),
+                    operation_id=operation_id(
+                        block.projection_id, "set_alt_text", new_alt
+                    ),
                     type="set_alt_text",
                     target_node_id=block.node_id,
                     precondition=EditPrecondition(

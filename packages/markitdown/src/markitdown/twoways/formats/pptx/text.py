@@ -195,7 +195,9 @@ def patch_text_shape(shape_element: Any, *, old_text: str, new_text: str) -> Non
                     "actual": actual_old,
                 },
             )
-        planned.append((text_nodes, _allocate_new_text(run_texts, new_paragraphs[paragraph_index])))
+        planned.append(
+            (text_nodes, _allocate_new_text(run_texts, new_paragraphs[paragraph_index]))
+        )
 
     xml_space = "{http://www.w3.org/XML/1998/namespace}space"
     for text_nodes, allocated in planned:

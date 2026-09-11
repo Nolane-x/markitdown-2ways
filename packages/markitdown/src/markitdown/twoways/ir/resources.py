@@ -42,7 +42,9 @@ class Relationship:
         if not self.kind:
             raise ValueError("kind must be non-empty")
         if (self.target_id is None) == (self.external_target is None):
-            raise ValueError("exactly one of target_id or external_target must be provided")
+            raise ValueError(
+                "exactly one of target_id or external_target must be provided"
+            )
         object.__setattr__(self, "metadata", dict(self.metadata))
 
 

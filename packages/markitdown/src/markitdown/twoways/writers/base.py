@@ -25,7 +25,8 @@ class DocumentWriter(Protocol):
         document: DocumentIR,
         target: TargetInfo,
         **kwargs: Any,
-    ) -> bool: ...
+    ) -> bool:
+        ...
 
     def write(
         self,
@@ -33,4 +34,5 @@ class DocumentWriter(Protocol):
         output: BinaryIO,
         target: TargetInfo,
         **kwargs: Any,
-    ) -> WriterResult: ...
+    ) -> WriterResult:
+        ...

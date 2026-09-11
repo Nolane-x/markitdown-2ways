@@ -81,7 +81,9 @@ def parse_text_block(block_text: str, block: ProjectionBlock) -> str:
     return "\n".join(_strip_inline_markdown(part) for part in paragraphs)
 
 
-def parse_image_block(block_text: str, block: ProjectionBlock, original_node) -> tuple[str, str]:
+def parse_image_block(
+    block_text: str, block: ProjectionBlock, original_node
+) -> tuple[str, str]:
     normalized = normalize_markdown_block(block_text)
     match = _IMAGE_RE.fullmatch(normalized)
     if match is None:
@@ -115,7 +117,9 @@ def operation_id(projection_id: str, edit_type: str, value: str) -> str:
     return "edit_" + sha256(material).hexdigest()[:24]
 
 
-def scan_markers(markdown: str, *, strict: bool) -> tuple[list[str], list[tuple[int, ParsedMarker]]]:
+def scan_markers(
+    markdown: str, *, strict: bool
+) -> tuple[list[str], list[tuple[int, ParsedMarker]]]:
     lines = markdown.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     markers: list[tuple[int, ParsedMarker]] = []
     for index, line in enumerate(lines):

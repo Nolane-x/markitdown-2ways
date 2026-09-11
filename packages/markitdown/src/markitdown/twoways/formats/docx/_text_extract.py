@@ -29,7 +29,9 @@ def _is_w_element(element: Any, name: str) -> bool:
     )
 
 
-def _attribute_value(element: Any, name: str, namespaces: tuple[str, ...]) -> str | None:
+def _attribute_value(
+    element: Any, name: str, namespaces: tuple[str, ...]
+) -> str | None:
     for namespace in namespaces:
         value = element.get(f"{{{namespace}}}{name}")
         if value is not None:
@@ -268,9 +270,7 @@ def extract_paragraph_payload(
         for carrier in carriers
     )
     text = "".join(run.text for run in runs)
-    ppr_nodes = [
-        child for child in paragraph_element if _is_w_element(child, "pPr")
-    ]
+    ppr_nodes = [child for child in paragraph_element if _is_w_element(child, "pPr")]
     alignment = None
     list_level = None
     if ppr_nodes:

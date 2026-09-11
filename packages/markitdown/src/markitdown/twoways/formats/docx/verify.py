@@ -124,10 +124,9 @@ def verify_docx_output(
         if node_id in edited_ids:
             continue
         output_node = output_document.nodes.get(node_id)
-        if (
-            output_node is None
-            or node_semantic_digest(output_node) != node_semantic_digest(node)
-        ):
+        if output_node is None or node_semantic_digest(
+            output_node
+        ) != node_semantic_digest(node):
             changed_unrelated.append(node_id)
     if changed_unrelated:
         _fail(

@@ -25,7 +25,6 @@ def _fail(check: str, message: str, *, expected=None, actual=None) -> None:
     )
 
 
-
 def _edited_nodes_and_ancestors(
     document: DocumentIR,
     edited_ids: set[str],
@@ -101,6 +100,7 @@ def _verify_unrelated_native_subtrees(
             actual=sorted(changed),
         )
 
+
 def verify_pptx_output(
     original_document: DocumentIR,
     source_bytes: bytes,
@@ -148,7 +148,10 @@ def verify_pptx_output(
     edited_ids = {edit.target_node_id for edit in edit_list if edit.target_node_id}
 
     for edit in edit_list:
-        if edit.target_node_id is None or edit.target_node_id not in output_document.nodes:
+        if (
+            edit.target_node_id is None
+            or edit.target_node_id not in output_document.nodes
+        ):
             _fail(
                 "semantic.target_identity",
                 "Edited PPTX node identity did not survive round trip.",
@@ -183,7 +186,9 @@ def verify_pptx_output(
         if node_id in edited_ids:
             continue
         output_node = output_document.nodes.get(node_id)
-        if output_node is None or node_semantic_digest(output_node) != node_semantic_digest(node):
+        if output_node is None or node_semantic_digest(
+            output_node
+        ) != node_semantic_digest(node):
             changed_unrelated.append(node_id)
     if changed_unrelated:
         _fail(

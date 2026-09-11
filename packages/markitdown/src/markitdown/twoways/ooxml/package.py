@@ -43,12 +43,20 @@ def _fail(reason: str, message: str, **details: object) -> None:
 
 def _validate_name(name: str) -> None:
     if not name or "\\" in name or name.startswith("/") or _DRIVE_RE.match(name):
-        _fail("unsafe_member_path", "OOXML package contains an unsafe member path.", member=name)
+        _fail(
+            "unsafe_member_path",
+            "OOXML package contains an unsafe member path.",
+            member=name,
+        )
     parts = name.split("/")
     if any(part in {".", ".."} for part in parts) or any(
         part == "" for part in parts[:-1]
     ):
-        _fail("unsafe_member_path", "OOXML package contains an unsafe member path.", member=name)
+        _fail(
+            "unsafe_member_path",
+            "OOXML package contains an unsafe member path.",
+            member=name,
+        )
 
 
 def read_binary_stream(stream: BinaryIO, *, stream_label: str) -> bytes:
@@ -295,7 +303,10 @@ def write_package(
     limits: OOXMLPackageLimits | None = None,
 ) -> int:
     if sha256(source_bytes).hexdigest() != snapshot.source_sha256:
-        _fail("source_digest_mismatch", "OOXML package snapshot does not match source bytes.")
+        _fail(
+            "source_digest_mismatch",
+            "OOXML package snapshot does not match source bytes.",
+        )
     if not replacements:
         written = output.write(source_bytes)
         return len(source_bytes) if written is None else written

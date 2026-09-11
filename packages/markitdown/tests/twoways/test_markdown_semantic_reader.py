@@ -1,4 +1,9 @@
-from markitdown.twoways import ImagePayload, TablePayload, TextPayload, validate_document
+from markitdown.twoways import (
+    ImagePayload,
+    TablePayload,
+    TextPayload,
+    validate_document,
+)
 from markitdown.twoways.markdown import read_markdown_ir
 
 
@@ -20,13 +25,21 @@ def test_semantic_reader_is_deterministic_with_explicit_document_id():
 
 
 def test_headings_and_rich_text_become_text_nodes_and_runs():
-    doc = read_markdown_ir("# Title\n\n## Section\n\nHello **world** and *friends*.\n", document_id="rich")
+    doc = read_markdown_ir(
+        "# Title\n\n## Section\n\nHello **world** and *friends*.\n", document_id="rich"
+    )
     nodes = list(doc.nodes.values())
     assert nodes[0].semantic_role == "title"
     assert nodes[1].semantic_role == "heading2"
     paragraph = nodes[2].payload.paragraphs[0]
-    assert any(run.text == "world" and run.style and run.style.direct.get("bold") for run in paragraph.runs)
-    assert any(run.text == "friends" and run.style and run.style.direct.get("italic") for run in paragraph.runs)
+    assert any(
+        run.text == "world" and run.style and run.style.direct.get("bold")
+        for run in paragraph.runs
+    )
+    assert any(
+        run.text == "friends" and run.style and run.style.direct.get("italic")
+        for run in paragraph.runs
+    )
 
 
 def test_lists_preserve_list_level_and_ordered_metadata():
@@ -81,4 +94,6 @@ def test_source_filename_is_recorded():
 
 def test_missing_document_id_is_marked_non_reproducible():
     doc = read_markdown_ir("Hello\n")
-    assert any(d.code == "markdown.semantic.non_reproducible_id" for d in doc.diagnostics)
+    assert any(
+        d.code == "markdown.semantic.non_reproducible_id" for d in doc.diagnostics
+    )

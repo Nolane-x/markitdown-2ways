@@ -47,9 +47,7 @@ def render_node(
         return render_chart(node, node.payload, options)
     if node.kind == "unknown_native":
         if options.include_unknown_placeholders:
-            return RenderedNode(
-                f"[Unsupported native content: {node.node_id}]", "", ()
-            )
+            return RenderedNode(f"[Unsupported native content: {node.node_id}]", "", ())
         return None
     if node.kind == "shape":
         if isinstance(node.payload, TextPayload):

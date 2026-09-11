@@ -62,7 +62,11 @@ def validate_identity_input(
                     )
                 )
 
-    headers = [(index, marker) for index, marker in markers if marker.marker_type == "projection"]
+    headers = [
+        (index, marker)
+        for index, marker in markers
+        if marker.marker_type == "projection"
+    ]
     if len(headers) != 1:
         raise_identity(
             "markdown.header.missing" if not headers else "markdown.marker.malformed",
@@ -94,7 +98,9 @@ def validate_identity_input(
         )
 
     block_by_pid = {block.projection_id: block for block in manifest.blocks}
-    parsed_blocks = [(index, marker) for index, marker in markers if marker.marker_type == "block"]
+    parsed_blocks = [
+        (index, marker) for index, marker in markers if marker.marker_type == "block"
+    ]
     seen_pids: set[str] = set()
     seen_nodes: set[str] = set()
     for _, marker in parsed_blocks:
@@ -132,7 +138,11 @@ def validate_identity_input(
                 projection_id=pid,
             )
 
-    missing = [block.projection_id for block in manifest.blocks if block.projection_id not in seen_pids]
+    missing = [
+        block.projection_id
+        for block in manifest.blocks
+        if block.projection_id not in seen_pids
+    ]
     if missing:
         raise_identity(
             "markdown.block.missing",
@@ -141,7 +151,9 @@ def validate_identity_input(
         )
 
     first_block_index = min((index for index, _ in parsed_blocks), default=len(lines))
-    unanchored_before = [line for line in lines[header_index + 1:first_block_index] if line.strip()]
+    unanchored_before = [
+        line for line in lines[header_index + 1 : first_block_index] if line.strip()
+    ]
     unanchored_prefix = [line for line in lines[:header_index] if line.strip()]
     if unanchored_before or unanchored_prefix:
         raise_import(

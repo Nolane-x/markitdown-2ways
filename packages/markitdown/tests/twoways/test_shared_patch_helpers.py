@@ -119,6 +119,7 @@ def test_shared_package_preservation_reports_only_untouched_changes():
     assert result.inventory_matches is True
     assert result.changed_untouched == ("b.xml",)
 
+
 def test_shared_binary_stream_reader_preserves_format_error_contract():
     from markitdown.twoways.ooxml.package import read_binary_stream
 
@@ -131,4 +132,3 @@ def test_shared_binary_stream_reader_preserves_format_error_contract():
 
     with pytest.raises(TypeError, match="DOCX input stream must yield bytes"):
         read_binary_stream(TextStream(), stream_label="DOCX input")
-

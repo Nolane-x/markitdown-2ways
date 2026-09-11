@@ -27,7 +27,10 @@ def make_representative_document(title: str = "Quarterly Revenue") -> DocumentIR
         text="Revenue increased 38%",
         paragraphs=(
             Paragraph(
-                runs=(TextRun("Revenue increased "), TextRun("38%", style=Style(direct={"bold": True}))),
+                runs=(
+                    TextRun("Revenue increased "),
+                    TextRun("38%", style=Style(direct={"bold": True})),
+                ),
             ),
         ),
     )
@@ -48,9 +51,22 @@ def make_representative_document(title: str = "Quarterly Revenue") -> DocumentIR
             canvas_id="slide1",
             order=0,
             style=title_style,
-            geometry=Geometry(x=914400, y=457200, width=4572000, height=685800, unit="emu"),
-            provenance=(Provenance(source_format="pptx", canvas_index=0, part_uri="/ppt/slides/slide1.xml"),),
-            native_locator=NativeLocator(backend="ooxml", part_uri="/ppt/slides/slide1.xml", object_id="17", creation_id="shape-title-1"),
+            geometry=Geometry(
+                x=914400, y=457200, width=4572000, height=685800, unit="emu"
+            ),
+            provenance=(
+                Provenance(
+                    source_format="pptx",
+                    canvas_index=0,
+                    part_uri="/ppt/slides/slide1.xml",
+                ),
+            ),
+            native_locator=NativeLocator(
+                backend="ooxml",
+                part_uri="/ppt/slides/slide1.xml",
+                object_id="17",
+                creation_id="shape-title-1",
+            ),
             payload=text_payload,
         ),
         "image1": Node(
@@ -88,23 +104,55 @@ def make_representative_document(title: str = "Quarterly Revenue") -> DocumentIR
         document_id="doc1",
         metadata=DocumentMetadata(title=title, author="Nolane"),
         canvases=(
-            Canvas(canvas_id="slide1", index=0, kind="slide", width=13.333, height=7.5, unit="in", root_node_ids=("group1",)),
-            Canvas(canvas_id="slide2", index=1, kind="slide", width=13.333, height=7.5, unit="in", root_node_ids=("table1", "unknown1")),
+            Canvas(
+                canvas_id="slide1",
+                index=0,
+                kind="slide",
+                width=13.333,
+                height=7.5,
+                unit="in",
+                root_node_ids=("group1",),
+            ),
+            Canvas(
+                canvas_id="slide2",
+                index=1,
+                kind="slide",
+                width=13.333,
+                height=7.5,
+                unit="in",
+                root_node_ids=("table1", "unknown1"),
+            ),
         ),
         nodes=nodes,
         root_node_ids=("group1", "table1", "unknown1"),
         resources={
-            "img1": Resource(resource_id="img1", sha256="a" * 64, content_type="image/png", filename="chart.png", size_bytes=1234, storage_ref="assets/aa.png")
+            "img1": Resource(
+                resource_id="img1",
+                sha256="a" * 64,
+                content_type="image/png",
+                filename="chart.png",
+                size_bytes=1234,
+                storage_ref="assets/aa.png",
+            )
         },
         native_payloads={
-            "native1": NativePayload(payload_id="native1", backend="ooxml", content_type="application/xml", sha256="b" * 64, storage_ref="native/unknown1.xml", scope="node")
+            "native1": NativePayload(
+                payload_id="native1",
+                backend="ooxml",
+                content_type="application/xml",
+                sha256="b" * 64,
+                storage_ref="native/unknown1.xml",
+                scope="node",
+            )
         },
         edits=(
             EditOperation(
                 operation_id="edit1",
                 type="replace_text",
                 target_node_id="text1",
-                precondition=EditPrecondition(expected_old_value="Revenue increased 38%"),
+                precondition=EditPrecondition(
+                    expected_old_value="Revenue increased 38%"
+                ),
                 payload={"text": "Revenue increased 42%"},
                 source_label="identity-markdown",
             ),

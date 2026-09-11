@@ -16,7 +16,7 @@ def _package(target_mode: str, target: str) -> bytes:
         'relationships">'
         f'<Relationship Id="rId1" Type="hyperlink" Target="{target}" '
         f'TargetMode="{target_mode}"/>'
-        '</Relationships>'
+        "</Relationships>"
     ).encode("utf-8")
     output = BytesIO()
     with ZipFile(output, "w") as archive:

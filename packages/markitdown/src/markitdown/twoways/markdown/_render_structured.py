@@ -34,9 +34,7 @@ def render_table(
         if 0 <= cell.row < payload.rows and 0 <= cell.column < payload.columns:
             grid[cell.row][cell.column] = user_text(cell.text or "", options)
     if not grid:
-        return RenderedNode(
-            "", semantic_text_for_node(node), (), tuple(diagnostics)
-        )
+        return RenderedNode("", semantic_text_for_node(node), (), tuple(diagnostics))
     header = grid[0]
     lines = [
         "| " + " | ".join(header) + " |",
@@ -68,8 +66,6 @@ def render_chart(
         value_text = user_text(str(value), options)
         lines.append(f"- {category_text}: {value_text}")
     markdown = (
-        "\n\n".join([lines[0], "\n".join(lines[1:])])
-        if len(lines) > 1
-        else lines[0]
+        "\n\n".join([lines[0], "\n".join(lines[1:])]) if len(lines) > 1 else lines[0]
     )
     return RenderedNode(markdown, payload.title or "", ())

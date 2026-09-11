@@ -10,9 +10,9 @@ from markitdown.twoways.ooxml import snapshot_package
 _RELATIONSHIPS_WITH_COMMENT = (
     b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/'
     b'relationships">'
-    b'<!-- relationship comment -->'
+    b"<!-- relationship comment -->"
     b'<Relationship Id="rId1" Type="image" Target="media/image1.png"/>'
-    b'</Relationships>'
+    b"</Relationships>"
 )
 
 

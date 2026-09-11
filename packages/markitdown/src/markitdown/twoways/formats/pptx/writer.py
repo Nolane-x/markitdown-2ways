@@ -29,7 +29,9 @@ def _archive_name(part_uri: str) -> str:
     return part_uri.lstrip("/")
 
 
-def _apply_edit(root: Any, document: DocumentIR, edit: EditOperation, *, part_uri: str) -> None:
+def _apply_edit(
+    root: Any, document: DocumentIR, edit: EditOperation, *, part_uri: str
+) -> None:
     if edit.target_node_id is None or edit.target_node_id not in document.nodes:
         raise PatchPreconditionError(
             "PPTX edit target node does not exist in the source IR.",
@@ -39,7 +41,10 @@ def _apply_edit(root: Any, document: DocumentIR, edit: EditOperation, *, part_ur
     if node.native_locator is None:
         raise PatchPreconditionError(
             "PPTX edit target has no native locator.",
-            details={"reason": "missing_native_locator", "target_node_id": node.node_id},
+            details={
+                "reason": "missing_native_locator",
+                "target_node_id": node.node_id,
+            },
         )
     validate_edit_preconditions(document, node, edit)
     shape_element = resolve_shape_element(
@@ -58,7 +63,10 @@ def _apply_edit(root: Any, document: DocumentIR, edit: EditOperation, *, part_ur
         if node.metadata.get("pptx:patch_text_compatible") is not True:
             raise UnsupportedEditError(
                 "PPTX text node is not patch-compatible in Phase C v1.",
-                details={"reason": "unsupported_text_structure", "target_node_id": node.node_id},
+                details={
+                    "reason": "unsupported_text_structure",
+                    "target_node_id": node.node_id,
+                },
             )
         new_text = edit.payload.get("text")
         if not isinstance(new_text, str):
@@ -145,7 +153,10 @@ def patch_pptx(
         if edit.target_node_id is None or edit.target_node_id not in document.nodes:
             raise PatchPreconditionError(
                 "PPTX edit target node does not exist in the source IR.",
-                details={"reason": "missing_target", "target_node_id": edit.target_node_id},
+                details={
+                    "reason": "missing_target",
+                    "target_node_id": edit.target_node_id,
+                },
             )
         node = document.nodes[edit.target_node_id]
         if node.native_locator is None or not node.native_locator.part_uri:

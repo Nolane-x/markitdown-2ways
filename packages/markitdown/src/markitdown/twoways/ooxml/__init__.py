@@ -77,9 +77,7 @@ def _validate_relationship_ids(source_bytes: bytes) -> None:
                     )
                 target = element.get("Target")
                 if target_mode in {None, "Internal"} and (
-                    target.startswith("/")
-                    or "\\" in target
-                    or urlsplit(target).scheme
+                    target.startswith("/") or "\\" in target or urlsplit(target).scheme
                 ):
                     raise OOXMLPackageError(
                         "OOXML internal relationship target must be relative.",

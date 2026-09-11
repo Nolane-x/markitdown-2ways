@@ -15,9 +15,7 @@ def _content_types(*part_names: str) -> bytes:
         f'<Override PartName="{part_name}" ContentType="{_MAIN_CONTENT_TYPE}"/>'
         for part_name in part_names
     )
-    return (
-        f'<Types xmlns="{_CONTENT_TYPES_NS}">{overrides}</Types>'
-    ).encode("utf-8")
+    return (f'<Types xmlns="{_CONTENT_TYPES_NS}">{overrides}</Types>').encode("utf-8")
 
 
 def test_main_part_discovery_rejects_distinct_main_document_parts():

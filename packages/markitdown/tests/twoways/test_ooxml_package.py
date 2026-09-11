@@ -149,7 +149,9 @@ def test_sparse_write_changes_only_replaced_member_content():
         replacements={"ppt/slides/slide1.xml": b"new"},
     )
 
-    with ZipFile(BytesIO(source)) as before, ZipFile(BytesIO(output.getvalue())) as after:
+    with ZipFile(BytesIO(source)) as before, ZipFile(
+        BytesIO(output.getvalue())
+    ) as after:
         assert after.namelist() == before.namelist()
         assert after.read("a.xml") == before.read("a.xml")
         assert after.read("b.xml") == before.read("b.xml")

@@ -35,9 +35,7 @@ def test_docx_parser_rejects_missing_required_attributes(missing_attribute: str)
         "Target": "media/image1.png",
     }
     del attributes[missing_attribute]
-    rendered = " ".join(
-        f'{name}="{value}"' for name, value in attributes.items()
-    )
+    rendered = " ".join(f'{name}="{value}"' for name, value in attributes.items())
     rels = (
         f'<Relationships xmlns="{_RELATIONSHIPS_NS}">'
         f"<Relationship {rendered}/>"

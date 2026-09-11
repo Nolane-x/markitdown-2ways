@@ -22,7 +22,7 @@ def test_duplicate_docx_relationship_ids_fail_closed():
         b'relationships">'
         b'<Relationship Id="rId7" Type="image" Target="media/image1.png"/>'
         b'<Relationship Id="rId7" Type="image" Target="media/image2.png"/>'
-        b'</Relationships>'
+        b"</Relationships>"
     )
 
     with pytest.raises(OOXMLPackageError) as exc:

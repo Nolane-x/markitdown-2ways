@@ -41,7 +41,9 @@ def test_cycle_fails_closed():
     doc = make_representative_document()
     text = dataclasses.replace(doc.nodes["text1"], children=("group1",))
     group = dataclasses.replace(doc.nodes["group1"], parent_id="text1")
-    broken = dataclasses.replace(doc, nodes={**doc.nodes, "text1": text, "group1": group})
+    broken = dataclasses.replace(
+        doc, nodes={**doc.nodes, "text1": text, "group1": group}
+    )
     with pytest.raises(IRValidationError) as raised:
         validate_document(broken)
     assert "node.cycle" in violation_codes(raised.value)
@@ -58,7 +60,9 @@ def test_nonexistent_canvas_reference_fails_closed():
 
 def test_missing_resource_reference_fails_closed():
     doc = make_representative_document()
-    image = dataclasses.replace(doc.nodes["image1"], payload=ImagePayload(resource_id="missing"))
+    image = dataclasses.replace(
+        doc.nodes["image1"], payload=ImagePayload(resource_id="missing")
+    )
     broken = dataclasses.replace(doc, nodes={**doc.nodes, "image1": image})
     with pytest.raises(IRValidationError) as raised:
         validate_document(broken)

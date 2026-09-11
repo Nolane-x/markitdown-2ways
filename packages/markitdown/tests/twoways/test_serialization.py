@@ -59,14 +59,18 @@ def test_nested_unknown_field_is_rejected_in_strict_mode():
 def test_nan_and_infinity_are_rejected_even_inside_custom_metadata():
     doc = make_representative_document()
     for bad in (math.nan, math.inf, -math.inf):
-        broken = dataclasses.replace(doc, metadata=DocumentMetadata(custom={"bad": bad}))
+        broken = dataclasses.replace(
+            doc, metadata=DocumentMetadata(custom={"bad": bad})
+        )
         with pytest.raises(ValueError):
             canonical_json_bytes(broken)
 
 
 def test_binary_values_are_not_silently_stringified():
     doc = make_representative_document()
-    broken = dataclasses.replace(doc, metadata=DocumentMetadata(custom={"blob": b"abc"}))
+    broken = dataclasses.replace(
+        doc, metadata=DocumentMetadata(custom={"blob": b"abc"})
+    )
     with pytest.raises(TypeError, match="bytes"):
         canonical_json_bytes(broken)
 

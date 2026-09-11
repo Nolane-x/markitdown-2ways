@@ -55,7 +55,10 @@ class Provenance:
         if not self.source_format.strip():
             raise ValueError("source_format must be non-empty")
         if self.confidence is not None:
-            if not isfinite(float(self.confidence)) or not 0.0 <= self.confidence <= 1.0:
+            if (
+                not isfinite(float(self.confidence))
+                or not 0.0 <= self.confidence <= 1.0
+            ):
                 raise ValueError("confidence must be between 0 and 1")
         if self.char_span is not None:
             start, end = self.char_span

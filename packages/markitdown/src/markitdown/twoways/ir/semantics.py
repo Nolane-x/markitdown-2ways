@@ -87,6 +87,7 @@ def node_semantic_digest(node: Node) -> str:
 def native_locator_digest(node: Node) -> str | None:
     return None if node.native_locator is None else stable_digest(node.native_locator)
 
+
 def validate_edit_preconditions(
     document: DocumentIR,
     node: Node,
@@ -128,4 +129,3 @@ def validate_edit_preconditions(
             actual = getter(node)
             if actual != expected:
                 fail(reason, actual)
-

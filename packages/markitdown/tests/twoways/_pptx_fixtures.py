@@ -15,7 +15,12 @@ PNG_1X1 = base64.b64decode(
 )
 
 
-def make_pptx_bytes(*, metric: str = "38%", alt_text: str = "Revenue icon", notes_text: str = "Speaker note 38%") -> bytes:
+def make_pptx_bytes(
+    *,
+    metric: str = "38%",
+    alt_text: str = "Revenue icon",
+    notes_text: str = "Speaker note 38%",
+) -> bytes:
     presentation = Presentation()
     slide = presentation.slides.add_slide(presentation.slide_layouts[5])
     slide.shapes.title.text = "Quarterly Revenue"
@@ -84,7 +89,9 @@ def make_grouped_pptx_bytes(*, metric: str = "38%") -> bytes:
 
     label = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(2), Inches(0.6))
     label.text = "Grouped Revenue"
-    metric_box = slide.shapes.add_textbox(Inches(1), Inches(1.8), Inches(2), Inches(0.6))
+    metric_box = slide.shapes.add_textbox(
+        Inches(1), Inches(1.8), Inches(2), Inches(0.6)
+    )
     paragraph = metric_box.text_frame.paragraphs[0]
     paragraph.clear()
     run = paragraph.add_run()

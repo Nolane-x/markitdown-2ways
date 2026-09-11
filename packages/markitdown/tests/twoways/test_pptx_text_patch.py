@@ -38,7 +38,10 @@ def _run_property_bytes(shape):
 
 
 def _run_texts(shape):
-    return [node.text or "" for node in shape.xpath('.//*[local-name()="r"]/*[local-name()="t"]')]
+    return [
+        node.text or ""
+        for node in shape.xpath('.//*[local-name()="r"]/*[local-name()="t"]')
+    ]
 
 
 def test_replace_text_preserves_run_elements_and_run_properties():
@@ -92,7 +95,9 @@ def test_line_break_structure_is_rejected_without_flattening():
     root = _slide_root(make_pptx_bytes())
     shape = _shape(root, "3")
     paragraph = shape.xpath('.//*[local-name()="p"]')[0]
-    paragraph.insert(1, etree.Element("{http://schemas.openxmlformats.org/drawingml/2006/main}br"))
+    paragraph.insert(
+        1, etree.Element("{http://schemas.openxmlformats.org/drawingml/2006/main}br")
+    )
 
     with pytest.raises(UnsupportedEditError) as exc:
         patch_text_shape(shape, old_text="Revenue 38%", new_text="Revenue 42%")

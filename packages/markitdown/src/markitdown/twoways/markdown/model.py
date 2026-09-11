@@ -11,7 +11,9 @@ from ..ir.edits import EditOperation
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
-def _require_digest(value: str | None, field_name: str, *, optional: bool = False) -> None:
+def _require_digest(
+    value: str | None, field_name: str, *, optional: bool = False
+) -> None:
     if value is None and optional:
         return
     if not isinstance(value, str) or _SHA256_RE.fullmatch(value) is None:
@@ -142,8 +144,12 @@ class MarkdownImportResult:
 
 def _json_ready(value):
     from dataclasses import fields, is_dataclass
+
     if is_dataclass(value):
-        return {field.name: _json_ready(getattr(value, field.name)) for field in fields(value)}
+        return {
+            field.name: _json_ready(getattr(value, field.name))
+            for field in fields(value)
+        }
     if isinstance(value, tuple):
         return [_json_ready(item) for item in value]
     if isinstance(value, list):
@@ -157,6 +163,7 @@ def _json_ready(value):
 
 def projection_manifest_bytes(manifest: ProjectionManifest) -> bytes:
     import json
+
     return json.dumps(
         _json_ready(manifest),
         ensure_ascii=False,
@@ -168,4 +175,5 @@ def projection_manifest_bytes(manifest: ProjectionManifest) -> bytes:
 
 def projection_manifest_digest(manifest: ProjectionManifest) -> str:
     from hashlib import sha256
+
     return sha256(projection_manifest_bytes(manifest)).hexdigest()

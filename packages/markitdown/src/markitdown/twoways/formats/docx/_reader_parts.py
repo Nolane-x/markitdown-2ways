@@ -176,7 +176,10 @@ def _build_part(
         if not isinstance(child.tag, str):
             continue
         name = child.tag.rsplit("}", 1)[-1]
-        if name in {"sectPr", "p", "tbl"} and child.tag != f"{{{root_namespace}}}{name}":
+        if (
+            name in {"sectPr", "p", "tbl"}
+            and child.tag != f"{{{root_namespace}}}{name}"
+        ):
             raise ValueError("DOCX WordprocessingML block namespace is invalid")
         if name == "sectPr":
             continue

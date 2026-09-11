@@ -4,16 +4,18 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 
-INITIAL_EDIT_TYPES = frozenset({
-    "replace_text",
-    "set_text_style",
-    "move_resize",
-    "replace_resource",
-    "set_alt_text",
-    "update_table_cells",
-    "add_node",
-    "remove_node",
-})
+INITIAL_EDIT_TYPES = frozenset(
+    {
+        "replace_text",
+        "set_text_style",
+        "move_resize",
+        "replace_resource",
+        "set_alt_text",
+        "update_table_cells",
+        "add_node",
+        "remove_node",
+    }
+)
 
 
 @dataclass(frozen=True)

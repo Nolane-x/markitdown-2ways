@@ -40,7 +40,9 @@ def _geometry(shape: Any) -> Geometry:
     )
 
 
-def _provenance(shape: Any, *, slide_index: int, part_uri: str) -> tuple[Provenance, ...]:
+def _provenance(
+    shape: Any, *, slide_index: int, part_uri: str
+) -> tuple[Provenance, ...]:
     geometry = _geometry(shape)
     return (
         Provenance(
@@ -270,7 +272,9 @@ def build_shape_tree(
             parent_id=parent_id,
         )
         native_payloads = (
-            {} if native_payload is None else {native_payload.payload_id: native_payload}
+            {}
+            if native_payload is None
+            else {native_payload.payload_id: native_payload}
         )
         return node, {node.node_id: node}, resources, native_payloads
 

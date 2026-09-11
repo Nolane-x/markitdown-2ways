@@ -37,7 +37,9 @@ def shape_locator(shape: Any, *, part_uri: str, z_order: int) -> NativeLocator:
     )
 
 
-def slide_locator(slide: Any, *, index: int, relationship_id: str | None) -> NativeLocator:
+def slide_locator(
+    slide: Any, *, index: int, relationship_id: str | None
+) -> NativeLocator:
     return NativeLocator(
         backend="pptx-ooxml",
         part_uri=str(slide.part.partname),
@@ -69,9 +71,7 @@ def stable_run_id(
         object_id=locator.object_id,
         creation_id=locator.creation_id,
         name=locator.name,
-        path=(
-            f"{locator.path or ''}/text/p[{paragraph_index + 1}]/r[{run_index + 1}]"
-        ),
+        path=(f"{locator.path or ''}/text/p[{paragraph_index + 1}]/r[{run_index + 1}]"),
         attributes={
             "paragraph_index": paragraph_index,
             "run_index": run_index,
@@ -89,7 +89,9 @@ def _shape_container_for_cnvpr(cnvpr: Any) -> Any | None:
     return None
 
 
-def _shape_identity_records(slide_root: Any) -> list[tuple[Any, Any, str | None, str | None]]:
+def _shape_identity_records(
+    slide_root: Any,
+) -> list[tuple[Any, Any, str | None, str | None]]:
     records: list[tuple[Any, Any, str | None, str | None]] = []
     for element in slide_root.iter():
         if _local_name(element.tag) != "cNvPr":
@@ -131,9 +133,15 @@ def resolve_shape_element(
         )
 
     records = _shape_identity_records(slide_root)
-    object_matches = [record for record in records if locator.object_id and record[2] == locator.object_id]
+    object_matches = [
+        record
+        for record in records
+        if locator.object_id and record[2] == locator.object_id
+    ]
     creation_matches = [
-        record for record in records if locator.creation_id and record[3] == locator.creation_id
+        record
+        for record in records
+        if locator.creation_id and record[3] == locator.creation_id
     ]
 
     if locator.object_id and locator.creation_id:
@@ -144,7 +152,9 @@ def resolve_shape_element(
                     details={"reason": "identity_mismatch"},
                 )
             return object_matches[0][0]
-        intersection = [record for record in object_matches if record in creation_matches]
+        intersection = [
+            record for record in object_matches if record in creation_matches
+        ]
         if len(intersection) == 1:
             return intersection[0][0]
         reason = "not_found" if not intersection else "ambiguous"

@@ -87,7 +87,9 @@ def test_resolver_requires_creation_and_object_id_to_agree():
 
     root = _slide_root(make_pptx_bytes())
     c_nv_pr = root.xpath('//*[local-name()="cNvPr" and @id="3"]')[0]
-    creation = etree.SubElement(c_nv_pr, "{http://schemas.microsoft.com/office/drawing/2014/main}creationId")
+    creation = etree.SubElement(
+        c_nv_pr, "{http://schemas.microsoft.com/office/drawing/2014/main}creationId"
+    )
     creation.set("id", "{GOOD}")
 
     good = NativeLocator(

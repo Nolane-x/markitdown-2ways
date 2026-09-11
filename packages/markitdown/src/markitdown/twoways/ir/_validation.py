@@ -132,7 +132,10 @@ def validate_document(document: DocumentIR) -> None:
                 path=f"nodes.{key}.canvas_id",
             )
         for index, provenance in enumerate(node.provenance):
-            if provenance.canvas_index is not None and provenance.canvas_index not in canvas_index_set:
+            if (
+                provenance.canvas_index is not None
+                and provenance.canvas_index not in canvas_index_set
+            ):
                 _add(
                     violations,
                     "provenance.missing_canvas",
@@ -277,7 +280,10 @@ def validate_document(document: DocumentIR) -> None:
 
     for node_id in sorted(document.nodes):
         payload = document.nodes[node_id].payload
-        if isinstance(payload, ImagePayload) and payload.resource_id not in resource_ids:
+        if (
+            isinstance(payload, ImagePayload)
+            and payload.resource_id not in resource_ids
+        ):
             _add(
                 violations,
                 "resource.missing",
@@ -304,7 +310,9 @@ def validate_document(document: DocumentIR) -> None:
                             path=f"nodes.{node_id}.payload.cells.{cell_index}.node_ids",
                         )
 
-    known_internal_ids = node_ids | canvas_id_set | resource_ids | payload_ids | {document.document_id}
+    known_internal_ids = (
+        node_ids | canvas_id_set | resource_ids | payload_ids | {document.document_id}
+    )
     relationship_ids = [rel.relationship_id for rel in document.relationships]
     for duplicate in sorted(_duplicates(relationship_ids)):
         _add(
@@ -338,7 +346,11 @@ def validate_document(document: DocumentIR) -> None:
             path="edits",
         )
     for index, edit in enumerate(document.edits):
-        if edit.type != "add_node" and edit.target_node_id is not None and edit.target_node_id not in node_ids:
+        if (
+            edit.type != "add_node"
+            and edit.target_node_id is not None
+            and edit.target_node_id not in node_ids
+        ):
             _add(
                 violations,
                 "edit.missing_target",

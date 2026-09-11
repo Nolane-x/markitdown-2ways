@@ -7,9 +7,7 @@ import pytest
 
 from markitdown.twoways.formats.docx._reader_parts import _build_part
 
-_TRANSITIONAL_W_NS = (
-    "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-)
+_TRANSITIONAL_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _STRICT_W_NS = "http://purl.oclc.org/ooxml/wordprocessingml/main"
 
 
@@ -35,9 +33,9 @@ def test_build_part_rejects_foreign_wordprocessing_root_namespace(
     root_name: str,
 ):
     body = "<x:body/>" if kind == "document" else ""
-    xml = (
-        f'<x:{root_name} xmlns:x="urn:not-word">{body}</x:{root_name}>'
-    ).encode("utf-8")
+    xml = (f'<x:{root_name} xmlns:x="urn:not-word">{body}</x:{root_name}>').encode(
+        "utf-8"
+    )
     source_bytes, members = _source(part_uri, xml)
 
     with pytest.raises(ValueError, match="WordprocessingML root"):
@@ -56,9 +54,7 @@ def test_build_part_rejects_foreign_wordprocessing_root_namespace(
 def test_build_part_accepts_known_wordprocessing_document_namespaces(
     namespace: str,
 ):
-    xml = (
-        f'<w:document xmlns:w="{namespace}"><w:body/></w:document>'
-    ).encode("utf-8")
+    xml = (f'<w:document xmlns:w="{namespace}"><w:body/></w:document>').encode("utf-8")
     source_bytes, members = _source("/word/document.xml", xml)
 
     canvas, nodes, resources, diagnostics = _build_part(

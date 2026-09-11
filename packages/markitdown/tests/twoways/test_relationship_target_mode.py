@@ -15,7 +15,7 @@ _INVALID_TARGET_MODE_RELS = (
     b'relationships">'
     b'<Relationship Id="rId1" Type="image" Target="media/image1.png" '
     b'TargetMode="Bogus"/>'
-    b'</Relationships>'
+    b"</Relationships>"
 )
 
 

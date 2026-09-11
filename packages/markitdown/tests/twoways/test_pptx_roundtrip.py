@@ -90,9 +90,14 @@ def test_end_to_end_text_patch_changes_only_one_slide_xml_member():
     patched = output.getvalue()
 
     presentation = Presentation(BytesIO(patched))
-    textbox = next(shape for shape in presentation.slides[0].shapes if shape.shape_id == 3)
+    textbox = next(
+        shape for shape in presentation.slides[0].shapes if shape.shape_id == 3
+    )
     assert textbox.text == "Revenue 42%"
-    assert [run.text for run in textbox.text_frame.paragraphs[0].runs] == ["Revenue ", "42%"]
+    assert [run.text for run in textbox.text_frame.paragraphs[0].runs] == [
+        "Revenue ",
+        "42%",
+    ]
     assert textbox.text_frame.paragraphs[0].runs[0].font.bold is True
     assert textbox.text_frame.paragraphs[0].runs[1].font.italic is True
 
@@ -117,7 +122,9 @@ def test_end_to_end_alt_text_patch_changes_only_one_slide_xml_member():
     patched = output.getvalue()
 
     presentation = Presentation(BytesIO(patched))
-    picture = next(shape for shape in presentation.slides[0].shapes if shape.shape_id == 4)
+    picture = next(
+        shape for shape in presentation.slides[0].shapes if shape.shape_id == 4
+    )
     assert picture._element._nvXxPr.cNvPr.get("descr") == "Updated icon"
     _assert_only_member_changed(source, patched, "ppt/slides/slide1.xml")
 
@@ -137,7 +144,9 @@ def test_identity_markdown_to_minimal_pptx_patch_vertical_slice():
         document,
         options=MarkdownProjectionOptions(mode=MarkdownProjectionMode.IDENTITY),
     )
-    edited_markdown = projection.markdown.replace("**Revenue ***38%*", "**Revenue ***42%*", 1)
+    edited_markdown = projection.markdown.replace(
+        "**Revenue ***38%*", "**Revenue ***42%*", 1
+    )
     imported = import_identity_markdown(
         edited_markdown,
         original_document=document,
@@ -148,7 +157,9 @@ def test_identity_markdown_to_minimal_pptx_patch_vertical_slice():
     output = BytesIO()
     patch_pptx(document, BytesIO(source), output, edits=imported.edits)
     presentation = Presentation(BytesIO(output.getvalue()))
-    textbox = next(shape for shape in presentation.slides[0].shapes if shape.shape_id == 3)
+    textbox = next(
+        shape for shape in presentation.slides[0].shapes if shape.shape_id == 3
+    )
     assert textbox.text == "Revenue 42%"
     _assert_only_member_changed(source, output.getvalue(), "ppt/slides/slide1.xml")
 
@@ -187,7 +198,9 @@ def test_end_to_end_notes_patch_changes_only_notes_slide_xml_member():
     )
     patched = output.getvalue()
     presentation = Presentation(BytesIO(patched))
-    assert presentation.slides[0].notes_slide.notes_text_frame.text == "Speaker note 42%"
+    assert (
+        presentation.slides[0].notes_slide.notes_text_frame.text == "Speaker note 42%"
+    )
     _assert_only_member_changed(source, patched, "ppt/notesSlides/notesSlide1.xml")
 
 
@@ -222,7 +235,9 @@ def test_end_to_end_group_child_text_patch_preserves_group_and_sibling():
 
     assert reread.nodes[group.node_id].children == group.children
     assert reread.nodes[target.node_id].payload.text == "42%"
-    assert node_semantic_digest(reread.nodes[sibling.node_id]) == node_semantic_digest(sibling)
+    assert node_semantic_digest(reread.nodes[sibling.node_id]) == node_semantic_digest(
+        sibling
+    )
     _assert_only_member_changed(source, patched, "ppt/slides/slide1.xml")
 
 

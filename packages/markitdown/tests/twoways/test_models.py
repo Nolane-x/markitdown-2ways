@@ -35,6 +35,7 @@ def test_native_locator_requires_backend_only():
     assert locator.backend == "ooxml"
     assert locator.creation_id == "abc"
 
+
 from markitdown.twoways import Resource
 from markitdown.twoways.ir.document import DocumentIdFactory
 from ._fixtures import make_representative_document
@@ -48,7 +49,9 @@ def test_representative_document_contains_ordered_canvases_and_unknown_native_no
 
 
 def test_document_id_factory_is_reproducible_for_same_seed():
-    assert DocumentIdFactory("same").new("document") == DocumentIdFactory("same").new("document")
+    assert DocumentIdFactory("same").new("document") == DocumentIdFactory("same").new(
+        "document"
+    )
 
 
 def test_document_id_factory_without_seed_is_explicitly_non_reproducible():

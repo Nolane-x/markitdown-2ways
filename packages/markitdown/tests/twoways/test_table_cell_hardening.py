@@ -78,6 +78,9 @@ def _table_xml(namespace: str, *, cell_prefix: str = "a", paragraph_prefix: str 
 
     xml = f"""
     <a:tbl xmlns:a="{namespace}" xmlns:foreign="urn:foreign">
+      <a:tblGrid>
+        <a:gridCol/>
+      </a:tblGrid>
       <a:tr>
         <{cell_prefix}:tc>
           <a:txBody>

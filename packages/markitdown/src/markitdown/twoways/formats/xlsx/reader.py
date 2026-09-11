@@ -153,8 +153,12 @@ def read_xlsx_ir(
             )
         )
 
-    filename = getattr(stream_info, "filename", None) if stream_info is not None else None
-    mimetype = getattr(stream_info, "mimetype", None) if stream_info is not None else None
+    filename = (
+        getattr(stream_info, "filename", None) if stream_info is not None else None
+    )
+    mimetype = (
+        getattr(stream_info, "mimetype", None) if stream_info is not None else None
+    )
     document = DocumentIR(
         document_id=f"xlsx-document-{source_digest[:24]}",
         source=SourceDescriptor(

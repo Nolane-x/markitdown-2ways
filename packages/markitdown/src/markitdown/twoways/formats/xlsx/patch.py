@@ -124,7 +124,8 @@ def patch_worksheet_cells(
             raise UnsupportedEditError(
                 "XLSX worksheet target cell is read-only.",
                 details={
-                    "reason": cell.capability.reason_code or "unsupported_cell_structure",
+                    "reason": cell.capability.reason_code
+                    or "unsupported_cell_structure",
                     "address": cell.address,
                 },
             )

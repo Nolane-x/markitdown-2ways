@@ -295,7 +295,13 @@ def read_worksheet_grid(
                     state=CapabilityState.READ_ONLY,
                     reason_code="xlsx.cell.merged_range",
                 )
-            elif not supported or type(value) not in {str, int, float, bool, type(None)}:
+            elif not supported or type(value) not in {
+                str,
+                int,
+                float,
+                bool,
+                type(None),
+            }:
                 capability = CapabilityDecision(
                     operation="update_sheet_cells",
                     state=CapabilityState.READ_ONLY,

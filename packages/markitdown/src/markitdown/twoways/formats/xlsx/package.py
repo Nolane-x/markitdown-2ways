@@ -61,7 +61,12 @@ def _relationship_part_name(part_uri: str) -> str:
 
 
 def _resolve_target(part_uri: str, target: str) -> str:
-    if not target or "\\" in target or target.startswith("/") or urlsplit(target).scheme:
+    if (
+        not target
+        or "\\" in target
+        or target.startswith("/")
+        or urlsplit(target).scheme
+    ):
         raise ValueError("internal relationship target must be a safe relative path")
     base_dir = posixpath.dirname(part_uri.lstrip("/"))
     resolved = posixpath.normpath(posixpath.join(base_dir, target))
@@ -70,7 +75,9 @@ def _resolve_target(part_uri: str, target: str) -> str:
     return f"/{resolved}"
 
 
-def _parse_relationships(data: bytes, *, source_part_uri: str) -> tuple[_Relationship, ...]:
+def _parse_relationships(
+    data: bytes, *, source_part_uri: str
+) -> tuple[_Relationship, ...]:
     root = parse_xml_part(data)
     expected_root = f"{{{PACKAGE_REL_NS}}}Relationships"
     expected_child = f"{{{PACKAGE_REL_NS}}}Relationship"
@@ -115,7 +122,11 @@ def _parse_relationships(data: bytes, *, source_part_uri: str) -> tuple[_Relatio
                 "XLSX relationship has an invalid TargetMode.",
                 relationship_id=relationship_id,
             )
-        resolved = None if target_mode == "External" else _resolve_target(source_part_uri, target)
+        resolved = (
+            None
+            if target_mode == "External"
+            else _resolve_target(source_part_uri, target)
+        )
         result.append(
             _Relationship(
                 relationship_id=relationship_id,
@@ -148,7 +159,12 @@ def _content_type_overrides(data: bytes) -> dict[str, str]:
             )
         part_name = element.get("PartName")
         content_type = element.get("ContentType")
-        if not part_name or not content_type or not part_name.startswith("/") or part_name.startswith("//"):
+        if (
+            not part_name
+            or not content_type
+            or not part_name.startswith("/")
+            or part_name.startswith("//")
+        ):
             _fail(
                 "malformed_content_types",
                 "XLSX Content Types contains an invalid Override.",
@@ -258,7 +274,9 @@ def discover_xlsx_parts(source_bytes: bytes) -> XlsxPackageParts:
     )
 
     workbook_root = parse_xml_part(members[workbook_part.lstrip("/")])
-    spreadsheet_namespace = _namespace_authority(workbook_root, expected_local="workbook")
+    spreadsheet_namespace = _namespace_authority(
+        workbook_root, expected_local="workbook"
+    )
     expected_rel_base = _relationship_base(spreadsheet_namespace)
     if workbook_relationship.relationship_type != f"{expected_rel_base}/officeDocument":
         _fail(
@@ -300,7 +318,9 @@ def discover_xlsx_parts(source_bytes: bytes) -> XlsxPackageParts:
     }
 
     worksheet_type = f"{expected_rel_base}/worksheet"
-    relationship_attribute = f"{{{_office_relationship_namespace(spreadsheet_namespace)}}}id"
+    relationship_attribute = (
+        f"{{{_office_relationship_namespace(spreadsheet_namespace)}}}id"
+    )
     worksheets: list[XlsxWorksheetPart] = []
     sheet_names: set[str] = set()
     for element in sheets_elements[0]:

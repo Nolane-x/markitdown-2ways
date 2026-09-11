@@ -17,16 +17,19 @@ from ...ir.sheet_edits import validate_sheet_cell_updates
 from ...ooxml import parse_xml_part, snapshot_package, write_package
 from ...ooxml.package import read_binary_stream, validate_source_authority
 from ...writers.base import DocumentWriter, TargetInfo
-from .cells import read_shared_strings
+from .cells import read_shared_string_table
 from .model import XlsxPatchOptions
 from .package import discover_xlsx_parts
 from .patch import patch_worksheet_cells
 from .verify import verify_xlsx_output
 
 
-def _shared_strings(source_bytes: bytes, part_uri: str | None) -> tuple[str, ...]:
+def _shared_strings(
+    source_bytes: bytes,
+    part_uri: str | None,
+) -> tuple[tuple[str, ...], frozenset[int]]:
     if part_uri is None:
-        return ()
+        return (), frozenset()
     with ZipFile(BytesIO(source_bytes), "r") as archive:
         try:
             data = archive.read(part_uri.lstrip("/"))
@@ -35,7 +38,7 @@ def _shared_strings(source_bytes: bytes, part_uri: str | None) -> tuple[str, ...
                 "XLSX shared strings part is missing from the source package.",
                 details={"reason": "missing_shared_strings_part", "part_uri": part_uri},
             ) from exc
-    return read_shared_strings(parse_xml_part(data))
+    return read_shared_string_table(parse_xml_part(data))
 
 
 def _prepare_updates(
@@ -147,7 +150,10 @@ def patch_xlsx(
 
     prepared, touched_parts = _prepare_updates(document, source_bytes, edit_list)
     parts = discover_xlsx_parts(source_bytes)
-    shared_strings = _shared_strings(source_bytes, parts.shared_strings_part)
+    shared_strings, rich_shared_string_indexes = _shared_strings(
+        source_bytes,
+        parts.shared_strings_part,
+    )
     replacements: dict[str, bytes] = {}
     with ZipFile(BytesIO(source_bytes), "r") as archive:
         for part_uri in sorted(prepared):
@@ -163,6 +169,7 @@ def patch_xlsx(
             replacements[member] = patch_worksheet_cells(
                 original,
                 shared_strings=shared_strings,
+                rich_shared_string_indexes=rich_shared_string_indexes,
                 updates=updates,
             )
 

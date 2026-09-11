@@ -125,6 +125,22 @@ def test_oversized_merged_range_fails_closed_before_large_expansion() -> None:
         )
 
 
+def test_cumulative_merged_cells_fail_closed() -> None:
+    merged_xml = SHEET1.replace(
+        "</worksheet>",
+        '<mergeCells count="2">'
+        '<mergeCell ref="A1:CV500"/>'
+        '<mergeCell ref="A501:CV1001"/>'
+        "</mergeCells></worksheet>",
+    )
+
+    with pytest.raises(ValueError, match="too many merged cells"):
+        read_worksheet_grid(
+            parse_xml_part(merged_xml.encode()),
+            shared_strings=("North",),
+        )
+
+
 def test_overlapping_merged_ranges_fail_closed() -> None:
     merged_xml = SHEET1.replace(
         "</worksheet>",
@@ -139,6 +155,16 @@ def test_overlapping_merged_ranges_fail_closed() -> None:
             parse_xml_part(merged_xml.encode()),
             shared_strings=("North",),
         )
+
+
+def test_conflicting_value_containers_fail_closed() -> None:
+    xml = SHEET1.replace(
+        '<c r="B1"><v>7</v></c>',
+        '<c r="B1"><v>7</v><is><t>shadow</t></is></c>',
+    )
+
+    with pytest.raises(ValueError, match="conflicting value containers"):
+        read_worksheet_grid(parse_xml_part(xml.encode()), shared_strings=("North",))
 
 
 def test_duplicate_cell_reference_fails_closed() -> None:

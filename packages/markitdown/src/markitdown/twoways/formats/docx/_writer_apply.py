@@ -8,10 +8,15 @@ from ..._errors import (
 )
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
-from ...ir.nodes import ImagePayload, TextPayload
+from ...ir.nodes import ImagePayload, TablePayload, TextPayload
 from ...ir.semantics import node_semantic_text
-from .locators import resolve_paragraph_element, resolve_picture_docpr
+from .locators import (
+    resolve_paragraph_element,
+    resolve_picture_docpr,
+    resolve_table_element,
+)
 from .patch import patch_picture_alt_text, validate_edit_preconditions
+from .table import patch_docx_table_cells
 from .text import patch_paragraph_text
 
 
@@ -82,7 +87,29 @@ def _apply_edit(
         patch_picture_alt_text(docpr, new_alt_text=new_alt)
         return
 
+    if edit.type == "update_table_cells":
+        if not isinstance(node.payload, TablePayload):
+            raise UnsupportedEditError(
+                "update_table_cells requires a DOCX table node.",
+                details={"reason": "wrong_node_kind", "target_node_id": node.node_id},
+            )
+        capabilities = node.metadata.get("docx:patch_capabilities", ())
+        if (
+            not isinstance(capabilities, (tuple, list, set, frozenset))
+            or "update_table_cells" not in capabilities
+        ):
+            raise UnsupportedEditError(
+                "DOCX table structure is read-only in Phase E.",
+                details={
+                    "reason": "unsupported_table_structure",
+                    "target_node_id": node.node_id,
+                },
+            )
+        table = resolve_table_element(root, node.native_locator, part_uri=part_uri)
+        patch_docx_table_cells(table, node.payload, edit.payload.get("cells"))
+        return
+
     raise UnsupportedEditError(
-        "Phase D v1 supports only replace_text and set_alt_text.",
+        "DOCX patch writer does not support this edit type.",
         details={"reason": "unsupported_edit_type", "edit_type": edit.type},
     )

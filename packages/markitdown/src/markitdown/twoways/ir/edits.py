@@ -12,6 +12,7 @@ INITIAL_EDIT_TYPES = frozenset(
         "replace_resource",
         "set_alt_text",
         "update_table_cells",
+        "update_sheet_cells",
         "add_node",
         "remove_node",
     }

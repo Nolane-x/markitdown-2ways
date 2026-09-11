@@ -170,3 +170,48 @@ def test_paragraph_resolver_does_not_execute_arbitrary_locator_xpath():
     with pytest.raises(AmbiguousNativeLocatorError) as exc:
         resolve_paragraph_element(root, locator, part_uri="/word/document.xml")
     assert exc.value.details["reason"] == "path_mismatch"
+
+
+def test_picture_locator_rejects_foreign_docpr_namespace():
+    from markitdown.twoways.formats.docx.locators import (
+        picture_locator,
+        resolve_picture_docpr,
+    )
+
+    root = parse_xml_part(
+        b'<w:document xmlns:w="http://schemas.openxmlformats.org/'
+        b'wordprocessingml/2006/main" xmlns:foreign="urn:foreign">'
+        b'<w:body><foreign:docPr id="9" descr="spoof"/></w:body></w:document>'
+    )
+    locator = picture_locator(
+        "/word/document.xml",
+        docpr_id="9",
+        relationship_id=None,
+        path="//*[local-name()='docPr' and @id='9']",
+    )
+    with pytest.raises(AmbiguousNativeLocatorError) as exc:
+        resolve_picture_docpr(root, locator, part_uri="/word/document.xml")
+    assert exc.value.details["reason"] == "not_found"
+
+
+def test_picture_locator_treats_docpr_id_as_data_not_xpath_source():
+    from markitdown.twoways.formats.docx.locators import (
+        picture_locator,
+        resolve_picture_docpr,
+    )
+
+    root = parse_xml_part(
+        b'<w:document xmlns:w="http://schemas.openxmlformats.org/'
+        b'wordprocessingml/2006/main" '
+        b'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/'
+        b'wordprocessingDrawing">'
+        b'<w:body><wp:docPr id="a&amp;quot;b" descr="quoted"/></w:body></w:document>'
+    )
+    locator = picture_locator(
+        "/word/document.xml",
+        docpr_id='a&quot;b',
+        relationship_id=None,
+        path="unused-by-picture-resolver",
+    )
+    resolved = resolve_picture_docpr(root, locator, part_uri="/word/document.xml")
+    assert resolved.get("descr") == "quoted"

@@ -18,6 +18,7 @@ from .locators import (
     stable_docx_node_id,
 )
 from .relationships import DocxRelationship
+from .table import docx_table_patch_compatible
 from .text import extract_paragraph_payload, paragraph_patch_compatible
 
 _DRAWING_NAMESPACES = (
@@ -115,6 +116,7 @@ def build_table_node(
         path=path,
         attributes={"table_index": table_index},
     )
+    compatible = docx_table_patch_compatible(table_element)
     return Node(
         node_id=stable_docx_node_id(locator, "table"),
         kind="table",
@@ -124,7 +126,9 @@ def build_table_node(
         native_locator=locator,
         provenance=_provenance(canvas_index=canvas_index, part_uri=part_uri),
         payload=TablePayload(rows=len(rows), columns=max_columns, cells=tuple(cells)),
-        metadata={"docx:patch_capabilities": ()},
+        metadata={
+            "docx:patch_capabilities": (("update_table_cells",) if compatible else ())
+        },
     )
 
 

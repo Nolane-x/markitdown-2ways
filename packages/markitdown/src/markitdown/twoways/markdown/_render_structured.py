@@ -7,6 +7,46 @@ from ._render_text import user_text
 from .semantics import semantic_text_for_node
 
 
+def _simple_identity_table(payload: TablePayload) -> bool:
+    if payload.rows <= 0 or payload.columns <= 0:
+        return False
+    if len(payload.cells) != payload.rows * payload.columns:
+        return False
+
+    coordinates: set[tuple[int, int]] = set()
+    for cell in payload.cells:
+        coordinate = (cell.row, cell.column)
+        text = cell.text or ""
+        if (
+            cell.row < 0
+            or cell.row >= payload.rows
+            or cell.column < 0
+            or cell.column >= payload.columns
+            or coordinate in coordinates
+            or cell.row_span != 1
+            or cell.column_span != 1
+            or cell.node_ids
+            or any(character in text for character in "\r\n|")
+            or text != text.strip()
+        ):
+            return False
+        coordinates.add(coordinate)
+    return len(coordinates) == payload.rows * payload.columns
+
+
+def _table_edit_capabilities(node: Node, payload: TablePayload) -> tuple[str, ...]:
+    if not _simple_identity_table(payload):
+        return ()
+    native_capabilities: set[str] = set()
+    for key in ("docx:patch_capabilities", "pptx:patch_capabilities"):
+        value = node.metadata.get(key, ())
+        if isinstance(value, (tuple, list, set, frozenset)):
+            native_capabilities.update(item for item in value if isinstance(item, str))
+    if "update_table_cells" in native_capabilities:
+        return ("update_table_cells",)
+    return ()
+
+
 def render_table(
     node: Node,
     payload: TablePayload,
@@ -43,7 +83,10 @@ def render_table(
     for row in grid[1:]:
         lines.append("| " + " | ".join(row) + " |")
     return RenderedNode(
-        "\n".join(lines), semantic_text_for_node(node), (), tuple(diagnostics)
+        "\n".join(lines),
+        semantic_text_for_node(node),
+        _table_edit_capabilities(node, payload),
+        tuple(diagnostics),
     )
 
 

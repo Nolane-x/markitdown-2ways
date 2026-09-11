@@ -118,6 +118,37 @@ with open("report-edited.docx", "wb") as output_file:
     )
 ```
 
+## Safe table cell round trips
+
+Simple DOCX and PPTX tables can participate in the same identity-Markdown workflow.
+When the reader proves that every cell has an unambiguous native text carrier, the
+table block advertises `update_table_cells`. Editing one or more cells in identity
+Markdown produces one typed operation containing only the changed coordinates:
+
+```python
+{
+    "cells": [
+        {
+            "row": 1,
+            "column": 1,
+            "old_text": "38%",
+            "text": "42%",
+        }
+    ]
+}
+```
+
+The writer validates the table-level source identity, the native locator, every cell
+coordinate, and each `old_text` value before mutating anything. It then changes only
+the existing native text carriers and verifies the complete table after reopening the
+output. Untouched cells, table/row/cell properties, relationships, media, and unrelated
+package members must remain preserved.
+
+This is deliberately not a structural table editor. Merged or spanned cells, nested
+DOCX tables, multi-paragraph cells, ambiguous text carriers, Markdown-ambiguous cell
+text, row/column count changes, insertion/deletion, merge/unmerge, and table-style or
+layout mutations remain read-only or fail closed.
+
 ## Current capability boundary
 
 | Area | PPTX | DOCX |
@@ -125,7 +156,7 @@ with open("report-edited.docx", "wb") as output_file:
 | Read into `DocumentIR` | slides, groups, notes, text, pictures, tables, charts | body, headers, footers, text, hyperlinks, pictures, tables |
 | Text patch | compatible slide/group/notes text | compatible body/header/footer/hyperlink text |
 | Picture alt text | patchable | patchable |
-| Tables | semantic read-only | semantic read-only |
+| Tables | simple cell text patchable; complex tables read-only | simple cell text patchable; complex tables read-only |
 | Charts | semantic read-only | native-preserved / unsupported for mutation |
 | Unsupported complex native edits | fail closed | fail closed |
 
@@ -139,9 +170,11 @@ The round-trip layer is designed around explicit proof rather than best-effort r
 
 - source package SHA-256 is bound to the `DocumentIR`;
 - edits can carry semantic, native-locator, and expected-old-value preconditions;
+- table-cell edits additionally bind each coordinate to its expected old text;
 - native locators are resolved strictly inside the designated OOXML part;
 - no-op patching preserves the original file byte-for-byte;
 - unrelated package members and native subtrees are verified after writes;
+- table verification permits changes only to explicitly authorized cell text carriers;
 - malformed or ambiguous OPC member paths fail closed;
 - duplicate relationship IDs inside one OOXML `.rels` part fail closed;
 - the same relationship ID may still appear independently in different `.rels` parts;

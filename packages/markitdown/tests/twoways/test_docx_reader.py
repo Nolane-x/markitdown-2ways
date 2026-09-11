@@ -73,7 +73,7 @@ def test_reader_preserves_run_styles_hyperlink_context_and_table_semantics():
         "Revenue",
         "38%",
     ]
-    assert table.metadata["docx:patch_capabilities"] == ()
+    assert table.metadata["docx:patch_capabilities"] == ("update_table_cells",)
 
 
 def test_reader_builds_header_footer_canvases_and_picture_resource():

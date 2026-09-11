@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from io import BytesIO
 import posixpath
@@ -55,7 +56,53 @@ def _resolve_node_subtree(root, node, *, part_uri: str):
     return None
 
 
-def _normalized_target_structure(element, *, kind: str, edit_type: str) -> bytes:
+def _table_cell(element, row: int, column: int):
+    rows = [
+        child
+        for child in element
+        if isinstance(getattr(child, "tag", None), str)
+        and child.tag.rsplit("}", 1)[-1] == "tr"
+    ]
+    if row < 0 or row >= len(rows):
+        return None
+    cells = [
+        child
+        for child in rows[row]
+        if isinstance(getattr(child, "tag", None), str)
+        and child.tag.rsplit("}", 1)[-1] == "tc"
+    ]
+    if column < 0 or column >= len(cells):
+        return None
+    return cells[column]
+
+
+def _mask_table_update_values(clone, edit: EditOperation) -> None:
+    updates = edit.payload.get("cells")
+    if not isinstance(updates, (list, tuple)):
+        return
+    for update in updates:
+        if not isinstance(update, Mapping):
+            continue
+        row = update.get("row")
+        column = update.get("column")
+        if type(row) is not int or type(column) is not int:
+            continue
+        cell = _table_cell(clone, row, column)
+        if cell is None:
+            continue
+        for text_node in cell.xpath('.//*[local-name()="t"]'):
+            text_node.text = ""
+            text_node.attrib.pop(_XML_SPACE, None)
+
+
+def _normalized_target_structure(
+    element,
+    *,
+    kind: str,
+    edit_type: str,
+    edit: EditOperation,
+) -> bytes:
+    del kind
     clone = deepcopy(element)
     if edit_type == "replace_text":
         for text_node in clone.xpath('.//*[local-name()="t"]'):
@@ -67,6 +114,8 @@ def _normalized_target_structure(element, *, kind: str, edit_type: str) -> bytes
             docprs = [clone]
         for docpr in docprs:
             docpr.set("descr", "")
+    elif edit_type == "update_table_cells":
+        _mask_table_update_values(clone, edit)
     return _canonical_subtree(clone)
 
 
@@ -123,11 +172,13 @@ def _verify_native_subtrees(
             before_subtree,
             kind=node.kind,
             edit_type=edit.type,
+            edit=edit,
         )
         after_structure = _normalized_target_structure(
             after_subtree,
             kind=node.kind,
             edit_type=edit.type,
+            edit=edit,
         )
         if before_structure != after_structure:
             target_structure_changed.append(node_id)

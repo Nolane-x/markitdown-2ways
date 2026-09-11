@@ -7,7 +7,9 @@ from ..._errors import RoundTripVerificationError
 from ..._results import FidelityEvidence, FidelityReport, FidelityStatus
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
+from ...ir.nodes import TablePayload
 from ...ir.semantics import node_semantic_digest, node_semantic_text
+from ...ir.table_edits import table_semantic_text_after_updates
 from ...ooxml import OOXMLPackageLimits
 from ...ooxml.package import inspect_package_preservation
 from ._verify_native import (
@@ -41,6 +43,22 @@ def _reopen_evidence(output_bytes: bytes) -> FidelityEvidence:
         status=FidelityStatus.PASSED,
         description="Patched DOCX reopens successfully with python-docx.",
     )
+
+
+def _expected_edit_value(original_document: DocumentIR, edit: EditOperation) -> object:
+    if edit.type == "replace_text":
+        return edit.payload.get("text")
+    if edit.type == "set_alt_text":
+        return edit.payload.get("alt_text")
+    if edit.type == "update_table_cells" and edit.target_node_id is not None:
+        source_node = original_document.nodes.get(edit.target_node_id)
+        if source_node is not None and isinstance(source_node.payload, TablePayload):
+            return table_semantic_text_after_updates(
+                source_node.payload,
+                edit.payload.get("cells"),
+                format_label="DOCX",
+            )
+    return None
 
 
 def verify_docx_output(
@@ -92,11 +110,7 @@ def verify_docx_output(
                 actual=None,
             )
         output_node = output_document.nodes[edit.target_node_id]
-        expected_value = (
-            edit.payload.get("text")
-            if edit.type == "replace_text"
-            else edit.payload.get("alt_text")
-        )
+        expected_value = _expected_edit_value(original_document, edit)
         actual_value = node_semantic_text(output_node)
         if actual_value != expected_value:
             _fail(

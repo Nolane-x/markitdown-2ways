@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from copy import deepcopy
 from io import BytesIO
 from typing import Iterable
 from zipfile import ZipFile
@@ -8,10 +10,14 @@ from ..._errors import RoundTripVerificationError
 from ..._results import FidelityEvidence, FidelityReport, FidelityStatus
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
+from ...ir.nodes import TablePayload
 from ...ir.semantics import node_semantic_digest, node_semantic_text
-from .locators import resolve_shape_element
+from ...ir.table_edits import table_semantic_text_after_updates
 from ...ooxml import OOXMLPackageLimits, parse_xml_part
 from ...ooxml.package import inspect_package_preservation
+from .locators import resolve_shape_element
+
+_XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
 
 
 def _fail(check: str, message: str, *, expected=None, actual=None) -> None:
@@ -44,6 +50,113 @@ def _canonical_subtree(element) -> bytes:
     return etree.tostring(element, method="c14n", with_comments=True)
 
 
+def _local_name(element) -> str | None:
+    tag = getattr(element, "tag", None)
+    return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else None
+
+
+def _table_cell(shape_element, row: int, column: int):
+    tables = [item for item in shape_element.iter() if _local_name(item) == "tbl"]
+    if len(tables) != 1:
+        return None
+    rows = [child for child in tables[0] if _local_name(child) == "tr"]
+    if row < 0 or row >= len(rows):
+        return None
+    cells = [child for child in rows[row] if _local_name(child) == "tc"]
+    if column < 0 or column >= len(cells):
+        return None
+    return cells[column]
+
+
+def _normalized_table_target(shape_element, edit: EditOperation) -> bytes:
+    clone = deepcopy(shape_element)
+    updates = edit.payload.get("cells")
+    if isinstance(updates, (list, tuple)):
+        for update in updates:
+            if not isinstance(update, Mapping):
+                continue
+            row = update.get("row")
+            column = update.get("column")
+            if type(row) is not int or type(column) is not int:
+                continue
+            cell = _table_cell(clone, row, column)
+            if cell is None:
+                continue
+            for text_node in cell.xpath('.//*[local-name()="t"]'):
+                text_node.text = ""
+                text_node.attrib.pop(_XML_SPACE, None)
+    return _canonical_subtree(clone)
+
+
+def _roots_for_touched_parts(
+    source_bytes: bytes,
+    output_bytes: bytes,
+    touched_parts: tuple[str, ...],
+) -> dict[str, tuple[object, object]]:
+    roots: dict[str, tuple[object, object]] = {}
+    with ZipFile(BytesIO(source_bytes), "r") as before_zip, ZipFile(
+        BytesIO(output_bytes), "r"
+    ) as after_zip:
+        for archive_name in touched_parts:
+            part_uri = f"/{archive_name.lstrip('/')}"
+            roots[part_uri] = (
+                parse_xml_part(before_zip.read(archive_name)),
+                parse_xml_part(after_zip.read(archive_name)),
+            )
+    return roots
+
+
+def _verify_edited_table_targets(
+    document: DocumentIR,
+    source_bytes: bytes,
+    output_bytes: bytes,
+    *,
+    edits: tuple[EditOperation, ...],
+    touched_parts: tuple[str, ...],
+) -> None:
+    table_edits = [edit for edit in edits if edit.type == "update_table_cells"]
+    if not table_edits:
+        return
+    roots = _roots_for_touched_parts(source_bytes, output_bytes, touched_parts)
+    changed: list[str] = []
+    for edit in table_edits:
+        if edit.target_node_id is None:
+            changed.append("<missing-target>")
+            continue
+        node = document.nodes.get(edit.target_node_id)
+        if node is None or node.native_locator is None:
+            changed.append(edit.target_node_id)
+            continue
+        part_uri = node.native_locator.part_uri
+        if not part_uri or part_uri not in roots:
+            changed.append(edit.target_node_id)
+            continue
+        before_root, after_root = roots[part_uri]
+        before_shape = resolve_shape_element(
+            before_root,
+            node.native_locator,
+            part_uri=part_uri,
+            strict=True,
+        )
+        after_shape = resolve_shape_element(
+            after_root,
+            node.native_locator,
+            part_uri=part_uri,
+            strict=True,
+        )
+        if _normalized_table_target(before_shape, edit) != _normalized_table_target(
+            after_shape, edit
+        ):
+            changed.append(edit.target_node_id)
+    if changed:
+        _fail(
+            "native.target_structure",
+            "PPTX table target structure changed beyond requested cell text values.",
+            expected=[],
+            actual=sorted(changed),
+        )
+
+
 def _verify_unrelated_native_subtrees(
     document: DocumentIR,
     source_bytes: bytes,
@@ -56,16 +169,7 @@ def _verify_unrelated_native_subtrees(
     if not touched_uris:
         return
     excluded = _edited_nodes_and_ancestors(document, edited_ids)
-    with ZipFile(BytesIO(source_bytes), "r") as before_zip, ZipFile(
-        BytesIO(output_bytes), "r"
-    ) as after_zip:
-        roots: dict[str, tuple[object, object]] = {}
-        for part_uri in sorted(touched_uris):
-            archive_name = part_uri.lstrip("/")
-            roots[part_uri] = (
-                parse_xml_part(before_zip.read(archive_name)),
-                parse_xml_part(after_zip.read(archive_name)),
-            )
+    roots = _roots_for_touched_parts(source_bytes, output_bytes, touched_parts)
 
     changed: list[str] = []
     for node_id, node in document.nodes.items():
@@ -99,6 +203,22 @@ def _verify_unrelated_native_subtrees(
             expected=[],
             actual=sorted(changed),
         )
+
+
+def _expected_edit_value(original_document: DocumentIR, edit: EditOperation) -> object:
+    if edit.type == "replace_text":
+        return edit.payload.get("text")
+    if edit.type == "set_alt_text":
+        return edit.payload.get("alt_text")
+    if edit.type == "update_table_cells" and edit.target_node_id is not None:
+        source_node = original_document.nodes.get(edit.target_node_id)
+        if source_node is not None and isinstance(source_node.payload, TablePayload):
+            return table_semantic_text_after_updates(
+                source_node.payload,
+                edit.payload.get("cells"),
+                format_label="PPTX",
+            )
+    return None
 
 
 def verify_pptx_output(
@@ -159,11 +279,7 @@ def verify_pptx_output(
                 actual=None,
             )
         output_node = output_document.nodes[edit.target_node_id]
-        expected_value = (
-            edit.payload.get("text")
-            if edit.type == "replace_text"
-            else edit.payload.get("alt_text")
-        )
+        expected_value = _expected_edit_value(original_document, edit)
         actual_value = node_semantic_text(output_node)
         if actual_value != expected_value:
             _fail(
@@ -173,6 +289,13 @@ def verify_pptx_output(
                 actual=actual_value,
             )
 
+    _verify_edited_table_targets(
+        original_document,
+        source_bytes,
+        output_bytes,
+        edits=edit_list,
+        touched_parts=touched_parts,
+    )
     _verify_unrelated_native_subtrees(
         original_document,
         source_bytes,
@@ -219,6 +342,18 @@ def verify_pptx_output(
             status=FidelityStatus.PASSED,
             description="Requested edits read back with the expected semantic values.",
             affected_node_ids=tuple(sorted(edited_ids)),
+        ),
+        FidelityEvidence(
+            check_code="native.target_structure",
+            status=FidelityStatus.PASSED,
+            description="Edited PPTX tables preserve native structure outside requested cell text values.",
+            affected_node_ids=tuple(
+                sorted(
+                    edit.target_node_id
+                    for edit in edit_list
+                    if edit.type == "update_table_cells" and edit.target_node_id
+                )
+            ),
         ),
         FidelityEvidence(
             check_code="native.unrelated_subtrees",

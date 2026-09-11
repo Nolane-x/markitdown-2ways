@@ -15,6 +15,7 @@ from ...ir.provenance import BoundingBox, Provenance
 from ...ir.resources import NativePayload
 from .locators import shape_locator, stable_node_id
 from .resources import extract_picture
+from .table import pptx_table_patch_compatible
 from .text import extract_text_payload, text_patch_compatible
 
 
@@ -113,7 +114,9 @@ def build_shape_node(
                 )
         node_id = stable_node_id(locator, "table")
         metadata = dict(common["metadata"])
-        metadata["pptx:patch_capabilities"] = ()
+        metadata["pptx:patch_capabilities"] = (
+            ("update_table_cells",) if pptx_table_patch_compatible(table) else ()
+        )
         return (
             Node(
                 node_id=node_id,

@@ -120,7 +120,7 @@ def test_reader_extracts_speaker_notes_as_patchable_note_nodes():
     assert note.metadata["pptx:patch_text_compatible"] is True
 
 
-def test_reader_extracts_tables_and_charts_as_read_only_semantic_nodes():
+def test_reader_extracts_patchable_simple_tables_and_read_only_charts():
     from markitdown.twoways import ChartPayload, TablePayload
     from markitdown.twoways.formats.pptx import read_pptx_ir
 
@@ -145,7 +145,7 @@ def test_reader_extracts_tables_and_charts_as_read_only_semantic_nodes():
         "APAC",
         "42",
     ]
-    assert table.metadata["pptx:patch_capabilities"] == ()
+    assert table.metadata["pptx:patch_capabilities"] == ("update_table_cells",)
 
     assert chart.kind == "chart"
     assert chart.payload.categories == ("Q1", "Q2")

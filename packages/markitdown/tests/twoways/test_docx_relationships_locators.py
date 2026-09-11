@@ -205,11 +205,11 @@ def test_picture_locator_treats_docpr_id_as_data_not_xpath_source():
         b'wordprocessingml/2006/main" '
         b'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/'
         b'wordprocessingDrawing">'
-        b'<w:body><wp:docPr id="a&amp;quot;b" descr="quoted"/></w:body></w:document>'
+        b'<w:body><wp:docPr id="a&quot;b" descr="quoted"/></w:body></w:document>'
     )
     locator = picture_locator(
         "/word/document.xml",
-        docpr_id='a&quot;b',
+        docpr_id='a"b',
         relationship_id=None,
         path="unused-by-picture-resolver",
     )

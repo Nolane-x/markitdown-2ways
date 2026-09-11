@@ -34,14 +34,32 @@ def _direct_cell_elements(root: Any, namespace: str) -> dict[str, Any]:
     return result
 
 
-def _remove_value_children(cell: Any, namespace: str) -> None:
+def _remove_value_children(cell: Any, namespace: str) -> int:
     removable = {f"{{{namespace}}}v", f"{{{namespace}}}is"}
-    for child in tuple(cell):
+    ext_list_tag = f"{{{namespace}}}extLst"
+    insertion_index: int | None = None
+    children = tuple(cell)
+    for index, child in enumerate(children):
+        if child.tag in removable:
+            if insertion_index is None:
+                insertion_index = index
+        elif insertion_index is None and child.tag == ext_list_tag:
+            insertion_index = index
+    for child in children:
         if child.tag in removable:
             cell.remove(child)
+    if insertion_index is None:
+        return len(cell)
+    return min(insertion_index, len(cell))
 
 
-def _append_value(cell: Any, namespace: str, value: object) -> None:
+def _append_value(
+    cell: Any,
+    namespace: str,
+    value: object,
+    *,
+    insertion_index: int,
+) -> None:
     if value is None:
         cell.attrib.pop("t", None)
         return
@@ -53,7 +71,7 @@ def _append_value(cell: Any, namespace: str, value: object) -> None:
         if value != value.strip():
             text.set(f"{{{_XML_NS}}}space", "preserve")
         inline.append(text)
-        cell.append(inline)
+        cell.insert(insertion_index, inline)
         return
     value_element = cell.makeelement(f"{{{namespace}}}v")
     if type(value) is bool:
@@ -70,7 +88,7 @@ def _append_value(cell: Any, namespace: str, value: object) -> None:
             "XLSX patch value type is not supported.",
             details={"reason": "invalid_cell_value"},
         )
-    cell.append(value_element)
+    cell.insert(insertion_index, value_element)
 
 
 def patch_worksheet_cells(
@@ -164,6 +182,11 @@ def patch_worksheet_cells(
         prepared.append((element, new_value))
 
     for element, new_value in prepared:
-        _remove_value_children(element, namespace)
-        _append_value(element, namespace, new_value)
+        insertion_index = _remove_value_children(element, namespace)
+        _append_value(
+            element,
+            namespace,
+            new_value,
+            insertion_index=insertion_index,
+        )
     return serialize_xml_part(root)

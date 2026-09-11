@@ -127,9 +127,7 @@ def build_table_node(
         provenance=_provenance(canvas_index=canvas_index, part_uri=part_uri),
         payload=TablePayload(rows=len(rows), columns=max_columns, cells=tuple(cells)),
         metadata={
-            "docx:patch_capabilities": (
-                ("update_table_cells",) if compatible else ()
-            )
+            "docx:patch_capabilities": (("update_table_cells",) if compatible else ())
         },
     )
 

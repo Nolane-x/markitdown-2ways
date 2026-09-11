@@ -40,9 +40,7 @@ def _table_edit_capabilities(node: Node, payload: TablePayload) -> tuple[str, ..
     for key in ("docx:patch_capabilities", "pptx:patch_capabilities"):
         value = node.metadata.get(key, ())
         if isinstance(value, (tuple, list, set, frozenset)):
-            native_capabilities.update(
-                item for item in value if isinstance(item, str)
-            )
+            native_capabilities.update(item for item in value if isinstance(item, str))
     if "update_table_cells" in native_capabilities:
         return ("update_table_cells",)
     return ()

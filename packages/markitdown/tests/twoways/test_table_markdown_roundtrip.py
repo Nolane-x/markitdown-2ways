@@ -52,7 +52,9 @@ def _identity_projection(document):
 
 def test_capable_table_projection_advertises_cell_updates():
     projection = _identity_projection(_capable_table_document())
-    block = next(item for item in projection.manifest.blocks if item.node_id == "table1")
+    block = next(
+        item for item in projection.manifest.blocks if item.node_id == "table1"
+    )
 
     assert block.editable_capabilities == ("update_table_cells",)
     assert "| Region | Revenue |" in projection.markdown
@@ -75,9 +77,7 @@ def test_single_cell_change_generates_update_table_cells_with_stale_write_eviden
     assert edit.type == "update_table_cells"
     assert edit.target_node_id == "table1"
     assert edit.payload == {
-        "cells": [
-            {"row": 1, "column": 1, "old_text": "38%", "text": "42%"}
-        ]
+        "cells": [{"row": 1, "column": 1, "old_text": "38%", "text": "42%"}]
     }
     assert edit.precondition is not None
     assert edit.precondition.expected_old_value == "Region\tRevenue\nAPAC\t38%"
@@ -89,9 +89,7 @@ def test_single_cell_change_generates_update_table_cells_with_stale_write_eviden
 def test_multi_cell_change_is_sorted_and_operation_id_is_deterministic():
     document = _capable_table_document()
     projection = _identity_projection(document)
-    edited = projection.markdown.replace("Region", "Market", 1).replace(
-        "38%", "42%", 1
-    )
+    edited = projection.markdown.replace("Region", "Market", 1).replace("38%", "42%", 1)
 
     first = import_identity_markdown(
         edited,
@@ -144,6 +142,8 @@ def test_pipe_or_multiline_cell_never_becomes_identity_editable():
     )
     document = replace(document, nodes={**document.nodes, "table1": unsafe})
     projection = _identity_projection(document)
-    block = next(item for item in projection.manifest.blocks if item.node_id == "table1")
+    block = next(
+        item for item in projection.manifest.blocks if item.node_id == "table1"
+    )
 
     assert block.editable_capabilities == ()

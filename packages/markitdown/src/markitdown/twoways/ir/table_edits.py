@@ -7,7 +7,9 @@ from .._errors import PatchPreconditionError, UnsupportedEditError
 from .nodes import TablePayload
 
 
-def _source_cells(payload: TablePayload, *, format_label: str) -> dict[tuple[int, int], str]:
+def _source_cells(
+    payload: TablePayload, *, format_label: str
+) -> dict[tuple[int, int], str]:
     if payload.rows <= 0 or payload.columns <= 0:
         raise UnsupportedEditError(
             f"{format_label} table cell patching requires a non-empty table.",

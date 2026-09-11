@@ -144,9 +144,9 @@ def _verify_edited_table_targets(
             part_uri=part_uri,
             strict=True,
         )
-        if _normalized_table_target(
-            before_shape, edit
-        ) != _normalized_table_target(after_shape, edit):
+        if _normalized_table_target(before_shape, edit) != _normalized_table_target(
+            after_shape, edit
+        ):
             changed.append(edit.target_node_id)
     if changed:
         _fail(

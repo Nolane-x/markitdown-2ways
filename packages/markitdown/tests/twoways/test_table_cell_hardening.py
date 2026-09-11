@@ -19,6 +19,10 @@ from ._pptx_fixtures import make_pptx_bytes
 
 _TRANSITIONAL_DRAWINGML = "http://schemas.openxmlformats.org/drawingml/2006/main"
 _STRICT_DRAWINGML = "http://purl.oclc.org/ooxml/drawingml/main"
+_TRANSITIONAL_WORDPROCESSINGML = (
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+)
+_STRICT_WORDPROCESSINGML = "http://purl.oclc.org/ooxml/wordprocessingml/main"
 
 
 def _payload() -> TablePayload:
@@ -95,6 +99,23 @@ def _table_xml(namespace: str, *, cell_prefix: str = "a", paragraph_prefix: str 
     return etree.fromstring(xml.encode("utf-8"))
 
 
+def _docx_table_xml(table_namespace: str, row_namespace: str):
+    from lxml import etree
+
+    xml = f"""
+    <w:tbl xmlns:w="{table_namespace}" xmlns:r="{row_namespace}">
+      <r:tr>
+        <w:tc>
+          <w:p>
+            <w:r><w:t>X</w:t></w:r>
+          </w:p>
+        </w:tc>
+      </r:tr>
+    </w:tbl>
+    """
+    return etree.fromstring(xml.encode("utf-8"))
+
+
 @pytest.mark.parametrize(
     "cells",
     [
@@ -136,6 +157,17 @@ def test_docx_merged_cell_is_read_only():
     assert table.metadata["docx:patch_capabilities"] == ()
 
 
+def test_docx_native_table_grid_rejects_mixed_supported_namespaces():
+    from markitdown.twoways.formats.docx.table import _table_grid
+
+    root = _docx_table_xml(
+        _TRANSITIONAL_WORDPROCESSINGML,
+        _STRICT_WORDPROCESSINGML,
+    )
+
+    assert _table_grid(root) is None
+
+
 def test_pptx_multi_paragraph_cell_is_read_only():
     from markitdown.twoways.formats.pptx import read_pptx_ir
 
@@ -161,6 +193,16 @@ def test_pptx_native_table_grid_accepts_supported_drawingml_namespaces(namespace
     from markitdown.twoways.formats.pptx.table import _native_grid
 
     assert _native_grid(_table_xml(namespace)) is not None
+
+
+def test_pptx_native_table_grid_rejects_mixed_supported_namespaces():
+    from markitdown.twoways.formats.pptx.table import _native_grid
+
+    root = _table_xml(_TRANSITIONAL_DRAWINGML)
+    row = next(child for child in root if child.tag.endswith("}tr"))
+    row.tag = f"{{{_STRICT_DRAWINGML}}}tr"
+
+    assert _native_grid(root) is None
 
 
 @pytest.mark.parametrize(

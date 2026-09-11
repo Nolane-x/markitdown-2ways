@@ -33,6 +33,13 @@ def test_public_namespace_exports_stable_core_contracts_without_registry_interna
         "canonical_json_bytes",
         "canonical_json_digest",
         "decode_document",
+        "CapabilityState",
+        "CapabilityDecision",
+        "NodeCapabilityProfile",
+        "CapabilityReasonSummary",
+        "CapabilityReport",
+        "capabilities_for_node",
+        "build_capability_report",
     }
     for name in public:
         assert hasattr(tw, name), name

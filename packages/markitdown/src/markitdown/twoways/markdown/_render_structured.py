@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ..capabilities import CapabilityState, capabilities_for_node
 from ..ir.nodes import ChartPayload, Node, TablePayload
 from .model import MarkdownProjectionOptions, ProjectionDiagnostic
 from ._render_model import RenderedNode
@@ -34,6 +35,31 @@ def _simple_identity_table(payload: TablePayload) -> bool:
     return len(coordinates) == payload.rows * payload.columns
 
 
+def _xlsx_identity_table(node: Node, payload: TablePayload) -> bool:
+    if node.native_locator is None or node.native_locator.backend != "xlsx":
+        return False
+    try:
+        decision = capabilities_for_node(node).for_operation("update_sheet_cells")
+    except ValueError:
+        return False
+    if decision.state is not CapabilityState.WRITABLE:
+        return False
+
+    for cell in payload.cells:
+        metadata = cell.metadata
+        typed_value = metadata.get("xlsx.typed_value")
+        if (
+            metadata.get("xlsx.present") is not True
+            or metadata.get("xlsx.writable") is not True
+            or type(typed_value) is not str
+            or typed_value != (cell.text or "")
+            or metadata.get("xlsx.formula") is not None
+            or metadata.get("xlsx.merged") is not False
+        ):
+            return False
+    return True
+
+
 def _table_edit_capabilities(node: Node, payload: TablePayload) -> tuple[str, ...]:
     if not _simple_identity_table(payload):
         return ()
@@ -44,6 +70,8 @@ def _table_edit_capabilities(node: Node, payload: TablePayload) -> tuple[str, ..
             native_capabilities.update(item for item in value if isinstance(item, str))
     if "update_table_cells" in native_capabilities:
         return ("update_table_cells",)
+    if _xlsx_identity_table(node, payload):
+        return ("update_sheet_cells",)
     return ()
 
 

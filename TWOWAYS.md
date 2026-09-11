@@ -8,9 +8,10 @@ high-value Office formats:
 native document -> DocumentIR -> Markdown / typed edits -> native document
 ```
 
-The current production scope is intentionally small: Core IR, Markdown round trip,
-PPTX, and DOCX. This is not intended to become an Office automation platform,
-workflow engine, document-management service, or general application framework.
+The current production scope is intentionally small: Core IR, capability reporting,
+Markdown round trip, PPTX, DOCX, and a conservative first XLSX tranche. This is not
+intended to become an Office automation platform, workflow engine, document-management
+service, or general application framework.
 
 ## Install this fork
 
@@ -20,7 +21,7 @@ than assuming the upstream PyPI package contains these APIs:
 ```bash
 git clone https://github.com/Nolane-x/markitdown-2ways.git
 cd markitdown-2ways
-pip install -e 'packages/markitdown[pptx,docx]'
+pip install -e 'packages/markitdown[pptx,docx,xlsx]'
 ```
 
 The original one-way API remains available:
@@ -31,6 +32,31 @@ from markitdown import MarkItDown
 result = MarkItDown().convert("report.pdf")
 print(result.markdown)
 ```
+
+## Capability inspection
+
+2Ways exposes deterministic capability decisions instead of treating successful
+parsing as proof that a native edit is safe. Callers can inspect one node or summarize
+a complete document:
+
+```python
+from markitdown.twoways import build_capability_report, capabilities_for_node
+from markitdown.twoways.formats.xlsx import read_xlsx_ir
+
+with open("workbook.xlsx", "rb") as source_file:
+    document = read_xlsx_ir(source_file)
+
+report = build_capability_report(document)
+print(report.writable_by_operation)
+print(report.reason_counts)
+
+node = document.nodes[document.canvases[0].root_node_ids[0]]
+decision = capabilities_for_node(node).for_operation("update_sheet_cells")
+print(decision.state, decision.reason_code, decision.constraints)
+```
+
+Unknown or unadvertised operations default to read-only. Reason codes are stable,
+machine-readable diagnostics rather than arbitrary exception text.
 
 ## PPTX round trip
 
@@ -118,6 +144,56 @@ with open("report-edited.docx", "wb") as output_file:
     )
 ```
 
+## XLSX tranche-one round trip
+
+The first XLSX tranche reads worksheets and typed scalar cells into `DocumentIR` and
+supports `update_sheet_cells` only where the reader and writer can prove a conservative
+native patch. Typed edits bind a coordinate to its expected old value:
+
+```python
+from io import BytesIO
+
+from markitdown.twoways import EditOperation
+from markitdown.twoways.formats.xlsx import patch_xlsx, read_xlsx_ir
+
+with open("workbook.xlsx", "rb") as source_file:
+    source = source_file.read()
+
+document = read_xlsx_ir(BytesIO(source))
+sheet_id = document.canvases[0].root_node_ids[0]
+edit = EditOperation(
+    operation_id="update-q3",
+    type="update_sheet_cells",
+    target_node_id=sheet_id,
+    payload={
+        "cells": [
+            {"row": 1, "column": 2, "old_value": 38, "value": 42},
+        ]
+    },
+)
+
+with open("workbook-edited.xlsx", "wb") as output_file:
+    patch_xlsx(
+        document,
+        BytesIO(source),
+        output_file,
+        edits=(edit,),
+    )
+```
+
+Simple, lossless text-cell regions can also participate in identity Markdown and are
+re-imported as typed `update_sheet_cells` operations. Formula cells, merged cells,
+rich inline/shared strings, unsupported cell types, and ambiguous or lossy Markdown
+regions stay read-only. Row/column/sheet structural edits, formula editing,
+merge/unmerge, chart or drawing mutation, and style mutation are outside tranche one.
+Those native structures are preserved rather than rebuilt by the XLSX writer.
+
+The writer starts from the original XLSX package, patches only authorized worksheet
+parts, re-reads output semantics, and verifies preservation. No-op writes must remain
+byte-identical. The regression corpus additionally opens patched output with
+`openpyxl` as an independent validation oracle; `openpyxl` is not the production
+writer.
+
 ## Safe table cell round trips
 
 Simple DOCX and PPTX tables can participate in the same identity-Markdown workflow.
@@ -151,18 +227,19 @@ layout mutations remain read-only or fail closed.
 
 ## Current capability boundary
 
-| Area | PPTX | DOCX |
-| --- | --- | --- |
-| Read into `DocumentIR` | slides, groups, notes, text, pictures, tables, charts | body, headers, footers, text, hyperlinks, pictures, tables |
-| Text patch | compatible slide/group/notes text | compatible body/header/footer/hyperlink text |
-| Picture alt text | patchable | patchable |
-| Tables | simple cell text patchable; complex tables read-only | simple cell text patchable; complex tables read-only |
-| Charts | semantic read-only | native-preserved / unsupported for mutation |
-| Unsupported complex native edits | fail closed | fail closed |
+| Area | PPTX | DOCX | XLSX tranche one |
+| --- | --- | --- | --- |
+| Read into `DocumentIR` | slides, groups, notes, text, pictures, tables, charts | body, headers, footers, text, hyperlinks, pictures, tables | worksheets and typed cells |
+| Scalar/text patch | compatible slide/group/notes text | compatible body/header/footer/hyperlink text | scalar non-formula, non-merged cells |
+| Picture alt text | patchable | patchable | preserved / unsupported for mutation |
+| Tables / grids | simple cell text patchable; complex tables read-only | simple cell text patchable; complex tables read-only | worksheet cell grid; safe cells patchable |
+| Formulas | n/a | n/a | read/preserved; read-only |
+| Charts / drawings | charts semantic read-only; drawings preserved | native-preserved / unsupported for mutation | native-preserved / unsupported for mutation |
+| Structural/style edits | unsupported complex native edits fail closed | unsupported complex native edits fail closed | row/column/sheet/style changes unsupported |
 
 Complex layout/style/numbering/field/tracked-change/media mutations are intentionally
-outside the current write surface. The preservation writer starts from the original
-OOXML package and edits only authorized parts.
+outside the current write surface. Preservation writers start from the original OOXML
+package and edit only authorized parts.
 
 ## Fidelity and safety model
 
@@ -171,10 +248,14 @@ The round-trip layer is designed around explicit proof rather than best-effort r
 - source package SHA-256 is bound to the `DocumentIR`;
 - edits can carry semantic, native-locator, and expected-old-value preconditions;
 - table-cell edits additionally bind each coordinate to its expected old text;
+- XLSX cell edits bind each coordinate to its expected old typed value;
 - native locators are resolved strictly inside the designated OOXML part;
 - no-op patching preserves the original file byte-for-byte;
 - unrelated package members and native subtrees are verified after writes;
 - table verification permits changes only to explicitly authorized cell text carriers;
+- XLSX verification re-reads target semantics and restricts changes to authorized cells;
+- rich XLSX inline/shared strings stay read-only until run-preserving editing exists;
+- oversized or overlapping XLSX merged ranges fail closed before unsafe expansion;
 - malformed or ambiguous OPC member paths fail closed;
 - duplicate relationship IDs inside one OOXML `.rels` part fail closed;
 - the same relationship ID may still appear independently in different `.rels` parts;
@@ -208,3 +289,8 @@ native locator evidence before emitting typed edits.
 New work in this fork should improve fidelity, compatibility, safety, tests, or reduce
 complexity. The project deliberately avoids broad platform features and keeps a soft
 production-size ceiling around roughly twice the upstream MarkItDown implementation.
+
+The broader parity program is documented in
+`docs/superpowers/specs/2026-09-11-markitdown-2ways-full-parity-program-design.md`.
+Each future format or deeper edit surface must independently prove safe writeback;
+parser support alone is never evidence that a mutation is allowed.

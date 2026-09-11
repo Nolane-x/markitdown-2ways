@@ -29,6 +29,27 @@ def _table_cell_map(payload: TablePayload) -> dict[tuple[int, int], str]:
     return cells
 
 
+def _sheet_cell_map(payload: TablePayload) -> dict[tuple[int, int], str]:
+    cells: dict[tuple[int, int], str] = {}
+    for cell in payload.cells:
+        coordinate = (cell.row, cell.column)
+        if coordinate in cells:
+            raise ValueError("worksheet payload contains duplicate coordinates")
+        metadata = cell.metadata
+        typed_value = metadata.get("xlsx.typed_value")
+        if (
+            metadata.get("xlsx.present") is not True
+            or metadata.get("xlsx.writable") is not True
+            or type(typed_value) is not str
+            or typed_value != (cell.text or "")
+            or metadata.get("xlsx.formula") is not None
+            or metadata.get("xlsx.merged") is not False
+        ):
+            raise ValueError("worksheet payload is not lossless identity-editable text")
+        cells[coordinate] = typed_value
+    return cells
+
+
 def generate_identity_edits(
     envelope: IdentityEnvelope,
     *,
@@ -67,6 +88,81 @@ def generate_identity_edits(
                 projection_id=block.projection_id,
                 node_id=block.node_id,
             )
+
+        if "update_sheet_cells" in block.editable_capabilities:
+            payload = original_node.payload
+            if not isinstance(payload, TablePayload):
+                raise_identity(
+                    "markdown.marker.metadata_mismatch",
+                    "Editable worksheet identity no longer points to a table payload.",
+                    projection_id=block.projection_id,
+                    node_id=block.node_id,
+                )
+            parsed_rows = parse_table_block(block_text, block, original_node)
+            try:
+                source_cells = _sheet_cell_map(payload)
+            except ValueError as exc:
+                raise_identity(
+                    "markdown.marker.metadata_mismatch",
+                    "Editable worksheet source grid is no longer lossless text.",
+                    projection_id=block.projection_id,
+                    node_id=block.node_id,
+                )
+                raise AssertionError("unreachable") from exc
+            changed_cells: list[dict[str, object]] = []
+            for row_index, row in enumerate(parsed_rows):
+                for column_index, new_text in enumerate(row):
+                    coordinate = (row_index, column_index)
+                    if coordinate not in source_cells:
+                        raise_identity(
+                            "markdown.marker.metadata_mismatch",
+                            "Editable worksheet source grid is incomplete.",
+                            projection_id=block.projection_id,
+                            node_id=block.node_id,
+                        )
+                    old_value = source_cells[coordinate]
+                    if new_text != old_value:
+                        changed_cells.append(
+                            {
+                                "row": row_index,
+                                "column": column_index,
+                                "old_value": old_value,
+                                "value": new_text,
+                            }
+                        )
+            if not changed_cells:
+                raise_import(
+                    "markdown.edit.unsupported",
+                    "Formatting-only worksheet changes are not silently discarded by identity Markdown v1.",
+                    projection_id=block.projection_id,
+                    node_id=block.node_id,
+                )
+            canonical_changes = json.dumps(
+                changed_cells,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            old_text = semantic_text_for_node(original_node)
+            edits.append(
+                EditOperation(
+                    operation_id=operation_id(
+                        block.projection_id,
+                        "update_sheet_cells",
+                        canonical_changes,
+                    ),
+                    type="update_sheet_cells",
+                    target_node_id=block.node_id,
+                    precondition=EditPrecondition(
+                        expected_semantic_digest=block.source_semantic_digest,
+                        expected_native_locator_digest=block.native_locator_digest,
+                        expected_old_value=old_text,
+                    ),
+                    payload={"cells": changed_cells},
+                    source_label="markdown.identity.v1",
+                )
+            )
+            continue
 
         if "update_table_cells" in block.editable_capabilities:
             payload = original_node.payload

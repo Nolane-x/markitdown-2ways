@@ -102,9 +102,7 @@ def test_xlsx_writer_rejects_rich_shared_string_target() -> None:
         type="update_sheet_cells",
         target_node_id=sheet_id,
         payload={
-            "cells": [
-                {"row": 0, "column": 0, "old_value": "North", "value": "South"}
-            ]
+            "cells": [{"row": 0, "column": 0, "old_value": "North", "value": "South"}]
         },
     )
 

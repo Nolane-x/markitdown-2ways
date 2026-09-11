@@ -80,6 +80,7 @@ features = ["all"]
 features = ["all"]
 extra-dependencies = [
   "openai",
+  "python-docx",
 ]
 
 [tool.hatch.envs.types]

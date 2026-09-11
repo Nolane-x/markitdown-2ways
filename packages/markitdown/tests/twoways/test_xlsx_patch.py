@@ -12,7 +12,9 @@ def _values(xml: bytes) -> dict[str, object]:
     return {cell.address: cell.value for cell in grid.cells}
 
 
-def test_patches_string_as_local_inline_string_without_touching_shared_strings() -> None:
+def test_patches_string_as_local_inline_string_without_touching_shared_strings() -> (
+    None
+):
     output = patch_worksheet_cells(
         SHEET1.encode(),
         shared_strings=("North",),

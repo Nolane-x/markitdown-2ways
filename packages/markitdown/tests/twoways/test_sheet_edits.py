@@ -128,7 +128,14 @@ def test_sheet_updates_require_exact_typed_old_value(
     with pytest.raises(PatchPreconditionError) as exc_info:
         validate_sheet_cell_updates(
             _sheet(),
-            [{"row": row, "column": column, "old_value": old_value, "value": "changed"}],
+            [
+                {
+                    "row": row,
+                    "column": column,
+                    "old_value": old_value,
+                    "value": "changed",
+                }
+            ],
         )
 
     assert exc_info.value.details["reason"] == "cell_old_value_mismatch"
@@ -165,7 +172,9 @@ def test_sheet_updates_reject_unsupported_values(value: object) -> None:
         (1, 1, None),
     ],
 )
-def test_sheet_updates_reject_typed_no_ops(row: int, column: int, value: object) -> None:
+def test_sheet_updates_reject_typed_no_ops(
+    row: int, column: int, value: object
+) -> None:
     with pytest.raises(UnsupportedEditError) as exc_info:
         validate_sheet_cell_updates(
             _sheet(),

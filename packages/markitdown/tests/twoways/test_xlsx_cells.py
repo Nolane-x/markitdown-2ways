@@ -16,14 +16,21 @@ from ._xlsx_fixtures import SHARED_STRINGS, SHEET1
 
 @pytest.mark.parametrize(
     ("address", "indices"),
-    [("A1", (0, 0)), ("Z9", (8, 25)), ("AA10", (9, 26)), ("XFD1048576", (1048575, 16383))],
+    [
+        ("A1", (0, 0)),
+        ("Z9", (8, 25)),
+        ("AA10", (9, 26)),
+        ("XFD1048576", (1048575, 16383)),
+    ],
 )
 def test_a1_round_trip(address: str, indices: tuple[int, int]) -> None:
     assert a1_to_indices(address) == indices
     assert indices_to_a1(*indices) == address
 
 
-@pytest.mark.parametrize("address", ["", "A0", "XFE1", "A1048577", "$A$1", "A1:B2", "1A", "a1"])
+@pytest.mark.parametrize(
+    "address", ["", "A0", "XFE1", "A1048577", "$A$1", "A1:B2", "1A", "a1"]
+)
 def test_a1_rejects_invalid_addresses(address: str) -> None:
     with pytest.raises(ValueError):
         a1_to_indices(address)
@@ -63,12 +70,17 @@ def test_plain_scalar_cells_are_writable() -> None:
         shared_strings=("North",),
     )
     for address in ("A1", "B1", "A2", "B2", "C2"):
-        decision = next(cell for cell in grid.cells if cell.address == address).capability
+        decision = next(
+            cell for cell in grid.cells if cell.address == address
+        ).capability
         assert decision.state is CapabilityState.WRITABLE, address
 
 
 def test_merged_cells_are_read_only() -> None:
-    merged_xml = SHEET1.replace("</worksheet>", '<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells></worksheet>')
+    merged_xml = SHEET1.replace(
+        "</worksheet>",
+        '<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells></worksheet>',
+    )
     grid = read_worksheet_grid(
         parse_xml_part(merged_xml.encode()),
         shared_strings=("North",),
@@ -80,6 +92,8 @@ def test_merged_cells_are_read_only() -> None:
 
 
 def test_duplicate_cell_reference_fails_closed() -> None:
-    xml = SHEET1.replace('<c r="B1"><v>7</v></c>', '<c r="B1"><v>7</v></c><c r="B1"><v>8</v></c>')
+    xml = SHEET1.replace(
+        '<c r="B1"><v>7</v></c>', '<c r="B1"><v>7</v></c><c r="B1"><v>8</v></c>'
+    )
     with pytest.raises(ValueError, match="duplicate"):
         read_worksheet_grid(parse_xml_part(xml.encode()), shared_strings=("North",))

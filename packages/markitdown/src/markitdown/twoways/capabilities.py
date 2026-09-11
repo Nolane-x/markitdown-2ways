@@ -98,7 +98,10 @@ class CapabilityReport:
         )
         if any(value < 0 for value in counts):
             raise ValueError("capability report counts must be non-negative")
-        if self.writable_nodes + self.read_only_nodes + self.derived_nodes != self.total_nodes:
+        if (
+            self.writable_nodes + self.read_only_nodes + self.derived_nodes
+            != self.total_nodes
+        ):
             raise ValueError("capability report node counts must sum to total_nodes")
         object.__setattr__(
             self,

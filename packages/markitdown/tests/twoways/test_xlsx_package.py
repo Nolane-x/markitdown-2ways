@@ -12,8 +12,14 @@ def test_discovers_authoritative_workbook_and_ordered_sheets() -> None:
     parts = discover_xlsx_parts(make_xlsx())
 
     assert parts.workbook_part == "/xl/workbook.xml"
-    assert parts.spreadsheet_namespace == "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-    assert [(sheet.name, sheet.relationship_id, sheet.part_uri) for sheet in parts.worksheets] == [
+    assert (
+        parts.spreadsheet_namespace
+        == "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    )
+    assert [
+        (sheet.name, sheet.relationship_id, sheet.part_uri)
+        for sheet in parts.worksheets
+    ] == [
         ("Data", "rId1", "/xl/worksheets/sheet1.xml"),
         ("Other", "rId2", "/xl/worksheets/sheet2.xml"),
     ]
@@ -36,14 +42,20 @@ def test_rejects_external_worksheet_relationship() -> None:
         'Target="https://example.invalid/sheet1.xml" TargetMode="External"',
     )
     with pytest.raises(OOXMLPackageError) as exc_info:
-        discover_xlsx_parts(make_xlsx(replacements={"xl/_rels/workbook.xml.rels": rels}))
+        discover_xlsx_parts(
+            make_xlsx(replacements={"xl/_rels/workbook.xml.rels": rels})
+        )
     assert exc_info.value.details["reason"] == "external_worksheet_target"
 
 
 def test_rejects_relationship_target_that_escapes_package_root() -> None:
-    rels = WORKBOOK_RELS.replace('Target="worksheets/sheet1.xml"', 'Target="../../../escape.xml"')
+    rels = WORKBOOK_RELS.replace(
+        'Target="worksheets/sheet1.xml"', 'Target="../../../escape.xml"'
+    )
     with pytest.raises((OOXMLPackageError, ValueError)):
-        discover_xlsx_parts(make_xlsx(replacements={"xl/_rels/workbook.xml.rels": rels}))
+        discover_xlsx_parts(
+            make_xlsx(replacements={"xl/_rels/workbook.xml.rels": rels})
+        )
 
 
 def test_rejects_wrong_worksheet_content_type() -> None:
@@ -53,7 +65,9 @@ def test_rejects_wrong_worksheet_content_type() -> None:
         1,
     )
     with pytest.raises(OOXMLPackageError) as exc_info:
-        discover_xlsx_parts(make_xlsx(replacements={"[Content_Types].xml": content_types}))
+        discover_xlsx_parts(
+            make_xlsx(replacements={"[Content_Types].xml": content_types})
+        )
     assert exc_info.value.details["reason"] == "wrong_worksheet_content_type"
 
 

@@ -83,7 +83,9 @@ def make_xlsx(*, replacements: dict[str, str | bytes] | None = None) -> bytes:
     output = BytesIO()
     with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
         for name, data in members.items():
-            archive.writestr(name, data.encode("utf-8") if isinstance(data, str) else data)
+            archive.writestr(
+                name, data.encode("utf-8") if isinstance(data, str) else data
+            )
     return output.getvalue()
 
 

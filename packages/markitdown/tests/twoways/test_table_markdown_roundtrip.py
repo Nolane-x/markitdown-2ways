@@ -89,7 +89,9 @@ def test_single_cell_change_generates_update_table_cells_with_stale_write_eviden
 def test_multi_cell_change_is_sorted_and_operation_id_is_deterministic():
     document = _capable_table_document()
     projection = _identity_projection(document)
-    edited = projection.markdown.replace("Region", "Market", 1).replace("38%", "42%", 1)
+    edited = projection.markdown.replace(
+        "| Region | Revenue |", "| Market | Revenue |", 1
+    ).replace("| APAC | 38% |", "| APAC | 42% |", 1)
 
     first = import_identity_markdown(
         edited,
@@ -102,6 +104,8 @@ def test_multi_cell_change_is_sorted_and_operation_id_is_deterministic():
         manifest=projection.manifest,
     )
 
+    assert len(first.edits) == 1
+    assert first.edits[0].type == "update_table_cells"
     assert first.edits[0].payload["cells"] == [
         {"row": 0, "column": 0, "old_text": "Region", "text": "Market"},
         {"row": 1, "column": 1, "old_text": "38%", "text": "42%"},

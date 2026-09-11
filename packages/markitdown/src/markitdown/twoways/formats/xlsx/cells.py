@@ -178,6 +178,8 @@ def _merged_addresses(root: Any, namespace: str) -> frozenset[str]:
         expanded = _range_addresses(reference)
         if addresses.intersection(expanded):
             raise ValueError("merged ranges overlap")
+        if len(addresses) + len(expanded) > _MAX_MERGED_RANGE_CELLS:
+            raise ValueError("too many merged cells")
         addresses.update(expanded)
     return frozenset(addresses)
 
@@ -192,6 +194,8 @@ def _cell_value(
     value_element = _single_direct_child(cell, namespace, "v")
     inline_element = _single_direct_child(cell, namespace, "is")
     formula_element = _single_direct_child(cell, namespace, "f")
+    if value_element is not None and inline_element is not None:
+        raise ValueError("cell has conflicting value containers")
     formula = None if formula_element is None else (formula_element.text or "")
     raw_value = None if value_element is None else (value_element.text or "")
     supported = True

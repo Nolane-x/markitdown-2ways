@@ -6,9 +6,11 @@ from markitdown.twoways.capabilities import (
     CAPABILITY_METADATA_KEY,
     CapabilityDecision,
     CapabilityState,
+    build_capability_report,
     capabilities_for_node,
     encode_capabilities,
 )
+from markitdown.twoways.ir.document import DocumentIR
 from markitdown.twoways.ir.nodes import Node
 
 
@@ -137,3 +139,112 @@ def test_malformed_capability_metadata_is_rejected(
 
     with pytest.raises(ValueError, match=message):
         capabilities_for_node(node)
+
+
+def test_capability_report_classifies_nodes_and_counts_reasons() -> None:
+    document = DocumentIR(
+        document_id="doc",
+        nodes={
+            "writable": Node(
+                node_id="writable",
+                kind="text",
+                metadata={
+                    CAPABILITY_METADATA_KEY: [
+                        {"operation": "replace_text", "state": "writable"},
+                        {
+                            "operation": "set_text_style",
+                            "state": "read-only",
+                            "reason_code": "text.style.unsupported",
+                        },
+                    ]
+                },
+            ),
+            "read-only": Node(
+                node_id="read-only",
+                kind="table",
+                metadata={
+                    CAPABILITY_METADATA_KEY: [
+                        {
+                            "operation": "update_table_cells",
+                            "state": "read-only",
+                            "reason_code": "docx.table.merged_cells",
+                        }
+                    ]
+                },
+            ),
+            "derived": Node(
+                node_id="derived",
+                kind="text",
+                metadata={
+                    CAPABILITY_METADATA_KEY: [
+                        {
+                            "operation": "replace_text",
+                            "state": "derived",
+                            "reason_code": "image.ocr.derived",
+                        }
+                    ]
+                },
+            ),
+            "unspecified": Node(node_id="unspecified", kind="unknown_native"),
+        },
+    )
+
+    report = build_capability_report(document)
+
+    assert report.total_nodes == 4
+    assert report.writable_nodes == 1
+    assert report.read_only_nodes == 2
+    assert report.derived_nodes == 1
+    assert dict(report.writable_by_operation) == {"replace_text": 1}
+    assert dict(report.reason_counts) == {
+        "capability.unspecified": 1,
+        "docx.table.merged_cells": 1,
+        "image.ocr.derived": 1,
+        "text.style.unsupported": 1,
+    }
+
+
+def test_capability_report_uses_writable_then_derived_precedence() -> None:
+    document = DocumentIR(
+        document_id="doc",
+        nodes={
+            "mixed-writable": Node(
+                node_id="mixed-writable",
+                kind="text",
+                metadata={
+                    CAPABILITY_METADATA_KEY: [
+                        {"operation": "replace_text", "state": "writable"},
+                        {
+                            "operation": "set_text_style",
+                            "state": "derived",
+                            "reason_code": "style.derived",
+                        },
+                    ]
+                },
+            ),
+            "mixed-derived": Node(
+                node_id="mixed-derived",
+                kind="text",
+                metadata={
+                    CAPABILITY_METADATA_KEY: [
+                        {
+                            "operation": "replace_text",
+                            "state": "derived",
+                            "reason_code": "text.derived",
+                        },
+                        {
+                            "operation": "set_text_style",
+                            "state": "read-only",
+                            "reason_code": "style.read_only",
+                        },
+                    ]
+                },
+            ),
+        },
+    )
+
+    report = build_capability_report(document)
+
+    assert report.writable_nodes == 1
+    assert report.derived_nodes == 1
+    assert report.read_only_nodes == 0

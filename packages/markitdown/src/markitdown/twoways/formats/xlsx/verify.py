@@ -17,7 +17,9 @@ from ...ooxml.package import inspect_package_preservation
 from .reader import read_xlsx_ir
 
 
-def _fail(check: str, message: str, *, expected: object = None, actual: object = None) -> None:
+def _fail(
+    check: str, message: str, *, expected: object = None, actual: object = None
+) -> None:
     raise RoundTripVerificationError(
         message,
         details={"check": check, "expected": expected, "actual": actual},
@@ -83,15 +85,15 @@ def _canonical_xml(root: Any) -> bytes:
     return etree.tostring(root, method="c14n", with_comments=True)
 
 
-def _normalized_worksheet(xml_bytes: bytes, updates: tuple[dict[str, object], ...]) -> bytes:
+def _normalized_worksheet(
+    xml_bytes: bytes, updates: tuple[dict[str, object], ...]
+) -> bytes:
     root = deepcopy(parse_xml_part(xml_bytes))
     tag = getattr(root, "tag", None)
     if not isinstance(tag, str) or not tag.startswith("{") or "}" not in tag:
         _fail("native.worksheet_structure", "XLSX worksheet namespace is invalid.")
     namespace = tag[1:].split("}", 1)[0]
-    requested = {
-        (int(update["row"]), int(update["column"])) for update in updates
-    }
+    requested = {(int(update["row"]), int(update["column"])) for update in updates}
     for cell in root.iter(f"{{{namespace}}}c"):
         address = cell.get("r")
         if not address:
@@ -119,7 +121,11 @@ def _verify_touched_native_structure(
     ) as after:
         for sheet_index, updates in grouped.items():
             node = _sheet_node_by_index(document, sheet_index)
-            if node is None or node.native_locator is None or not node.native_locator.part_uri:
+            if (
+                node is None
+                or node.native_locator is None
+                or not node.native_locator.part_uri
+            ):
                 _fail(
                     "native.worksheet_structure",
                     "XLSX worksheet target lost native part authority.",
@@ -240,9 +246,7 @@ def verify_xlsx_output(
 
     affected = tuple(
         sorted(
-            edit.target_node_id
-            for edit in edit_list
-            if edit.target_node_id is not None
+            edit.target_node_id for edit in edit_list if edit.target_node_id is not None
         )
     )
     return FidelityReport(

@@ -42,10 +42,7 @@ def _prepare_updates(
     document: DocumentIR,
     source_bytes: bytes,
     edits: tuple[EditOperation, ...],
-) -> tuple[
-    dict[str, tuple[object, tuple[dict[str, object], ...]]],
-    tuple[str, ...],
-]:
+) -> tuple[dict[str, tuple[object, tuple[dict[str, object], ...]]], tuple[str, ...],]:
     parts = discover_xlsx_parts(source_bytes)
     authoritative_parts = {worksheet.part_uri for worksheet in parts.worksheets}
     grouped: dict[str, tuple[object, list[dict[str, object]]]] = {}
@@ -59,7 +56,10 @@ def _prepare_updates(
         if edit.target_node_id is None or edit.target_node_id not in document.nodes:
             raise PatchPreconditionError(
                 "XLSX edit target node does not exist in the source IR.",
-                details={"reason": "missing_target", "target_node_id": edit.target_node_id},
+                details={
+                    "reason": "missing_target",
+                    "target_node_id": edit.target_node_id,
+                },
             )
         node = document.nodes[edit.target_node_id]
         if not isinstance(node.payload, TablePayload):

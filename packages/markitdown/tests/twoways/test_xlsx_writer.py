@@ -90,17 +90,13 @@ def test_xlsx_writer_is_deterministic_for_edit_order() -> None:
         operation_id="a",
         type="update_sheet_cells",
         target_node_id=sheet_id,
-        payload={
-            "cells": [{"row": 0, "column": 1, "old_value": 7, "value": 11}]
-        },
+        payload={"cells": [{"row": 0, "column": 1, "old_value": 7, "value": 11}]},
     )
     second = EditOperation(
         operation_id="b",
         type="update_sheet_cells",
         target_node_id=sheet_id,
-        payload={
-            "cells": [{"row": 1, "column": 0, "old_value": True, "value": False}]
-        },
+        payload={"cells": [{"row": 1, "column": 0, "old_value": True, "value": False}]},
     )
 
     left = BytesIO()

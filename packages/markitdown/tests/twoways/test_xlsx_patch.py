@@ -53,3 +53,25 @@ def test_preserves_style_attribute_on_target_cell() -> None:
     root = parse_xml_part(output)
     target = root.xpath("//*[local-name()='c' and @r='A1']")[0]
     assert target.get("s") == "1"
+
+
+def test_patch_preserves_value_carrier_position_before_ext_list() -> None:
+    worksheet = SHEET1.replace(
+        '<c r="B1"><v>7</v></c>',
+        '<c r="B1"><v>7</v><extLst/></c>',
+    )
+
+    output = patch_worksheet_cells(
+        worksheet.encode(),
+        shared_strings=("North",),
+        updates=({"row": 0, "column": 1, "old_value": 7, "value": 9},),
+    )
+    root = parse_xml_part(output)
+    target = root.xpath("//*[local-name()='c' and @r='B1']")[0]
+    child_names = [
+        child.tag.rsplit("}", 1)[-1]
+        for child in target
+        if isinstance(child.tag, str)
+    ]
+
+    assert child_names == ["v", "extLst"]

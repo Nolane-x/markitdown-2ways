@@ -80,7 +80,7 @@ def test_xlsx_writer_patches_only_target_sheet_and_re_reads_semantics() -> None:
     )
     assert read_member(output_bytes, "custom/preserved.bin") == b"preserve-me-exactly"
     assert result.metadata["touched_parts"] == ("xl/worksheets/sheet1.xml",)
-    assert result.fidelity.claimed_tier == "verified-preserve"
+    assert result.fidelity.claimed_tier == "high"
     assert not result.fidelity.warnings
 
 

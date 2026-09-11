@@ -8,6 +8,31 @@ from ...ir.table_edits import validate_table_cell_updates
 from ._text_extract import _collect_carriers, _is_w_element
 from ._text_patch import patch_paragraph_text
 
+_WORDPROCESSINGML_NAMESPACES = (
+    "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+    "http://purl.oclc.org/ooxml/wordprocessingml/main",
+)
+
+
+def _element_namespace(element: Any) -> str | None:
+    tag = getattr(element, "tag", None)
+    if not isinstance(tag, str) or not tag.startswith("{") or "}" not in tag:
+        return None
+    return tag[1:].split("}", 1)[0]
+
+
+def _uses_single_wordprocessingml_namespace(table_element: Any) -> bool:
+    namespace = _element_namespace(table_element)
+    if namespace not in _WORDPROCESSINGML_NAMESPACES:
+        return False
+    for descendant in table_element.iter():
+        tag = getattr(descendant, "tag", None)
+        if not isinstance(tag, str):
+            continue
+        if _element_namespace(descendant) != namespace:
+            return False
+    return True
+
 
 def _direct_w_children(element: Any, name: str) -> list[Any]:
     return [child for child in element if _is_w_element(child, name)]
@@ -52,6 +77,8 @@ def _cell_paragraph(cell: Any) -> Any | None:
 
 def _table_grid(table_element: Any) -> list[list[Any]] | None:
     if not _is_w_element(table_element, "tbl"):
+        return None
+    if not _uses_single_wordprocessingml_namespace(table_element):
         return None
     if _unsupported_direct_children(table_element, {"tblPr", "tblGrid", "tr"}):
         return None

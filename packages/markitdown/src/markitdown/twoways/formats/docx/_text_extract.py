@@ -105,6 +105,12 @@ class _Carrier:
 
 
 def _run_text_node(run_element: Any) -> Any | None:
+    rpr_nodes = [child for child in run_element if _is_w_element(child, "rPr")]
+    if len(rpr_nodes) > 1:
+        raise UnsupportedEditError(
+            "DOCX run contains multiple run-property containers.",
+            details={"reason": "unsupported_text_structure", "element": "rPr"},
+        )
     text_nodes = [child for child in run_element if _is_w_element(child, "t")]
     unsupported = [
         child
@@ -137,6 +143,7 @@ def _collect_carriers(paragraph_element: Any) -> list[_Carrier]:
     carriers: list[_Carrier] = []
     run_index = 0
     context_index = 0
+    seen_ppr = False
     for child in paragraph_element:
         if not isinstance(child.tag, str):
             continue
@@ -147,6 +154,12 @@ def _collect_carriers(paragraph_element: Any) -> list[_Carrier]:
                     "DOCX paragraph contains unsupported native structure.",
                     details={"reason": "unsupported_text_structure", "element": name},
                 )
+            if seen_ppr:
+                raise UnsupportedEditError(
+                    "DOCX paragraph contains multiple paragraph-property containers.",
+                    details={"reason": "unsupported_text_structure", "element": "pPr"},
+                )
+            seen_ppr = True
             continue
         if name == "r":
             if not _is_w_element(child, "r"):

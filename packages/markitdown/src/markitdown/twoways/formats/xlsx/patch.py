@@ -77,10 +77,15 @@ def patch_worksheet_cells(
     worksheet_xml: bytes,
     *,
     shared_strings: tuple[str, ...] = (),
+    rich_shared_string_indexes: frozenset[int] = frozenset(),
     updates: Sequence[Mapping[str, object]],
 ) -> bytes:
     root = parse_xml_part(worksheet_xml)
-    grid = read_worksheet_grid(root, shared_strings=shared_strings)
+    grid = read_worksheet_grid(
+        root,
+        shared_strings=shared_strings,
+        rich_shared_string_indexes=rich_shared_string_indexes,
+    )
     namespace = root.tag[1:].split("}", 1)[0]
     native = {(cell.row, cell.column): cell for cell in grid.cells}
     elements = _direct_cell_elements(root, namespace)

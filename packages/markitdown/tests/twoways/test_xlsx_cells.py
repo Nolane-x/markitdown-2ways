@@ -91,7 +91,10 @@ def test_rich_inline_string_is_read_only_to_preserve_runs() -> None:
 
     assert cell.value == "East"
     assert cell.capability.state is CapabilityState.READ_ONLY
-    assert cell.capability.reason_code == "xlsx.cell.rich_text_requires_run_preserving_edit"
+    assert (
+        cell.capability.reason_code
+        == "xlsx.cell.rich_text_requires_run_preserving_edit"
+    )
 
 
 def test_merged_cells_are_read_only() -> None:

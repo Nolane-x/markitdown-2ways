@@ -39,9 +39,7 @@ def _paragraph_text_nodes(paragraph_element: Any) -> list[Any] | None:
         return None
     if (
         sum(
-            1
-            for child in paragraph_element
-            if _is_drawing_element(child, "endParaRPr")
+            1 for child in paragraph_element if _is_drawing_element(child, "endParaRPr")
         )
         > 1
     ):
@@ -92,7 +90,9 @@ def pptx_table_patch_compatible(table: Any) -> bool:
 
 
 def _native_table(shape_element: Any) -> Any | None:
-    matches = [item for item in shape_element.iter() if _is_drawing_element(item, "tbl")]
+    matches = [
+        item for item in shape_element.iter() if _is_drawing_element(item, "tbl")
+    ]
     return matches[0] if len(matches) == 1 else None
 
 

@@ -17,7 +17,7 @@ from ...ir.serialization import validate_document
 from ...ooxml import parse_xml_part
 from ...ooxml.package import read_binary_stream
 from ...readers.base import DocumentIRReader
-from .cells import indices_to_a1, read_shared_strings, read_worksheet_grid
+from .cells import indices_to_a1, read_shared_string_table, read_worksheet_grid
 from .package import discover_xlsx_parts
 
 
@@ -35,8 +35,9 @@ def read_xlsx_ir(
     members = _read_members(source_bytes)
     source_digest = sha256(source_bytes).hexdigest()
     shared_strings: tuple[str, ...] = ()
+    rich_shared_string_indexes: frozenset[int] = frozenset()
     if parts.shared_strings_part is not None:
-        shared_strings = read_shared_strings(
+        shared_strings, rich_shared_string_indexes = read_shared_string_table(
             parse_xml_part(members[parts.shared_strings_part.lstrip("/")])
         )
 
@@ -44,7 +45,11 @@ def read_xlsx_ir(
     nodes: dict[str, Node] = {}
     for index, worksheet in enumerate(parts.worksheets):
         root = parse_xml_part(members[worksheet.part_uri.lstrip("/")])
-        grid = read_worksheet_grid(root, shared_strings=shared_strings)
+        grid = read_worksheet_grid(
+            root,
+            shared_strings=shared_strings,
+            rich_shared_string_indexes=rich_shared_string_indexes,
+        )
         native_cells = {(cell.row, cell.column): cell for cell in grid.cells}
         table_cells: list[TableCell] = []
         writable_count = 0

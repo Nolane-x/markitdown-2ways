@@ -117,3 +117,29 @@ def test_reader_node_ids_survive_text_only_source_change():
     before_image = next(node for node in before.nodes.values() if node.kind == "image")
     after_image = next(node for node in after.nodes.values() if node.kind == "image")
     assert before_image.node_id == after_image.node_id
+
+
+def test_reader_does_not_promote_foreign_docpr_to_picture_node():
+    from markitdown.twoways.formats.docx import read_docx_ir
+
+    source = build_docx_fixture()
+    spoofed = _rewrite_document_text(
+        source,
+        b"<wp:docPr ",
+        b'<foreign:docPr xmlns:foreign="urn:foreign" ',
+    )
+    document = read_docx_ir(BytesIO(spoofed))
+    assert not [node for node in document.nodes.values() if node.kind == "image"]
+
+
+def test_reader_does_not_accept_foreign_blip_as_picture_relationship_carrier():
+    from markitdown.twoways.formats.docx import read_docx_ir
+
+    source = build_docx_fixture()
+    spoofed = _rewrite_document_text(
+        source,
+        b"<a:blip ",
+        b'<foreign:blip xmlns:foreign="urn:foreign" ',
+    )
+    document = read_docx_ir(BytesIO(spoofed))
+    assert not [node for node in document.nodes.values() if node.kind == "image"]

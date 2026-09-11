@@ -50,7 +50,7 @@ all = [
   "azure-ai-contentunderstanding>=1.2.0b1",
   "azure-identity",
 ]
-pptx = ["python-pptx"]
+pptx = ["python-pptx", "lxml"]
 docx = ["mammoth~=1.11.0", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
@@ -80,6 +80,7 @@ features = ["all"]
 features = ["all"]
 extra-dependencies = [
   "openai",
+  "python-docx",
 ]
 
 [tool.hatch.envs.types]

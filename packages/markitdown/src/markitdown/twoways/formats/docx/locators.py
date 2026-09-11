@@ -7,6 +7,18 @@ from ..._errors import AmbiguousNativeLocatorError
 from ...ir.provenance import NativeLocator
 
 _BACKEND = "docx-ooxml"
+_WORDPROCESSING_DRAWING_NAMESPACES = (
+    "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+    "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing",
+)
+
+
+def _is_wordprocessing_drawing_element(element: Any, name: str) -> bool:
+    tag = getattr(element, "tag", None)
+    return isinstance(tag, str) and any(
+        tag == f"{{{namespace}}}{name}"
+        for namespace in _WORDPROCESSING_DRAWING_NAMESPACES
+    )
 
 
 def paragraph_locator(
@@ -107,9 +119,7 @@ def _indexed_child(
             "DOCX structural locator points beyond available native elements.",
             details={"reason": "not_found", "index": raw_index},
         )
-    expected_path = (
-        f"{prefix}/*[local-name()='{child_name}'][{raw_index + 1}]"
-    )
+    expected_path = f"{prefix}/*[local-name()='{child_name}'][{raw_index + 1}]"
     if locator.path != expected_path:
         raise AmbiguousNativeLocatorError(
             "DOCX structural locator path does not match its indexed identity.",
@@ -152,7 +162,12 @@ def resolve_picture_docpr(root: Any, locator: NativeLocator, *, part_uri: str) -
             "DOCX picture locator requires wp:docPr id.",
             details={"reason": "insufficient_identity"},
         )
-    matches = root.xpath(f'.//*[local-name()="docPr" and @id="{docpr_id}"]')
+    matches = [
+        element
+        for element in root.iter()
+        if _is_wordprocessing_drawing_element(element, "docPr")
+        and element.get("id") == str(docpr_id)
+    ]
     if len(matches) != 1:
         raise AmbiguousNativeLocatorError(
             "DOCX picture locator did not resolve uniquely.",

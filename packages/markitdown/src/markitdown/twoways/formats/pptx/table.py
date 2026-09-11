@@ -13,6 +13,26 @@ _DRAWINGML_NAMESPACES = (
 )
 
 
+def _element_namespace(element: Any) -> str | None:
+    tag = getattr(element, "tag", None)
+    if not isinstance(tag, str) or not tag.startswith("{") or "}" not in tag:
+        return None
+    return tag[1:].split("}", 1)[0]
+
+
+def _uses_single_drawingml_namespace(table_element: Any) -> bool:
+    namespace = _element_namespace(table_element)
+    if namespace not in _DRAWINGML_NAMESPACES:
+        return False
+    for descendant in table_element.iter():
+        tag = getattr(descendant, "tag", None)
+        if not isinstance(tag, str):
+            continue
+        if _element_namespace(descendant) != namespace:
+            return False
+    return True
+
+
 def _is_drawing_element(element: Any, name: str) -> bool:
     tag = getattr(element, "tag", None)
     return isinstance(tag, str) and any(
@@ -121,6 +141,8 @@ def _cell_paragraph(cell: Any) -> Any | None:
 
 def _native_grid(table_element: Any) -> list[list[Any]] | None:
     if not _is_drawing_element(table_element, "tbl"):
+        return None
+    if not _uses_single_drawingml_namespace(table_element):
         return None
     if not _supported_children(table_element, {"tblPr", "tblGrid", "tr"}):
         return None

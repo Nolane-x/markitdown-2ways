@@ -8,6 +8,7 @@ from ..._errors import MissingOptionalDependencyError
 from ...ir.document import Canvas, DocumentMetadata
 from ...ir.provenance import NativeLocator
 from ...ooxml import parse_xml_part
+from .locators import _is_wordprocessing_drawing_element
 from .relationships import relationships_for_part
 from .structures import build_paragraph_node, build_picture_nodes, build_table_node
 
@@ -181,7 +182,11 @@ def _build_part(
             continue
         if name == "p":
             paragraph_path = f"{prefix}/*[local-name()='p'][{paragraph_index + 1}]"
-            picture_docprs = child.xpath('.//*[local-name()="docPr"]')
+            picture_docprs = [
+                element
+                for element in child.iter()
+                if _is_wordprocessing_drawing_element(element, "docPr")
+            ]
             text = "".join(child.xpath('.//*[local-name()="t"]/text()'))
             if text or not picture_docprs:
                 node = build_paragraph_node(

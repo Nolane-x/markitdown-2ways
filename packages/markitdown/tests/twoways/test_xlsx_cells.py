@@ -76,6 +76,24 @@ def test_plain_scalar_cells_are_writable() -> None:
         assert decision.state is CapabilityState.WRITABLE, address
 
 
+def test_rich_inline_string_is_read_only_to_preserve_runs() -> None:
+    rich_xml = SHEET1.replace(
+        '<c r="B2" t="inlineStr"><is><t>East</t></is></c>',
+        '<c r="B2" t="inlineStr"><is>'
+        '<r><rPr><b/></rPr><t>Ea</t></r><r><t>st</t></r>'
+        '</is></c>',
+    )
+    grid = read_worksheet_grid(
+        parse_xml_part(rich_xml.encode()),
+        shared_strings=("North",),
+    )
+    cell = next(cell for cell in grid.cells if cell.address == "B2")
+
+    assert cell.value == "East"
+    assert cell.capability.state is CapabilityState.READ_ONLY
+    assert cell.capability.reason_code == "xlsx.cell.rich_text_requires_run_preserving_edit"
+
+
 def test_merged_cells_are_read_only() -> None:
     merged_xml = SHEET1.replace(
         "</worksheet>",

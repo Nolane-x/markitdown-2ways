@@ -4,7 +4,7 @@ from hashlib import sha256
 import re
 
 from .._errors import MarkdownIdentityError, MarkdownImportError
-from ..ir.nodes import ImagePayload
+from ..ir.nodes import ImagePayload, TablePayload
 from .identity import ParsedMarker, parse_marker_line, unescape_marker_like_text
 from .model import ProjectionBlock
 from .rendering import normalize_markdown_block
@@ -109,6 +109,73 @@ def parse_image_block(
             target=target,
         )
     return alt_text, target
+
+
+def _parse_table_row(
+    line: str, *, columns: int, block: ProjectionBlock
+) -> tuple[str, ...]:
+    stripped = line.strip()
+    if not stripped.startswith("|") or not stripped.endswith("|"):
+        raise_import(
+            "markdown.semantic.parse_error",
+            "Table row no longer matches the supported identity Markdown structure.",
+            projection_id=block.projection_id,
+        )
+    parts = stripped.split("|")
+    if parts[0] or parts[-1] or len(parts) != columns + 2:
+        raise_import(
+            "markdown.semantic.parse_error",
+            "Table row column count changed in identity Markdown.",
+            projection_id=block.projection_id,
+        )
+    return tuple(unescape_marker_like_text(item.strip()) for item in parts[1:-1])
+
+
+def parse_table_block(
+    block_text: str, block: ProjectionBlock, original_node
+) -> tuple[tuple[str, ...], ...]:
+    payload = original_node.payload
+    if not isinstance(payload, TablePayload):
+        raise_identity(
+            "markdown.marker.metadata_mismatch",
+            "Manifest table identity does not point to a table payload.",
+            projection_id=block.projection_id,
+        )
+    if payload.rows <= 0 or payload.columns <= 0:
+        raise_import(
+            "markdown.semantic.parse_error",
+            "Editable identity Markdown tables require a non-empty rectangular grid.",
+            projection_id=block.projection_id,
+        )
+
+    lines = normalize_markdown_block(block_text).splitlines()
+    if len(lines) != payload.rows + 1:
+        raise_import(
+            "markdown.semantic.parse_error",
+            "Table row count changed in identity Markdown.",
+            projection_id=block.projection_id,
+        )
+
+    header = _parse_table_row(lines[0], columns=payload.columns, block=block)
+    separator = _parse_table_row(lines[1], columns=payload.columns, block=block)
+    if any(item != "---" for item in separator):
+        raise_import(
+            "markdown.semantic.parse_error",
+            "Table separator row changed in identity Markdown.",
+            projection_id=block.projection_id,
+        )
+    rows = [header]
+    rows.extend(
+        _parse_table_row(line, columns=payload.columns, block=block)
+        for line in lines[2:]
+    )
+    if len(rows) != payload.rows:
+        raise_import(
+            "markdown.semantic.parse_error",
+            "Table row count changed in identity Markdown.",
+            projection_id=block.projection_id,
+        )
+    return tuple(rows)
 
 
 def operation_id(projection_id: str, edit_type: str, value: str) -> str:

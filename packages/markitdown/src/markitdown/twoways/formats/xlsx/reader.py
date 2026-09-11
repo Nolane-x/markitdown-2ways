@@ -21,9 +21,41 @@ from .cells import indices_to_a1, read_shared_string_table, read_worksheet_grid
 from .package import discover_xlsx_parts
 
 
+_MAX_MATERIALIZED_GRID_CELLS = 100_000
+_GRID_TOO_LARGE_REASON = "xlsx.sheet.grid_too_large_to_materialize"
+
+
 def _read_members(source_bytes: bytes) -> dict[str, bytes]:
     with ZipFile(BytesIO(source_bytes), "r") as archive:
         return {info.filename: archive.read(info) for info in archive.infolist()}
+
+
+def _native_table_cell(
+    native: Any,
+    *,
+    forced_read_only_reason: str | None = None,
+) -> TableCell:
+    writable = (
+        forced_read_only_reason is None
+        and native.capability.state is CapabilityState.WRITABLE
+    )
+    return TableCell(
+        row=native.row,
+        column=native.column,
+        text=native.display_text,
+        metadata={
+            "xlsx.address": native.address,
+            "xlsx.typed_value": native.value,
+            "xlsx.data_type": native.data_type,
+            "xlsx.formula": native.formula,
+            "xlsx.style_id": native.style_id,
+            "xlsx.merged": native.merged,
+            "xlsx.present": True,
+            "xlsx.writable": writable,
+            "xlsx.reason_code": forced_read_only_reason
+            or native.capability.reason_code,
+        },
+    )
 
 
 def read_xlsx_ir(
@@ -50,53 +82,54 @@ def read_xlsx_ir(
             shared_strings=shared_strings,
             rich_shared_string_indexes=rich_shared_string_indexes,
         )
-        native_cells = {(cell.row, cell.column): cell for cell in grid.cells}
         table_cells: list[TableCell] = []
         writable_count = 0
-        for row in range(grid.rows):
-            for column in range(grid.columns):
-                native = native_cells.get((row, column))
-                address = indices_to_a1(row, column)
-                if native is None:
-                    table_cells.append(
-                        TableCell(
-                            row=row,
-                            column=column,
-                            text="",
-                            metadata={
-                                "xlsx.address": address,
-                                "xlsx.typed_value": None,
-                                "xlsx.present": False,
-                                "xlsx.writable": False,
-                                "xlsx.reason_code": "xlsx.cell.missing_native_cell",
-                            },
+        dense_materialization = (
+            grid.rows * grid.columns <= _MAX_MATERIALIZED_GRID_CELLS
+        )
+        if dense_materialization:
+            native_cells = {(cell.row, cell.column): cell for cell in grid.cells}
+            for row in range(grid.rows):
+                for column in range(grid.columns):
+                    native = native_cells.get((row, column))
+                    address = indices_to_a1(row, column)
+                    if native is None:
+                        table_cells.append(
+                            TableCell(
+                                row=row,
+                                column=column,
+                                text="",
+                                metadata={
+                                    "xlsx.address": address,
+                                    "xlsx.typed_value": None,
+                                    "xlsx.present": False,
+                                    "xlsx.writable": False,
+                                    "xlsx.reason_code": "xlsx.cell.missing_native_cell",
+                                },
+                            )
                         )
-                    )
-                    continue
-                writable = native.capability.state is CapabilityState.WRITABLE
-                writable_count += int(writable)
-                table_cells.append(
-                    TableCell(
-                        row=row,
-                        column=column,
-                        text=native.display_text,
-                        metadata={
-                            "xlsx.address": native.address,
-                            "xlsx.typed_value": native.value,
-                            "xlsx.data_type": native.data_type,
-                            "xlsx.formula": native.formula,
-                            "xlsx.style_id": native.style_id,
-                            "xlsx.merged": native.merged,
-                            "xlsx.present": True,
-                            "xlsx.writable": writable,
-                            "xlsx.reason_code": native.capability.reason_code,
-                        },
-                    )
+                        continue
+                    writable = native.capability.state is CapabilityState.WRITABLE
+                    writable_count += int(writable)
+                    table_cells.append(_native_table_cell(native))
+        else:
+            table_cells.extend(
+                _native_table_cell(
+                    native,
+                    forced_read_only_reason=_GRID_TOO_LARGE_REASON,
                 )
+                for native in grid.cells
+            )
 
         canvas_id = f"xlsx-worksheet-{index}"
         node_id = f"xlsx-sheet-{sha256(f'{source_digest}:{index}:{worksheet.part_uri}'.encode()).hexdigest()[:24]}"
-        if writable_count:
+        if not dense_materialization:
+            table_capability = CapabilityDecision(
+                operation="update_sheet_cells",
+                state=CapabilityState.READ_ONLY,
+                reason_code=_GRID_TOO_LARGE_REASON,
+            )
+        elif writable_count:
             table_capability = CapabilityDecision(
                 operation="update_sheet_cells",
                 state=CapabilityState.WRITABLE,

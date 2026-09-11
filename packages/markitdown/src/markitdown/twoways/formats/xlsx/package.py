@@ -323,6 +323,9 @@ def discover_xlsx_parts(source_bytes: bytes) -> XlsxPackageParts:
     )
     worksheets: list[XlsxWorksheetPart] = []
     sheet_names: set[str] = set()
+    sheet_ids: set[int] = set()
+    sheet_relationship_ids: set[str] = set()
+    worksheet_part_uris: set[str] = set()
     for element in sheets_elements[0]:
         if not isinstance(element.tag, str):
             continue
@@ -348,13 +351,22 @@ def discover_xlsx_parts(source_bytes: bytes) -> XlsxPackageParts:
                 "XLSX sheetId must be an integer.",
                 details={"reason": "malformed_sheet", "sheet_id": raw_sheet_id},
             ) from exc
-        if sheet_id <= 0 or name in sheet_names:
+        if sheet_id <= 0 or name in sheet_names or sheet_id in sheet_ids:
             _fail(
                 "malformed_sheet",
                 "XLSX sheet identifiers and names must be unique and valid.",
                 sheet_name=name,
+                sheet_id=sheet_id,
+            )
+        if relationship_id in sheet_relationship_ids:
+            _fail(
+                "duplicate_sheet_relationship",
+                "XLSX sheet declarations must not reuse worksheet relationship IDs.",
+                relationship_id=relationship_id,
             )
         sheet_names.add(name)
+        sheet_ids.add(sheet_id)
+        sheet_relationship_ids.add(relationship_id)
         relationship = workbook_relationships.get(relationship_id)
         if relationship is None or relationship.relationship_type != worksheet_type:
             _fail(
@@ -369,6 +381,13 @@ def discover_xlsx_parts(source_bytes: bytes) -> XlsxPackageParts:
                 relationship_id=relationship_id,
             )
         part_uri = relationship.resolved_target
+        if part_uri in worksheet_part_uris:
+            _fail(
+                "duplicate_worksheet_target",
+                "XLSX sheet declarations must not alias one worksheet part.",
+                part_uri=part_uri,
+            )
+        worksheet_part_uris.add(part_uri)
         if part_uri.lstrip("/") not in members:
             _fail(
                 "missing_worksheet_part",

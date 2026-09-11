@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
+
 from ..ir.document import DocumentIR
 from ..ir.edits import EditOperation, EditPrecondition
+from ..ir.nodes import TablePayload
 from ._import_helpers import (
     block_digest,
     operation_id,
     parse_image_block,
+    parse_table_block,
     parse_text_block,
     raise_identity,
     raise_import,
@@ -13,6 +17,16 @@ from ._import_helpers import (
 from ._import_integrity import IdentityEnvelope
 from .model import MarkdownImportResult
 from .rendering import semantic_text_for_node, source_semantic_digest
+
+
+def _table_cell_map(payload: TablePayload) -> dict[tuple[int, int], str]:
+    cells: dict[tuple[int, int], str] = {}
+    for cell in payload.cells:
+        coordinate = (cell.row, cell.column)
+        if coordinate in cells:
+            raise ValueError("table payload contains duplicate coordinates")
+        cells[coordinate] = cell.text or ""
+    return cells
 
 
 def generate_identity_edits(
@@ -53,6 +67,71 @@ def generate_identity_edits(
                 projection_id=block.projection_id,
                 node_id=block.node_id,
             )
+
+        if "update_table_cells" in block.editable_capabilities:
+            payload = original_node.payload
+            if not isinstance(payload, TablePayload):
+                raise_identity(
+                    "markdown.marker.metadata_mismatch",
+                    "Editable table identity no longer points to a table payload.",
+                    projection_id=block.projection_id,
+                    node_id=block.node_id,
+                )
+            parsed_rows = parse_table_block(block_text, block, original_node)
+            source_cells = _table_cell_map(payload)
+            changed_cells: list[dict[str, object]] = []
+            for row_index, row in enumerate(parsed_rows):
+                for column_index, new_text in enumerate(row):
+                    old_text = source_cells.get((row_index, column_index))
+                    if old_text is None:
+                        raise_identity(
+                            "markdown.marker.metadata_mismatch",
+                            "Editable table source grid is incomplete.",
+                            projection_id=block.projection_id,
+                            node_id=block.node_id,
+                        )
+                    if new_text != old_text:
+                        changed_cells.append(
+                            {
+                                "row": row_index,
+                                "column": column_index,
+                                "old_text": old_text,
+                                "text": new_text,
+                            }
+                        )
+            if not changed_cells:
+                raise_import(
+                    "markdown.edit.unsupported",
+                    "Formatting-only table changes are not silently discarded by identity Markdown v1.",
+                    projection_id=block.projection_id,
+                    node_id=block.node_id,
+                )
+            canonical_changes = json.dumps(
+                changed_cells,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            old_text = semantic_text_for_node(original_node)
+            edits.append(
+                EditOperation(
+                    operation_id=operation_id(
+                        block.projection_id,
+                        "update_table_cells",
+                        canonical_changes,
+                    ),
+                    type="update_table_cells",
+                    target_node_id=block.node_id,
+                    precondition=EditPrecondition(
+                        expected_semantic_digest=block.source_semantic_digest,
+                        expected_native_locator_digest=block.native_locator_digest,
+                        expected_old_value=old_text,
+                    ),
+                    payload={"cells": changed_cells},
+                    source_label="markdown.identity.v1",
+                )
+            )
+            continue
 
         if "replace_text" in block.editable_capabilities:
             old_text = semantic_text_for_node(original_node)

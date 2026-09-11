@@ -16,7 +16,9 @@ from ._xlsx_fixtures import SHEET1, make_xlsx
 TEST_FILES = Path(__file__).resolve().parents[1] / "test_files"
 
 
-def test_patched_workbook_opens_with_openpyxl_and_preserves_untouched_semantics() -> None:
+def test_patched_workbook_opens_with_openpyxl_and_preserves_untouched_semantics() -> (
+    None
+):
     sheet1 = SHEET1.replace(' t="s" s="1"', ' t="s"')
     source = make_xlsx(replacements={"xl/worksheets/sheet1.xml": sheet1})
     document = read_xlsx_ir(BytesIO(source))
@@ -63,7 +65,9 @@ def test_patched_workbook_opens_with_openpyxl_and_preserves_untouched_semantics(
         cached.close()
 
 
-def test_real_xlsx_fixture_reads_reports_capabilities_and_noops_byte_identically() -> None:
+def test_real_xlsx_fixture_reads_reports_capabilities_and_noops_byte_identically() -> (
+    None
+):
     source = (TEST_FILES / "test.xlsx").read_bytes()
     document = read_xlsx_ir(BytesIO(source))
     report = build_capability_report(document)

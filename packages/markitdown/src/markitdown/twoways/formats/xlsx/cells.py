@@ -75,6 +75,11 @@ def _descendant_text(container: Any, namespace: str) -> str:
     return "".join(values)
 
 
+def _is_plain_inline_string(container: Any, namespace: str) -> bool:
+    children = [child for child in container if isinstance(child.tag, str)]
+    return len(children) == 1 and children[0].tag == f"{{{namespace}}}t"
+
+
 def read_shared_strings(root: Any) -> tuple[str, ...]:
     namespace = _root_namespace(root, "sst")
     values: list[str] = []
@@ -164,7 +169,7 @@ def _cell_value(
     cell: Any,
     namespace: str,
     shared_strings: tuple[str, ...],
-) -> tuple[object, str | None, str | None, bool]:
+) -> tuple[object, str | None, str | None, bool, bool]:
     cell_type = cell.get("t")
     value_element = _single_direct_child(cell, namespace, "v")
     inline_element = _single_direct_child(cell, namespace, "is")
@@ -172,6 +177,7 @@ def _cell_value(
     formula = None if formula_element is None else (formula_element.text or "")
     raw_value = None if value_element is None else (value_element.text or "")
     supported = True
+    rich_text = False
 
     if cell_type == "s":
         if raw_value is None or inline_element is not None:
@@ -187,6 +193,7 @@ def _cell_value(
         if inline_element is None or value_element is not None:
             raise ValueError("inline-string cell has invalid value structure")
         value = _descendant_text(inline_element, namespace)
+        rich_text = not _is_plain_inline_string(inline_element, namespace)
     elif cell_type == "b":
         if raw_value not in {"0", "1"}:
             raise ValueError("boolean cell value must be 0 or 1")
@@ -199,7 +206,7 @@ def _cell_value(
     else:
         value = raw_value
         supported = False
-    return value, cell_type, formula, supported
+    return value, cell_type, formula, supported, rich_text
 
 
 def _display_text(value: object) -> str:
@@ -268,7 +275,7 @@ def read_worksheet_grid(
             if address in seen:
                 raise ValueError("duplicate worksheet cell reference")
             seen.add(address)
-            value, data_type, formula, supported = _cell_value(
+            value, data_type, formula, supported, rich_text = _cell_value(
                 cell_element,
                 namespace,
                 shared_strings,
@@ -294,6 +301,12 @@ def read_worksheet_grid(
                     operation="update_sheet_cells",
                     state=CapabilityState.READ_ONLY,
                     reason_code="xlsx.cell.merged_range",
+                )
+            elif rich_text:
+                capability = CapabilityDecision(
+                    operation="update_sheet_cells",
+                    state=CapabilityState.READ_ONLY,
+                    reason_code="xlsx.cell.rich_text_requires_run_preserving_edit",
                 )
             elif not supported or type(value) not in {
                 str,

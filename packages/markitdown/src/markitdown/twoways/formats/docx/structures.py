@@ -11,13 +11,30 @@ from ...ir.nodes import ImagePayload, Node, TableCell, TablePayload, TextPayload
 from ...ir.provenance import NativeLocator, Provenance
 from ...ir.resources import Resource
 from ._text_extract import _r_value
-from .locators import paragraph_locator, picture_locator, stable_docx_node_id
+from .locators import (
+    _is_wordprocessing_drawing_element,
+    paragraph_locator,
+    picture_locator,
+    stable_docx_node_id,
+)
 from .relationships import DocxRelationship
 from .text import extract_paragraph_payload, paragraph_patch_compatible
+
+_DRAWING_NAMESPACES = (
+    "http://schemas.openxmlformats.org/drawingml/2006/main",
+    "http://purl.oclc.org/ooxml/drawingml/main",
+)
 
 
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
+
+
+def _is_drawing_element(element: Any, name: str) -> bool:
+    tag = getattr(element, "tag", None)
+    return isinstance(tag, str) and any(
+        tag == f"{{{namespace}}}{name}" for namespace in _DRAWING_NAMESPACES
+    )
 
 
 def _provenance(*, canvas_index: int, part_uri: str) -> tuple[Provenance, ...]:
@@ -112,12 +129,21 @@ def build_table_node(
 
 
 def _picture_relationship_id(docpr: Any) -> str | None:
+    if not _is_wordprocessing_drawing_element(docpr, "docPr"):
+        return None
     parent = docpr.getparent()
-    while parent is not None and _local_name(parent.tag) not in {"inline", "anchor"}:
+    while parent is not None and not (
+        _is_wordprocessing_drawing_element(parent, "inline")
+        or _is_wordprocessing_drawing_element(parent, "anchor")
+    ):
         parent = parent.getparent()
     if parent is None:
         return None
-    blips = parent.xpath('.//*[local-name()="blip"]')
+    blips = [
+        element
+        for element in parent.iter()
+        if _is_drawing_element(element, "blip")
+    ]
     if len(blips) != 1:
         return None
     return _r_value(blips[0], "embed")
@@ -137,9 +163,12 @@ def build_picture_nodes(
     nodes: list[Node] = []
     resources: dict[str, Resource] = {}
     diagnostics: list[Diagnostic] = []
-    for picture_index, docpr in enumerate(
-        paragraph_element.xpath('.//*[local-name()="docPr"]')
-    ):
+    docprs = [
+        element
+        for element in paragraph_element.iter()
+        if _is_wordprocessing_drawing_element(element, "docPr")
+    ]
+    for picture_index, docpr in enumerate(docprs):
         docpr_id = docpr.get("id")
         relationship_id = _picture_relationship_id(docpr)
         relationship = relationships.get(relationship_id) if relationship_id else None

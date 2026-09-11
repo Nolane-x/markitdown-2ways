@@ -15,6 +15,7 @@ from .model import (
 _A1_RE = re.compile(r"^([A-Z]{1,3})([1-9][0-9]{0,6})$")
 _MAX_ROWS = 1_048_576
 _MAX_COLUMNS = 16_384
+_MAX_MERGED_RANGE_CELLS = 100_000
 
 
 def _local_name(tag: object) -> str | None:
@@ -139,6 +140,10 @@ def _range_addresses(reference: str) -> set[str]:
     end_row, end_col = a1_to_indices(end)
     if end_row < start_row or end_col < start_col:
         raise ValueError("merged range is reversed")
+    height = end_row - start_row + 1
+    width = end_col - start_col + 1
+    if height * width > _MAX_MERGED_RANGE_CELLS:
+        raise ValueError("merged range is too large")
     return {
         indices_to_a1(row, column)
         for row in range(start_row, end_row + 1)
@@ -170,7 +175,10 @@ def _merged_addresses(root: Any, namespace: str) -> frozenset[str]:
         reference = element.get("ref")
         if not reference:
             raise ValueError("mergeCell is missing ref")
-        addresses.update(_range_addresses(reference))
+        expanded = _range_addresses(reference)
+        if addresses.intersection(expanded):
+            raise ValueError("merged ranges overlap")
+        addresses.update(expanded)
     return frozenset(addresses)
 
 

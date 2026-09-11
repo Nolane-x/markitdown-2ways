@@ -24,6 +24,15 @@ from ._errors import (
     WriterNotFoundError,
 )
 from ._results import FidelityEvidence, FidelityReport, FidelityStatus, WriterResult
+from .capabilities import (
+    CapabilityDecision,
+    CapabilityReasonSummary,
+    CapabilityReport,
+    CapabilityState,
+    NodeCapabilityProfile,
+    build_capability_report,
+    capabilities_for_node,
+)
 from .ir import (
     BoundingBox,
     Canvas,
@@ -79,6 +88,10 @@ __all__ = [
     "AmbiguousNativeLocatorError",
     "BoundingBox",
     "Canvas",
+    "CapabilityDecision",
+    "CapabilityReasonSummary",
+    "CapabilityReport",
+    "CapabilityState",
     "ChartPayload",
     "Diagnostic",
     "DocumentIdFactory",
@@ -103,6 +116,7 @@ __all__ = [
     "NativeLocator",
     "NativePayload",
     "Node",
+    "NodeCapabilityProfile",
     "Paragraph",
     "PatchPreconditionError",
     "Provenance",
@@ -124,6 +138,8 @@ __all__ = [
     "UnsupportedSchemaVersionError",
     "WriterNotFoundError",
     "WriterResult",
+    "build_capability_report",
+    "capabilities_for_node",
     "read_markdown_ir",
     "projection_manifest_digest",
     "projection_manifest_bytes",

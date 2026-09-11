@@ -17,6 +17,9 @@ from markitdown.twoways.ir.table_edits import validate_table_cell_updates
 from ._docx_fixtures import build_docx_fixture
 from ._pptx_fixtures import make_pptx_bytes
 
+_TRANSITIONAL_DRAWINGML = "http://schemas.openxmlformats.org/drawingml/2006/main"
+_STRICT_DRAWINGML = "http://purl.oclc.org/ooxml/drawingml/main"
+
 
 def _payload() -> TablePayload:
     return TablePayload(
@@ -68,6 +71,25 @@ def _mutate_pptx(mutator) -> bytes:
     output = BytesIO()
     presentation.save(output)
     return output.getvalue()
+
+
+def _table_xml(namespace: str, *, cell_prefix: str = "a", paragraph_prefix: str = "a"):
+    from lxml import etree
+
+    xml = f"""
+    <a:tbl xmlns:a="{namespace}" xmlns:foreign="urn:foreign">
+      <a:tr>
+        <{cell_prefix}:tc>
+          <a:txBody>
+            <{paragraph_prefix}:p>
+              <a:r><a:t>X</a:t></a:r>
+            </{paragraph_prefix}:p>
+          </a:txBody>
+        </{cell_prefix}:tc>
+      </a:tr>
+    </a:tbl>
+    """
+    return etree.fromstring(xml.encode("utf-8"))
 
 
 @pytest.mark.parametrize(
@@ -129,6 +151,31 @@ def test_pptx_merged_cell_is_read_only():
     table = _table(read_pptx_ir(BytesIO(source)))
 
     assert table.metadata["pptx:patch_capabilities"] == ()
+
+
+@pytest.mark.parametrize("namespace", [_TRANSITIONAL_DRAWINGML, _STRICT_DRAWINGML])
+def test_pptx_native_table_grid_accepts_supported_drawingml_namespaces(namespace):
+    from markitdown.twoways.formats.pptx.table import _native_grid
+
+    assert _native_grid(_table_xml(namespace)) is not None
+
+
+@pytest.mark.parametrize(
+    ("cell_prefix", "paragraph_prefix"),
+    [("foreign", "a"), ("a", "foreign")],
+)
+def test_pptx_native_table_grid_rejects_foreign_local_name_spoof(
+    cell_prefix, paragraph_prefix
+):
+    from markitdown.twoways.formats.pptx.table import _native_grid
+
+    root = _table_xml(
+        _TRANSITIONAL_DRAWINGML,
+        cell_prefix=cell_prefix,
+        paragraph_prefix=paragraph_prefix,
+    )
+
+    assert _native_grid(root) is None
 
 
 @pytest.mark.parametrize("new_text", ["Doanh thu 日本語 🚀", ""])

@@ -109,7 +109,8 @@ def _run_text_node(run_element: Any) -> Any | None:
     unsupported = [
         child
         for child in run_element
-        if not (_is_w_element(child, "rPr") or _is_w_element(child, "t"))
+        if isinstance(child.tag, str)
+        and not (_is_w_element(child, "rPr") or _is_w_element(child, "t"))
     ]
     if unsupported:
         raise UnsupportedEditError(
@@ -137,6 +138,8 @@ def _collect_carriers(paragraph_element: Any) -> list[_Carrier]:
     run_index = 0
     context_index = 0
     for child in paragraph_element:
+        if not isinstance(child.tag, str):
+            continue
         name = _local_name(child.tag)
         if name == "pPr":
             if not _is_w_element(child, "pPr"):
@@ -179,6 +182,8 @@ def _collect_carriers(paragraph_element: Any) -> list[_Carrier]:
                 )
             hyperlink_context_index = context_index
             for hyperlink_child in child:
+                if not isinstance(hyperlink_child.tag, str):
+                    continue
                 hyperlink_name = _local_name(hyperlink_child.tag)
                 if hyperlink_name != "r" or not _is_w_element(hyperlink_child, "r"):
                     raise UnsupportedEditError(
@@ -258,6 +263,8 @@ def extract_paragraph_payload(
     if ppr_nodes:
         ppr = ppr_nodes[0]
         for child in ppr:
+            if not isinstance(child.tag, str):
+                continue
             name = _local_name(child.tag)
             if name == "jc" and _is_w_element(child, "jc"):
                 alignment = _w_value(child, "val")

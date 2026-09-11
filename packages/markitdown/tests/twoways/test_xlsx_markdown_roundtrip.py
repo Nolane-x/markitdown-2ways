@@ -102,9 +102,7 @@ def test_xlsx_identity_edit_round_trips_through_native_writer() -> None:
     reread = read_xlsx_ir(BytesIO(output.getvalue()))
     data_sheet = reread.nodes[reread.canvases[0].root_node_ids[0]]
     cell = next(
-        cell
-        for cell in data_sheet.payload.cells
-        if (cell.row, cell.column) == (1, 1)
+        cell for cell in data_sheet.payload.cells if (cell.row, cell.column) == (1, 1)
     )
 
     assert cell.metadata["xlsx.typed_value"] == "42%"
@@ -114,20 +112,26 @@ def test_mixed_type_xlsx_sheet_stays_identity_read_only() -> None:
     document = read_xlsx_ir(BytesIO(make_xlsx()))
     projection = _identity_projection(document)
     data_node_id = document.canvases[0].root_node_ids[0]
-    block = next(item for item in projection.manifest.blocks if item.node_id == data_node_id)
+    block = next(
+        item for item in projection.manifest.blocks if item.node_id == data_node_id
+    )
 
     assert block.editable_capabilities == ()
 
 
 @pytest.mark.parametrize("unsafe_text", [" Region", "Region ", "A|B", "A\nB"])
 def test_unsafe_xlsx_text_cell_stays_identity_read_only(unsafe_text: str) -> None:
-    escaped = unsafe_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    escaped = (
+        unsafe_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    )
     sheet = _TEXT_SHEET.replace("Region</t>", f"{escaped}</t>", 1)
     source = make_xlsx(replacements={"xl/worksheets/sheet1.xml": sheet})
     document = read_xlsx_ir(BytesIO(source))
     projection = _identity_projection(document)
     data_node_id = document.canvases[0].root_node_ids[0]
-    block = next(item for item in projection.manifest.blocks if item.node_id == data_node_id)
+    block = next(
+        item for item in projection.manifest.blocks if item.node_id == data_node_id
+    )
 
     assert block.editable_capabilities == ()
 

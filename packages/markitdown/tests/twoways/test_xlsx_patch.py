@@ -69,9 +69,7 @@ def test_patch_preserves_value_carrier_position_before_ext_list() -> None:
     root = parse_xml_part(output)
     target = root.xpath("//*[local-name()='c' and @r='B1']")[0]
     child_names = [
-        child.tag.rsplit("}", 1)[-1]
-        for child in target
-        if isinstance(child.tag, str)
+        child.tag.rsplit("}", 1)[-1] for child in target if isinstance(child.tag, str)
     ]
 
     assert child_names == ["v", "extLst"]

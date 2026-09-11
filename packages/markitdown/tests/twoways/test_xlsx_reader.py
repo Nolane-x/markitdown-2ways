@@ -75,7 +75,9 @@ def test_reader_table_capability_is_writable_when_sheet_has_writable_cells() -> 
     assert decision.constraints["typed_cells"] is True
 
 
-def test_reader_keeps_large_sparse_grid_read_only_without_dense_materialization() -> None:
+def test_reader_keeps_large_sparse_grid_read_only_without_dense_materialization() -> (
+    None
+):
     sparse_sheet = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetData>
@@ -101,8 +103,7 @@ def test_reader_keeps_large_sparse_grid_read_only_without_dense_materialization(
     assert cell.metadata["xlsx.typed_value"] == 7
     assert cell.metadata["xlsx.writable"] is False
     assert (
-        cell.metadata["xlsx.reason_code"]
-        == "xlsx.sheet.grid_too_large_to_materialize"
+        cell.metadata["xlsx.reason_code"] == "xlsx.sheet.grid_too_large_to_materialize"
     )
     decision = capabilities_for_node(table).for_operation("update_sheet_cells")
     assert decision.state is CapabilityState.READ_ONLY

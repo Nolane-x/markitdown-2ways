@@ -84,9 +84,7 @@ def read_xlsx_ir(
         )
         table_cells: list[TableCell] = []
         writable_count = 0
-        dense_materialization = (
-            grid.rows * grid.columns <= _MAX_MATERIALIZED_GRID_CELLS
-        )
+        dense_materialization = grid.rows * grid.columns <= _MAX_MATERIALIZED_GRID_CELLS
         if dense_materialization:
             native_cells = {(cell.row, cell.column): cell for cell in grid.cells}
             for row in range(grid.rows):

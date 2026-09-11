@@ -112,6 +112,35 @@ def test_merged_cells_are_read_only() -> None:
         assert cell.capability.reason_code == "xlsx.cell.merged_range"
 
 
+def test_oversized_merged_range_fails_closed_before_large_expansion() -> None:
+    merged_xml = SHEET1.replace(
+        "</worksheet>",
+        '<mergeCells count="1"><mergeCell ref="A1:CV1001"/></mergeCells></worksheet>',
+    )
+
+    with pytest.raises(ValueError, match="too large"):
+        read_worksheet_grid(
+            parse_xml_part(merged_xml.encode()),
+            shared_strings=("North",),
+        )
+
+
+def test_overlapping_merged_ranges_fail_closed() -> None:
+    merged_xml = SHEET1.replace(
+        "</worksheet>",
+        '<mergeCells count="2">'
+        '<mergeCell ref="A1:B1"/>'
+        '<mergeCell ref="B1:C1"/>'
+        "</mergeCells></worksheet>",
+    )
+
+    with pytest.raises(ValueError, match="overlap"):
+        read_worksheet_grid(
+            parse_xml_part(merged_xml.encode()),
+            shared_strings=("North",),
+        )
+
+
 def test_duplicate_cell_reference_fails_closed() -> None:
     xml = SHEET1.replace(
         '<c r="B1"><v>7</v></c>', '<c r="B1"><v>7</v></c><c r="B1"><v>8</v></c>'

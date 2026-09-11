@@ -27,6 +27,7 @@ def _simple_identity_table(payload: TablePayload) -> bool:
             or cell.column_span != 1
             or cell.node_ids
             or any(character in text for character in "\r\n|")
+            or text != text.strip()
         ):
             return False
         coordinates.add(coordinate)

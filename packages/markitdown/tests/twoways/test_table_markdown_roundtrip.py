@@ -151,3 +151,22 @@ def test_pipe_or_multiline_cell_never_becomes_identity_editable():
     )
 
     assert block.editable_capabilities == ()
+
+
+@pytest.mark.parametrize("unsafe_text", [" Region", "Region ", "\tRegion"])
+def test_boundary_whitespace_cell_never_becomes_identity_editable(unsafe_text):
+    document = _capable_table_document()
+    table = document.nodes["table1"]
+    cells = list(table.payload.cells)
+    cells[0] = TableCell(row=0, column=0, text=unsafe_text)
+    unsafe = replace(
+        table,
+        payload=TablePayload(rows=2, columns=2, cells=tuple(cells)),
+    )
+    document = replace(document, nodes={**document.nodes, "table1": unsafe})
+    projection = _identity_projection(document)
+    block = next(
+        item for item in projection.manifest.blocks if item.node_id == "table1"
+    )
+
+    assert block.editable_capabilities == ()

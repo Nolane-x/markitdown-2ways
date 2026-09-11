@@ -79,3 +79,27 @@ def test_rejects_mixed_supported_spreadsheetml_namespaces_in_workbook() -> None:
     with pytest.raises(OOXMLPackageError) as exc_info:
         discover_xlsx_parts(make_xlsx(replacements={"xl/workbook.xml": workbook}))
     assert exc_info.value.details["reason"] == "mixed_spreadsheet_namespace"
+
+
+def test_rejects_duplicate_numeric_sheet_ids() -> None:
+    workbook = WORKBOOK.replace(
+        '<sheet name="Other" sheetId="2" r:id="rId2"/>',
+        '<sheet name="Other" sheetId="1" r:id="rId2"/>',
+    )
+
+    with pytest.raises(OOXMLPackageError) as exc_info:
+        discover_xlsx_parts(make_xlsx(replacements={"xl/workbook.xml": workbook}))
+
+    assert exc_info.value.details["reason"] == "malformed_sheet"
+
+
+def test_rejects_reused_sheet_relationship_authority() -> None:
+    workbook = WORKBOOK.replace(
+        '<sheet name="Other" sheetId="2" r:id="rId2"/>',
+        '<sheet name="Other" sheetId="2" r:id="rId1"/>',
+    )
+
+    with pytest.raises(OOXMLPackageError) as exc_info:
+        discover_xlsx_parts(make_xlsx(replacements={"xl/workbook.xml": workbook}))
+
+    assert exc_info.value.details["reason"] == "duplicate_sheet_relationship"

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ...capabilities import CapabilityDecision
+from ...ooxml import OOXMLPackageLimits
 
 
 SPREADSHEETML_TRANSITIONAL_NS = (
@@ -33,6 +34,12 @@ SHARED_STRINGS_CONTENT_TYPE = (
 STYLES_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"
 )
+
+
+@dataclass(frozen=True)
+class XlsxPatchOptions:
+    verify_output: bool = True
+    limits: OOXMLPackageLimits = field(default_factory=OOXMLPackageLimits)
 
 
 @dataclass(frozen=True)

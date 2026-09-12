@@ -262,9 +262,7 @@ def build_shape_node(
         replace_capability = (
             _writable("replace_text", preserve_run_structure=True)
             if text_compatible
-            else _read_only(
-                "replace_text", "pptx.text.unsupported_native_structure"
-            )
+            else _read_only("replace_text", "pptx.text.unsupported_native_structure")
         )
         style_capability = (
             _writable(
@@ -308,11 +306,7 @@ def build_shape_node(
     )
     metadata = dict(common["metadata"])
     metadata[_CAPABILITY_KEY] = encode_capabilities(
-        (
-            _read_only(
-                "move_resize", "pptx.geometry.unknown_native_shape_read_only"
-            ),
-        )
+        (_read_only("move_resize", "pptx.geometry.unknown_native_shape_read_only"),)
     )
     return (
         Node(
@@ -451,11 +445,7 @@ def build_shape_tree(
             "pptx:z_order": z_order,
             "pptx:patch_capabilities": (),
             _CAPABILITY_KEY: encode_capabilities(
-                (
-                    _read_only(
-                        "move_resize", "pptx.geometry.group_coordinate_space"
-                    ),
-                )
+                (_read_only("move_resize", "pptx.geometry.group_coordinate_space"),)
             ),
         },
     )

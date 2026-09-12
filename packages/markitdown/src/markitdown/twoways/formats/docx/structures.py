@@ -164,9 +164,7 @@ def build_table_node(
     table_capability = (
         _writable("update_table_cells", preserve_cell_wrappers=True)
         if compatible
-        else _read_only(
-            "update_table_cells", "docx.table.unsupported_native_structure"
-        )
+        else _read_only("update_table_cells", "docx.table.unsupported_native_structure")
     )
     return Node(
         node_id=stable_docx_node_id(locator, "table"),

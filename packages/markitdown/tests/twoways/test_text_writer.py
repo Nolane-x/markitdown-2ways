@@ -22,7 +22,9 @@ def _node(document):
     return document.nodes[document.canvases[0].root_node_ids[0]]
 
 
-def _replace_edit(document, text: str, *, old_value: str | None = None) -> EditOperation:
+def _replace_edit(
+    document, text: str, *, old_value: str | None = None
+) -> EditOperation:
     node = _node(document)
     return EditOperation(
         operation_id="edit-1",
@@ -86,7 +88,13 @@ def test_replace_text_preserves_crlf_and_utf8_bom() -> None:
         document,
         BytesIO(source),
         output,
-        edits=(_replace_edit(document, "gamma\ndelta\n", old_value="alpha\r\nbeta\r\n"),),
+        edits=(
+            _replace_edit(
+                document,
+                "gamma\ndelta\n",
+                old_value="alpha\r\nbeta\r\n",
+            ),
+        ),
     )
 
     assert output.getvalue() == codecs.BOM_UTF8 + b"gamma\r\ndelta\r\n"

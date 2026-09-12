@@ -10,4 +10,4 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        entry: bash -c 'printf "H5_FORMAT_ARCHIVE_BEGIN\n"; tar -czf - packages/markitdown/src/markitdown/twoways/formats/html packages/markitdown/tests/twoways/test_html_*.py | base64 -w0; printf "\nH5_FORMAT_ARCHIVE_END\n"; exit 1'
+        entry: bash -c 'printf "H5_FORMAT_PATCH_BEGIN\n"; git diff -- packages/markitdown/src/markitdown/twoways/formats/html packages/markitdown/tests/twoways/test_html_*.py | gzip -9 | base64 -w0; printf "\nH5_FORMAT_PATCH_END\n"; exit 1'

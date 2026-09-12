@@ -72,12 +72,16 @@ class _Parser:
         root_nodes = self._parse_value("", None)
         self._skip_whitespace()
         if self.position != self.length:
-            raise JsonLexicalError("JSON source contains trailing data after root value")
+            raise JsonLexicalError(
+                "JSON source contains trailing data after root value"
+            )
         _strict_stdlib_check(self.text)
         return JsonLexicalDocument(root_pointer="", nodes=tuple(root_nodes))
 
     def _skip_whitespace(self) -> None:
-        while self.position < self.length and self.text[self.position] in _JSON_WHITESPACE:
+        while (
+            self.position < self.length and self.text[self.position] in _JSON_WHITESPACE
+        ):
             self.position += 1
 
     def _node(
@@ -130,7 +134,9 @@ class _Parser:
                 )
             ]
         if character == "t" and self.text.startswith("true", self.position):
-            return [self._parse_literal(pointer, parent_pointer, "true", "boolean", True)]
+            return [
+                self._parse_literal(pointer, parent_pointer, "true", "boolean", True)
+            ]
         if character == "f" and self.text.startswith("false", self.position):
             return [
                 self._parse_literal(pointer, parent_pointer, "false", "boolean", False)
@@ -173,7 +179,9 @@ class _Parser:
         raw = self.text[start : self.position]
         try:
             number_value = Decimal(raw)
-        except Exception as exc:  # Decimal failure is a lexical failure at this boundary.
+        except (
+            Exception
+        ) as exc:  # Decimal failure is a lexical failure at this boundary.
             raise JsonLexicalError(f"invalid JSON number token: {raw!r}") from exc
         return self._node(
             pointer=pointer,
@@ -199,10 +207,14 @@ class _Parser:
                 except (json.JSONDecodeError, ValueError) as exc:
                     raise JsonLexicalError(f"invalid JSON string token: {exc}") from exc
                 if not isinstance(value, str):
-                    raise JsonLexicalError("JSON string token did not decode to a string")
+                    raise JsonLexicalError(
+                        "JSON string token did not decode to a string"
+                    )
                 return value, self.position
             if ord(character) < 0x20:
-                raise JsonLexicalError("JSON string contains an unescaped control character")
+                raise JsonLexicalError(
+                    "JSON string contains an unescaped control character"
+                )
             if character == "\\":
                 self.position += 1
                 if self.position >= self.length:
@@ -213,7 +225,9 @@ class _Parser:
                         raise JsonLexicalError("JSON unicode escape is incomplete")
                     digits = self.text[self.position + 1 : self.position + 5]
                     if len(digits) != 4 or any(digit not in _HEX for digit in digits):
-                        raise JsonLexicalError("JSON unicode escape contains non-hex digits")
+                        raise JsonLexicalError(
+                            "JSON unicode escape contains non-hex digits"
+                        )
                     self.position += 5
                     continue
                 if escape not in _SIMPLE_ESCAPES:
@@ -252,7 +266,9 @@ class _Parser:
                 raise JsonLexicalError("JSON object member key must be a string")
             key, _key_end = self._parse_string_token()
             if key in seen_keys:
-                raise JsonLexicalError(f"duplicate JSON object key is ambiguous: {key!r}")
+                raise JsonLexicalError(
+                    f"duplicate JSON object key is ambiguous: {key!r}"
+                )
             seen_keys.add(key)
             self._skip_whitespace()
             if self.position >= self.length or self.text[self.position] != ":":

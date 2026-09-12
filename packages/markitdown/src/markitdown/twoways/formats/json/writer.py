@@ -486,8 +486,7 @@ def _verify_untouched_bytes(
         )
     if (
         original_bom_length != candidate_bom_length
-        or source_bytes[:original_bom_length]
-        != candidate_bytes[:candidate_bom_length]
+        or source_bytes[:original_bom_length] != candidate_bytes[:candidate_bom_length]
     ):
         raise RoundTripVerificationError(
             "JSON BOM or encoded payload boundary changed unexpectedly.",
@@ -526,7 +525,9 @@ def _verify_untouched_bytes(
         )
 
 
-def _topology_by_pointer(pointer_nodes: Mapping[str, Node]) -> dict[str, tuple[object, tuple[str, ...]]]:
+def _topology_by_pointer(
+    pointer_nodes: Mapping[str, Node]
+) -> dict[str, tuple[object, tuple[str, ...]]]:
     pointer_by_id = {node.node_id: pointer for pointer, node in pointer_nodes.items()}
     topology: dict[str, tuple[object, tuple[str, ...]]] = {}
     for pointer, node in pointer_nodes.items():
@@ -536,7 +537,10 @@ def _topology_by_pointer(pointer_nodes: Mapping[str, Node]) -> dict[str, tuple[o
             if parent_pointer is None:
                 raise RoundTripVerificationError(
                     "JSON candidate topology contains an unknown parent.",
-                    details={"reason": "json.candidate_topology_parent", "pointer": pointer},
+                    details={
+                        "reason": "json.candidate_topology_parent",
+                        "pointer": pointer,
+                    },
                 )
         try:
             children = tuple(pointer_by_id[child_id] for child_id in node.children)
@@ -621,7 +625,9 @@ def _verify_candidate(
         candidate_node = candidate_nodes[pointer]
         candidate_kind = candidate_node.metadata.get("json.kind")
         if pointer in requested:
-            _token, expected_kind, expected_semantic = _render_scalar(requested[pointer])
+            _token, expected_kind, expected_semantic = _render_scalar(
+                requested[pointer]
+            )
             actual_kind, actual_semantic = _node_scalar_semantic(candidate_node)
             if (actual_kind, actual_semantic) != (expected_kind, expected_semantic):
                 raise RoundTripVerificationError(

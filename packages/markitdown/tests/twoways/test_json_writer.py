@@ -100,7 +100,7 @@ def test_string_scalar_is_replaced_by_its_exact_lexical_span() -> None:
         edits=(_edit(document, "/name", 'A"B\nC'),),
     )
 
-    assert output.getvalue() == b'{ "name" : "A\\\"B\\nC", "keep" : [ 1, 2 ] }\n'
+    assert output.getvalue() == b'{ "name" : "A\\"B\\nC", "keep" : [ 1, 2 ] }\n'
 
 
 @pytest.mark.parametrize(
@@ -114,7 +114,9 @@ def test_string_scalar_is_replaced_by_its_exact_lexical_span() -> None:
         (b"1", "", "root", b'"root"'),
     ],
 )
-def test_scalar_types_and_type_changes_are_supported(source, pointer, value, expected) -> None:
+def test_scalar_types_and_type_changes_are_supported(
+    source, pointer, value, expected
+) -> None:
     document = read_json_ir(BytesIO(source), filename="data.json")
     output = BytesIO()
 

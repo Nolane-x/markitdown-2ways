@@ -15,8 +15,12 @@ def _by_pointer(document):
 def test_json_reader_builds_deterministic_hierarchical_ir() -> None:
     source = b'{"name":"Ada","n":1,"ok":true,"none":null,"arr":[2]}'
 
-    first = read_json_ir(BytesIO(source), filename="data.json", mimetype="application/json")
-    second = read_json_ir(BytesIO(source), filename="data.json", mimetype="application/json")
+    first = read_json_ir(
+        BytesIO(source), filename="data.json", mimetype="application/json"
+    )
+    second = read_json_ir(
+        BytesIO(source), filename="data.json", mimetype="application/json"
+    )
 
     validate_document(first)
     assert canonical_json_digest(first) == canonical_json_digest(second)
@@ -37,7 +41,9 @@ def test_json_reader_builds_deterministic_hierarchical_ir() -> None:
     assert root.semantic_role == "json-object"
     assert root.parent_id is None
     assert root.payload == {"json_type": "object", "size": 5}
-    assert tuple(first.nodes[node_id].metadata["json.pointer"] for node_id in root.children) == (
+    assert tuple(
+        first.nodes[node_id].metadata["json.pointer"] for node_id in root.children
+    ) == (
         "/name",
         "/n",
         "/ok",
@@ -77,7 +83,9 @@ def test_scalar_nodes_are_writable_but_containers_are_structural_read_only() -> 
     nodes = _by_pointer(document)
 
     scalar = capabilities_for_node(nodes["/value"]).for_operation("replace_json_scalar")
-    container = capabilities_for_node(nodes["/nested"]).for_operation("replace_json_scalar")
+    container = capabilities_for_node(nodes["/nested"]).for_operation(
+        "replace_json_scalar"
+    )
 
     assert scalar.state is CapabilityState.WRITABLE
     assert scalar.reason_code is None
@@ -114,22 +122,30 @@ def test_root_scalar_is_a_single_writable_root_node() -> None:
     root = nodes[""]
     assert root.semantic_role == "json-boolean"
     assert root.payload == {"json_type": "boolean", "value": True}
-    assert capabilities_for_node(root).for_operation("replace_json_scalar").state is CapabilityState.WRITABLE
+    assert (
+        capabilities_for_node(root).for_operation("replace_json_scalar").state
+        is CapabilityState.WRITABLE
+    )
 
 
 def test_json_ir_reader_accepts_only_json_extension_or_exact_mimetype() -> None:
     reader = JsonIRReader()
 
-    assert reader.accepts(BytesIO(b""), SimpleNamespace(extension=".json", mimetype=None))
+    assert reader.accepts(
+        BytesIO(b""), SimpleNamespace(extension=".json", mimetype=None)
+    )
     assert reader.accepts(
         BytesIO(b""), SimpleNamespace(extension=".txt", mimetype="application/json")
     )
     assert reader.accepts(
-        BytesIO(b""), SimpleNamespace(extension=None, mimetype="text/json; charset=utf-8")
+        BytesIO(b""),
+        SimpleNamespace(extension=None, mimetype="text/json; charset=utf-8"),
     )
     assert not reader.accepts(
-        BytesIO(b""), SimpleNamespace(extension=".jsonl", mimetype="application/x-ndjson")
+        BytesIO(b""),
+        SimpleNamespace(extension=".jsonl", mimetype="application/x-ndjson"),
     )
     assert not reader.accepts(
-        BytesIO(b""), SimpleNamespace(extension=".txt", mimetype="application/problem+json")
+        BytesIO(b""),
+        SimpleNamespace(extension=".txt", mimetype="application/problem+json"),
     )

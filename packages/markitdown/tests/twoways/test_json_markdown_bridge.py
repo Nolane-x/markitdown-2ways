@@ -25,5 +25,9 @@ def test_json_identity_markdown_is_inspection_only() -> None:
     )
 
     assert projection.manifest.blocks
-    assert all(block.node_kind == "unknown_native" for block in projection.manifest.blocks)
-    assert all(block.editable_capabilities == () for block in projection.manifest.blocks)
+    assert all(
+        block.node_kind == "unknown_native" for block in projection.manifest.blocks
+    )
+    assert all(
+        block.editable_capabilities == () for block in projection.manifest.blocks
+    )

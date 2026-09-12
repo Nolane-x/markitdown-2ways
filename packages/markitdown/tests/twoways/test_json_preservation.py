@@ -83,9 +83,7 @@ def test_reversible_legacy_encoding_is_preserved() -> None:
         edits=(_edit(document, "/city", "Lyon"),),
     )
 
-    assert output.getvalue() == '{"name":"André", "city":"Lyon"}\r\n'.encode(
-        "cp1252"
-    )
+    assert output.getvalue() == '{"name":"André", "city":"Lyon"}\r\n'.encode("cp1252")
 
 
 def test_unencodable_replacement_fails_before_destination_output() -> None:

@@ -38,7 +38,7 @@ def test_scans_nested_json_with_exact_spans_and_pointers() -> None:
 
 
 def test_string_escape_semantics_are_strict_and_span_is_lexical() -> None:
-    text = '{"s":"line\\n\\u0041\\\\\\\""}'
+    text = '{"s":"line\\n\\u0041\\\\\\""}'
     document = scan_json_text(text)
     node = _by_pointer(document)["/s"]
 
@@ -58,7 +58,9 @@ def test_string_escape_semantics_are_strict_and_span_is_lexical() -> None:
         ("1E-2", Decimal("1E-2")),
     ],
 )
-def test_json_number_grammar_and_decimal_semantics(token: str, expected: Decimal) -> None:
+def test_json_number_grammar_and_decimal_semantics(
+    token: str, expected: Decimal
+) -> None:
     document = scan_json_text(token)
     node = document.nodes[0]
 
@@ -80,7 +82,7 @@ def test_json_number_grammar_and_decimal_semantics(token: str, expected: Decimal
         "Infinity",
         "-Infinity",
         '{"a":1,}',
-        '[1,]',
+        "[1,]",
         '{"a":1 // comment\n}',
         '{"a":1} trailing',
         '"unterminated',
@@ -97,7 +99,9 @@ def test_duplicate_decoded_object_key_fails_closed() -> None:
         scan_json_text('{"a":1,"\\u0061":2}')
 
 
-def test_root_scalar_and_whitespace_are_supported_without_absorbing_whitespace() -> None:
+def test_root_scalar_and_whitespace_are_supported_without_absorbing_whitespace() -> (
+    None
+):
     text = " \r\n  true\t "
     document = scan_json_text(text)
     node = document.nodes[0]

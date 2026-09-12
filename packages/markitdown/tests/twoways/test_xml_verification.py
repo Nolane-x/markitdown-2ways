@@ -92,7 +92,7 @@ def test_candidate_verifier_rejects_unrequested_reference_raw_drift() -> None:
 
 
 def test_candidate_verifier_rejects_bom_representation_drift() -> None:
-    source = codecs.BOM_UTF8 + b'<r><a>1</a><b>2</b></r>'
+    source = codecs.BOM_UTF8 + b"<r><a>1</a><b>2</b></r>"
     document = read_xml_ir(BytesIO(source), filename="data.xml")
 
     with pytest.raises(RoundTripVerificationError, match="representation"):

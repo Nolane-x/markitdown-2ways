@@ -13,8 +13,7 @@ class XmlPatchWriter(DocumentWriter):
         del kwargs
         source_format = document.source.format if document.source is not None else None
         return source_format == "xml" and (
-            target.format.lower() == "xml"
-            or (target.extension or "").lower() == ".xml"
+            target.format.lower() == "xml" or (target.extension or "").lower() == ".xml"
         )
 
     def write(

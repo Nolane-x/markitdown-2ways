@@ -52,7 +52,7 @@ def test_default_namespace_does_not_apply_to_unprefixed_attributes() -> None:
 
 
 def test_preserves_comment_pi_cdata_and_self_closing_lexemes() -> None:
-    text = '<?pi test?><r><!--c--><![CDATA[x<y]]><a /></r>'
+    text = "<?pi test?><r><!--c--><![CDATA[x<y]]><a /></r>"
     document = scan_xml_text(text)
     nodes = tuple(document.nodes)
 
@@ -63,9 +63,7 @@ def test_preserves_comment_pi_cdata_and_self_closing_lexemes() -> None:
     assert any(node.kind == "comment" and node.raw == "<!--c-->" for node in nodes)
     cdata = next(node for node in nodes if node.kind == "cdata")
     assert cdata.value == "x<y"
-    child = next(
-        node for node in nodes if node.kind == "element" and node.qname == "a"
-    )
+    child = next(node for node in nodes if node.kind == "element" and node.qname == "a")
     assert child.raw == "<a />"
 
 

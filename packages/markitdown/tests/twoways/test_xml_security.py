@@ -20,7 +20,7 @@ from markitdown.twoways.formats.xml.lexical import (
         b'<r xmlns:p="u"><p:x></r>',
         b'<r p:x="1"/>',
         b'<r a="1" a="2"/>',
-        b'<r><a></r>',
+        b"<r><a></r>",
     ],
 )
 def test_unsafe_or_malformed_xml_fails_closed(source: bytes) -> None:
@@ -59,10 +59,7 @@ def test_declaration_encoding_conflict_fails_closed() -> None:
 
 
 def test_external_entity_text_is_not_treated_as_a_normal_reference() -> None:
-    source = (
-        b'<!DOCTYPE r [<!ENTITY x SYSTEM "file:///etc/passwd">]>'
-        b'<r>&x;</r>'
-    )
+    source = b'<!DOCTYPE r [<!ENTITY x SYSTEM "file:///etc/passwd">]>' b"<r>&x;</r>"
 
     with pytest.raises(XmlLexicalError):
         parse_xml_source(source)
@@ -70,4 +67,4 @@ def test_external_entity_text_is_not_treated_as_a_normal_reference() -> None:
 
 def test_processing_instruction_cannot_use_xml_target_outside_declaration() -> None:
     with pytest.raises(XmlLexicalError):
-        parse_xml_source(b'<r><?xml bad?></r>')
+        parse_xml_source(b"<r><?xml bad?></r>")

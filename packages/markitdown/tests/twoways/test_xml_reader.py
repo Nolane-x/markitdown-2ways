@@ -100,7 +100,9 @@ def test_xml_capabilities_are_narrow_and_kind_specific() -> None:
     text = nodes["/r[1]/#text[1]"]
     cdata = nodes["/r[1]/#cdata[1]"]
     namespace = next(
-        node for node in document.nodes.values() if node.semantic_role == "xml-namespace"
+        node
+        for node in document.nodes.values()
+        if node.semantic_role == "xml-namespace"
     )
 
     text_decision = capabilities_for_node(text).for_operation("replace_xml_text")
@@ -125,10 +127,7 @@ def test_xml_capabilities_are_narrow_and_kind_specific() -> None:
     assert element_decision.state is CapabilityState.READ_ONLY
     assert element_decision.reason_code == "xml.element.structural_edit_unsupported"
     assert namespace_decision.state is CapabilityState.READ_ONLY
-    assert (
-        namespace_decision.reason_code
-        == "xml.namespace.structural_edit_unsupported"
-    )
+    assert namespace_decision.reason_code == "xml.namespace.structural_edit_unsupported"
     assert cdata_decision.state is CapabilityState.READ_ONLY
     assert cdata_decision.reason_code == "xml.cdata.lexical_edit_unsupported"
 

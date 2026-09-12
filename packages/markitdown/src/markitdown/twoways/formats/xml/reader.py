@@ -246,13 +246,10 @@ def read_xml_ir(
             semantic_role=f"xml-{lexeme.kind.replace('_', '-')}",
             order=order,
             parent_id=(
-                node_ids[lexeme.parent_path]
-                if lexeme.parent_path is not None
-                else None
+                node_ids[lexeme.parent_path] if lexeme.parent_path is not None else None
             ),
             children=tuple(
-                node_ids[child.path]
-                for child in direct_children.get(lexeme.path, ())
+                node_ids[child.path] for child in direct_children.get(lexeme.path, ())
             ),
             canvas_id=canvas_id,
             provenance=(

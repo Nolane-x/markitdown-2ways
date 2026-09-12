@@ -131,7 +131,9 @@ def _root_node(document: DocumentIR) -> Node:
     return root
 
 
-def _representation(document: DocumentIR, *, require_writable: bool) -> TextRepresentation:
+def _representation(
+    document: DocumentIR, *, require_writable: bool
+) -> TextRepresentation:
     root = _root_node(document)
     encoding = root.metadata.get("xml.encoding")
     bom = root.metadata.get("xml.bom")
@@ -532,7 +534,9 @@ def _build_candidate(
             )
         prefix = source_text[cursor:start]
         parts.append(prefix)
-        untouched.append((cursor, start, candidate_cursor, candidate_cursor + len(prefix)))
+        untouched.append(
+            (cursor, start, candidate_cursor, candidate_cursor + len(prefix))
+        )
         candidate_cursor += len(prefix)
         parts.append(token)
         candidate_cursor += len(token)
@@ -594,8 +598,7 @@ def _verify_untouched_bytes(
         )
     if (
         original_bom_length != candidate_bom_length
-        or source_bytes[:original_bom_length]
-        != candidate_bytes[:candidate_bom_length]
+        or source_bytes[:original_bom_length] != candidate_bytes[:candidate_bom_length]
     ):
         raise RoundTripVerificationError(
             "XML BOM or encoded payload boundary changed unexpectedly.",

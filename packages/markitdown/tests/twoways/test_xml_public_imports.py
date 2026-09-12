@@ -31,7 +31,9 @@ def test_xml_patch_writer_accepts_only_xml_backed_xml_targets() -> None:
         xml_document,
         TargetInfo(format="native", extension=".XML"),
     )
-    assert not writer.accepts(xml_document, TargetInfo(format="json", extension=".json"))
+    assert not writer.accepts(
+        xml_document, TargetInfo(format="json", extension=".json")
+    )
     assert not writer.accepts(json_document, TargetInfo(format="xml", extension=".xml"))
 
 

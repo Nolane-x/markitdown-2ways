@@ -34,8 +34,8 @@ _DECL_RE = re.compile(
     r"""(?:\s+standalone\s*=\s*(?P<sq>['"])(?P<standalone>yes|no)(?P=sq))?\s*\?>"""
 )
 _BYTES_DECL_ENCODING_RE = re.compile(
-    br"""^<\?xml\s+version\s*=\s*['"][^'"]+['"]"""
-    br""".*?\s+encoding\s*=\s*['"](?P<encoding>[A-Za-z][A-Za-z0-9._-]*)['"]""",
+    rb"""^<\?xml\s+version\s*=\s*['"][^'"]+['"]"""
+    rb""".*?\s+encoding\s*=\s*['"](?P<encoding>[A-Za-z][A-Za-z0-9._-]*)['"]""",
     re.DOTALL,
 )
 _NAME_DELIMITERS = frozenset(" \t\r\n/><=?")
@@ -142,7 +142,9 @@ def _decode_value(raw: str, *, attribute: bool) -> str:
             index += 1
             continue
         if not _is_xml_char(character):
-            raise XmlLexicalError("XML source contains a character forbidden by XML 1.0")
+            raise XmlLexicalError(
+                "XML source contains a character forbidden by XML 1.0"
+            )
         result.append(character)
         index += 1
     value = "".join(result)
@@ -256,7 +258,9 @@ class _Scanner:
         quote_character = self.text[self.position]
         self.position += 1
         value_start = self.position
-        while self.position < self.length and self.text[self.position] != quote_character:
+        while (
+            self.position < self.length and self.text[self.position] != quote_character
+        ):
             if self.text[self.position] == "<":
                 raise XmlLexicalError("XML attribute value contains '<'")
             self.position += 1
@@ -310,7 +314,9 @@ class _Scanner:
                 if uri != _XML_URI:
                     raise XmlLexicalError("the xml prefix has a fixed namespace URI")
             elif uri == _XML_URI:
-                raise XmlLexicalError("the XML namespace URI belongs only to prefix xml")
+                raise XmlLexicalError(
+                    "the XML namespace URI belongs only to prefix xml"
+                )
             if prefix and not uri:
                 raise XmlLexicalError("prefixed XML namespaces cannot be undeclared")
             namespaces[prefix] = uri
@@ -452,9 +458,9 @@ class _Scanner:
                 if self.text.startswith("<![CDATA[", self.position):
                     content_nodes.append(self._parse_cdata(path, lexical_kind_counts))
                     continue
-                if self.text.startswith("<!DOCTYPE", self.position) or self.text.startswith(
-                    "<!", self.position
-                ):
+                if self.text.startswith(
+                    "<!DOCTYPE", self.position
+                ) or self.text.startswith("<!", self.position):
                     raise XmlLexicalError(
                         "XML DTDs and markup declarations are forbidden in H4"
                     )
@@ -571,7 +577,7 @@ class _Scanner:
         end_marker = self.text.find("?>", self.position)
         if end_marker < 0:
             raise XmlLexicalError("XML processing instruction is unterminated")
-        data = self.text[self.position:end_marker].strip()
+        data = self.text[self.position : end_marker].strip()
         self.position = end_marker + 2
         raw = self.text[start : self.position]
         kind_counts["processing_instruction"] += 1
@@ -629,7 +635,9 @@ def _security_cross_check(text: str) -> None:
             forbid_external=True,
         )
     except (DefusedXmlException, ParseError, ValueError) as exc:
-        raise XmlLexicalError(f"XML security/well-formedness check failed: {exc}") from exc
+        raise XmlLexicalError(
+            f"XML security/well-formedness check failed: {exc}"
+        ) from exc
 
 
 def scan_xml_text(text: str) -> XmlLexicalDocument:
@@ -724,7 +732,9 @@ def parse_xml_source(
     try:
         text, representation = decode_text_source(source, encoding=hint)
     except (UnicodeError, LookupError, ValueError) as exc:
-        raise XmlLexicalError(f"XML source encoding could not be decoded safely: {exc}") from exc
+        raise XmlLexicalError(
+            f"XML source encoding could not be decoded safely: {exc}"
+        ) from exc
 
     lexical = scan_xml_text(text)
     declaration = lexical.declaration
@@ -735,9 +745,13 @@ def parse_xml_source(
             )
     try:
         if encode_text_source(text, representation) != source:
-            raise XmlLexicalError("XML source fails exact decode/encode authority proof")
+            raise XmlLexicalError(
+                "XML source fails exact decode/encode authority proof"
+            )
     except (UnicodeError, ValueError) as exc:
-        raise XmlLexicalError("XML source fails exact decode/encode authority proof") from exc
+        raise XmlLexicalError(
+            "XML source fails exact decode/encode authority proof"
+        ) from exc
     return ParsedXmlSource(
         text=text,
         representation=representation,

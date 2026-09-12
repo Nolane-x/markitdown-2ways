@@ -13,6 +13,7 @@ INITIAL_EDIT_TYPES = frozenset(
         "set_alt_text",
         "update_table_cells",
         "update_sheet_cells",
+        "update_csv_cells",
         "add_node",
         "remove_node",
     }

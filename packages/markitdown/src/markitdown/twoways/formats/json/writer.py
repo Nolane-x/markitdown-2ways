@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 import codecs
 from decimal import Decimal
 from hashlib import sha256
+from io import BytesIO
 import json
 import math
 from typing import BinaryIO
@@ -30,6 +31,10 @@ from ..text.codec import decode_text_source, encode_text_source
 from ..text.model import TextRepresentation
 from .lexical import scan_json_text
 from .model import JsonLexicalDocument, JsonLexicalNode
+from .reader import read_json_ir
+
+
+_CONTAINER_KINDS = frozenset({"object", "array"})
 
 
 def _read_source_bytes(source_stream: BinaryIO) -> bytes:
@@ -83,8 +88,7 @@ def _nodes_by_pointer(document: DocumentIR) -> dict[str, Node]:
 
 
 def _representation(document: DocumentIR) -> TextRepresentation:
-    nodes = _nodes_by_pointer(document)
-    root = nodes.get("")
+    root = _nodes_by_pointer(document).get("")
     if root is None:
         raise PatchPreconditionError(
             "JSON root node is missing from the DocumentIR.",
@@ -208,13 +212,15 @@ def _validate_node_evidence(
             expected=expected_children,
             actual=node.children,
         )
-    if node.kind != "unknown_native" or node.semantic_role != f"json-{lexical.kind}":
+    expected_semantics = ("unknown_native", f"json-{lexical.kind}")
+    actual_semantics = (node.kind, node.semantic_role)
+    if actual_semantics != expected_semantics:
         _fail_native_evidence(
             node,
             pointer,
             "semantic_kind",
-            expected=("unknown_native", f"json-{lexical.kind}"),
-            actual=(node.kind, node.semantic_role),
+            expected=expected_semantics,
+            actual=actual_semantics,
         )
 
 
@@ -313,6 +319,32 @@ def _source_semantic(node: JsonLexicalNode) -> tuple[str, object]:
     return node.kind, node.value
 
 
+def _node_scalar_semantic(node: Node) -> tuple[str, object]:
+    kind = node.metadata.get("json.kind")
+    if kind in _CONTAINER_KINDS or not isinstance(kind, str):
+        raise RoundTripVerificationError(
+            "JSON candidate scalar verification received a container.",
+            details={"reason": "json.candidate_scalar_kind", "kind": kind},
+        )
+    if kind == "number":
+        raw = node.metadata.get("json.raw")
+        if not isinstance(raw, str):
+            raise RoundTripVerificationError(
+                "JSON candidate number is missing its raw token.",
+                details={"reason": "json.candidate_number_raw"},
+            )
+        return "number", Decimal(raw)
+    payload = node.payload
+    if not isinstance(payload, Mapping):
+        raise RoundTripVerificationError(
+            "JSON candidate scalar payload is malformed.",
+            details={"reason": "json.candidate_scalar_payload"},
+        )
+    if kind == "null":
+        return "null", None
+    return kind, payload.get("value")
+
+
 def _preflight_edit(
     document: DocumentIR,
     edit: EditOperation,
@@ -351,15 +383,15 @@ def _preflight_edit(
                 "pointer": pointer,
             },
         )
-
     if set(edit.payload) != {"value"}:
         raise UnsupportedEditError(
             "JSON scalar edits require exactly one 'value' payload field.",
             details={"reason": "json.scalar.payload_shape", "pointer": pointer},
         )
+
     token, requested_kind, requested_semantic = _render_scalar(edit.payload["value"])
     lexical_node = lexical_by_pointer[pointer]
-    if lexical_node.kind in {"object", "array"}:
+    if lexical_node.kind in _CONTAINER_KINDS:
         raise UnsupportedEditError(
             "JSON object and array structural replacement is not supported in H3.",
             details={"reason": "json.container.structural_edit_unsupported"},
@@ -423,7 +455,10 @@ def _encoded_payload_and_boundaries(
     if encoded != expected:
         raise RoundTripVerificationError(
             "Incremental JSON encoding disagrees with strict whole-text encoding.",
-            details={"reason": "json.incremental_encoding_mismatch", "encoding": encoding},
+            details={
+                "reason": "json.incremental_encoding_mismatch",
+                "encoding": encoding,
+            },
         )
     return encoded, tuple(boundaries)
 
@@ -491,6 +526,163 @@ def _verify_untouched_bytes(
         )
 
 
+def _topology_by_pointer(pointer_nodes: Mapping[str, Node]) -> dict[str, tuple[object, tuple[str, ...]]]:
+    pointer_by_id = {node.node_id: pointer for pointer, node in pointer_nodes.items()}
+    topology: dict[str, tuple[object, tuple[str, ...]]] = {}
+    for pointer, node in pointer_nodes.items():
+        parent_pointer = None
+        if node.parent_id is not None:
+            parent_pointer = pointer_by_id.get(node.parent_id)
+            if parent_pointer is None:
+                raise RoundTripVerificationError(
+                    "JSON candidate topology contains an unknown parent.",
+                    details={"reason": "json.candidate_topology_parent", "pointer": pointer},
+                )
+        try:
+            children = tuple(pointer_by_id[child_id] for child_id in node.children)
+        except KeyError as exc:
+            raise RoundTripVerificationError(
+                "JSON candidate topology contains an unknown child.",
+                details={"reason": "json.candidate_topology_child", "pointer": pointer},
+            ) from exc
+        topology[pointer] = (parent_pointer, children)
+    return topology
+
+
+def _verify_candidate(
+    document: DocumentIR,
+    candidate: bytes,
+    representation: TextRepresentation,
+    requested: Mapping[str, object],
+) -> None:
+    descriptor = document.source
+    if descriptor is None:
+        raise RoundTripVerificationError(
+            "JSON candidate verification requires source metadata.",
+            details={"reason": "json.candidate_source_metadata"},
+        )
+    try:
+        candidate_document = read_json_ir(
+            BytesIO(candidate),
+            filename=descriptor.filename,
+            mimetype=descriptor.mimetype,
+            encoding=representation.encoding,
+        )
+    except (UnicodeError, ValueError, TypeError) as exc:
+        raise RoundTripVerificationError(
+            "JSON candidate could not be re-read strictly.",
+            details={"reason": "json.candidate_reread_failed"},
+        ) from exc
+
+    original_nodes = _nodes_by_pointer(document)
+    candidate_nodes = _nodes_by_pointer(candidate_document)
+    candidate_root = candidate_nodes.get("")
+    if candidate_root is None:
+        raise RoundTripVerificationError(
+            "JSON candidate pointer set is missing the root.",
+            details={"reason": "json.candidate_pointer_set"},
+        )
+    actual_representation = (
+        candidate_root.metadata.get("json.encoding"),
+        candidate_root.metadata.get("json.bom"),
+        candidate_root.metadata.get("json.byte_roundtrip"),
+    )
+    expected_representation = (
+        representation.encoding,
+        representation.bom,
+        True,
+    )
+    if actual_representation != expected_representation:
+        raise RoundTripVerificationError(
+            "JSON candidate representation changed after re-read.",
+            details={
+                "reason": "json.candidate_representation",
+                "expected": expected_representation,
+                "actual": actual_representation,
+            },
+        )
+
+    if set(original_nodes) != set(candidate_nodes):
+        raise RoundTripVerificationError(
+            "JSON candidate pointer set changed after mutation.",
+            details={
+                "reason": "json.candidate_pointer_set",
+                "expected": tuple(sorted(original_nodes)),
+                "actual": tuple(sorted(candidate_nodes)),
+            },
+        )
+    if _topology_by_pointer(original_nodes) != _topology_by_pointer(candidate_nodes):
+        raise RoundTripVerificationError(
+            "JSON candidate topology changed after mutation.",
+            details={"reason": "json.candidate_topology"},
+        )
+
+    for pointer, original_node in original_nodes.items():
+        candidate_node = candidate_nodes[pointer]
+        candidate_kind = candidate_node.metadata.get("json.kind")
+        if pointer in requested:
+            _token, expected_kind, expected_semantic = _render_scalar(requested[pointer])
+            actual_kind, actual_semantic = _node_scalar_semantic(candidate_node)
+            if (actual_kind, actual_semantic) != (expected_kind, expected_semantic):
+                raise RoundTripVerificationError(
+                    "JSON requested scalar does not match the candidate re-read.",
+                    details={
+                        "reason": "json.candidate_requested_semantic",
+                        "pointer": pointer,
+                        "expected": (expected_kind, expected_semantic),
+                        "actual": (actual_kind, actual_semantic),
+                    },
+                )
+            continue
+
+        original_kind = original_node.metadata.get("json.kind")
+        if candidate_kind != original_kind:
+            raise RoundTripVerificationError(
+                "JSON unrequested value kind changed in the candidate.",
+                details={
+                    "reason": "json.candidate_unrequested_kind",
+                    "pointer": pointer,
+                    "expected": original_kind,
+                    "actual": candidate_kind,
+                },
+            )
+        if original_kind in _CONTAINER_KINDS:
+            if candidate_node.payload != original_node.payload:
+                raise RoundTripVerificationError(
+                    "JSON unrequested container semantics changed in the candidate.",
+                    details={
+                        "reason": "json.candidate_unrequested_container",
+                        "pointer": pointer,
+                    },
+                )
+            continue
+
+        original_semantic = _node_scalar_semantic(original_node)
+        candidate_semantic = _node_scalar_semantic(candidate_node)
+        if candidate_semantic != original_semantic:
+            raise RoundTripVerificationError(
+                "JSON unrequested scalar semantics changed in the candidate.",
+                details={
+                    "reason": "json.candidate_unrequested_semantic",
+                    "pointer": pointer,
+                    "expected": original_semantic,
+                    "actual": candidate_semantic,
+                },
+            )
+        original_raw_digest = original_node.metadata.get("json.raw_digest")
+        candidate_raw_digest = candidate_node.metadata.get("json.raw_digest")
+        if candidate_raw_digest != original_raw_digest:
+            raise RoundTripVerificationError(
+                "JSON unrequested raw lexical token changed in the candidate.",
+                details={
+                    "reason": "json.candidate_unrequested_raw",
+                    "pointer": pointer,
+                    "expected": original_raw_digest,
+                    "actual": candidate_raw_digest,
+                },
+            )
+
+
 def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
     checks = [
         FidelityEvidence(
@@ -524,6 +716,11 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
                     check_code="json.untouched_byte_segments",
                     status=FidelityStatus.PASSED,
                     description="All encoded byte segments outside target scalars stayed exact.",
+                ),
+                FidelityEvidence(
+                    check_code="json.candidate_reread",
+                    status=FidelityStatus.PASSED,
+                    description="Candidate JSON passed strict semantic and topology re-read verification.",
                 ),
             )
         )
@@ -563,7 +760,7 @@ def patch_json(
     lexical_by_pointer = {item.pointer: item for item in lexical.nodes}
 
     replacements: list[tuple[JsonLexicalNode, str]] = []
-    target_pointers: set[str] = set()
+    requested_values: dict[str, object] = {}
     for edit in edits:
         lexical_node, token = _preflight_edit(
             document,
@@ -571,15 +768,16 @@ def patch_json(
             pointer_nodes,
             lexical_by_pointer,
         )
-        if lexical_node.pointer in target_pointers:
+        pointer = lexical_node.pointer
+        if pointer in requested_values:
             raise UnsupportedEditError(
                 "JSON edit set contains a duplicate target.",
                 details={
                     "reason": "json.scalar.duplicate_target",
-                    "pointer": lexical_node.pointer,
+                    "pointer": pointer,
                 },
             )
-        target_pointers.add(lexical_node.pointer)
+        requested_values[pointer] = edit.payload["value"]
         replacements.append((lexical_node, token))
 
     candidate_text, untouched = _build_candidate(source_text, replacements)
@@ -604,5 +802,6 @@ def patch_json(
         representation,
         untouched,
     )
+    _verify_candidate(document, candidate, representation, requested_values)
     output.write(candidate)
     return _result(len(candidate), zero_edit=False)

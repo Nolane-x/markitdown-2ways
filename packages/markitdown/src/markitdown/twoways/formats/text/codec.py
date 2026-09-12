@@ -65,7 +65,9 @@ def decode_text_source(
     explicit = _canonical_encoding(encoding) if encoding is not None else None
 
     if bom_encoding is not None:
-        if explicit is not None and not _bom_compatible_encoding(explicit, bom_encoding):
+        if explicit is not None and not _bom_compatible_encoding(
+            explicit, bom_encoding
+        ):
             raise ValueError("explicit encoding does not match detected Unicode BOM")
         resolved = bom_encoding
         text = payload.decode(resolved, errors="strict")

@@ -13,17 +13,8 @@ from ..._errors import (
     SourcePackageMismatchError,
     UnsupportedEditError,
 )
-from ..._results import (
-    FidelityEvidence,
-    FidelityReport,
-    FidelityStatus,
-    WriterResult,
-)
-from ...capabilities import (
-    CAPABILITY_METADATA_KEY,
-    CapabilityState,
-    capabilities_for_node,
-)
+from ..._results import FidelityEvidence, FidelityReport, FidelityStatus, WriterResult
+from ...capabilities import CAPABILITY_METADATA_KEY, CapabilityState, capabilities_for_node
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation, EditPrecondition
 from ...ir.nodes import Node
@@ -32,6 +23,7 @@ from ...ir.serialization import validate_document
 from ..text.codec import encode_text_source
 from ..text.model import TextRepresentation
 from .lexical import parse_html_source
+from .preservation import verify_untouched_bytes
 from .reader import read_html_ir
 from .render import render_html_attribute, render_html_text
 
@@ -61,11 +53,7 @@ def _validate_source_authority(document: DocumentIR, source: bytes) -> None:
     if digest != descriptor.sha256:
         _source_mismatch("source_sha256", expected=descriptor.sha256, actual=digest)
     if len(source) != descriptor.size_bytes:
-        _source_mismatch(
-            "source_size",
-            expected=descriptor.size_bytes,
-            actual=len(source),
-        )
+        _source_mismatch("source_size", expected=descriptor.size_bytes, actual=len(source))
 
 
 def _nodes_by_path(document: DocumentIR) -> dict[str, Node]:
@@ -92,8 +80,7 @@ def _root_node(document: DocumentIR) -> Node:
             "HTML DocumentIR must contain exactly one document root.",
             details={"reason": "html.root_count"},
         )
-    root_id = document.root_node_ids[0]
-    root = document.nodes.get(root_id)
+    root = document.nodes.get(document.root_node_ids[0])
     if root is None:
         raise PatchPreconditionError(
             "HTML document root is missing.",
@@ -107,9 +94,7 @@ def _root_node(document: DocumentIR) -> Node:
     return root
 
 
-def _representation(
-    document: DocumentIR, *, require_writable: bool
-) -> TextRepresentation:
+def _representation(document: DocumentIR, *, require_writable: bool) -> TextRepresentation:
     root = _root_node(document)
     encoding = root.metadata.get("html.encoding")
     bom = root.metadata.get("html.bom")
@@ -133,10 +118,7 @@ def _representation(
     if require_writable and not recovery_stable:
         raise UnsupportedEditError(
             "HTML recovery-sensitive source is read-only.",
-            details={
-                "reason": root.metadata.get("html.recovery_reason")
-                or "html.recovery.unproven"
-            },
+            details={"reason": root.metadata.get("html.recovery_reason") or "html.recovery.unproven"},
         )
     if require_writable and not byte_roundtrip:
         raise UnsupportedEditError(
@@ -190,7 +172,6 @@ def _validate_node_evidence(node: Node, expected: Node, path: str) -> None:
             expected=expected_metadata,
             actual=actual_metadata,
         )
-
     checks = (
         ("native_locator", expected.native_locator, node.native_locator),
         ("provenance", expected.provenance, node.provenance),
@@ -198,11 +179,7 @@ def _validate_node_evidence(node: Node, expected: Node, path: str) -> None:
         ("children", expected.children, node.children),
         ("order", expected.order, node.order),
         ("canvas", expected.canvas_id, node.canvas_id),
-        (
-            "semantic_kind",
-            (expected.kind, expected.semantic_role),
-            (node.kind, node.semantic_role),
-        ),
+        ("semantic_kind", (expected.kind, expected.semantic_role), (node.kind, node.semantic_role)),
         ("payload", expected.payload, node.payload),
     )
     for reason, expected_value, actual_value in checks:
@@ -236,7 +213,6 @@ def _validate_source_model(
             "HTML source cannot be re-read using the recorded representation.",
             details={"reason": "html.source_reread"},
         ) from exc
-
     actual_nodes = _nodes_by_path(document)
     expected_nodes = _nodes_by_path(expected_document)
     if set(actual_nodes) != set(expected_nodes):
@@ -258,17 +234,13 @@ def _validate_source_model(
             "HTML canvas ownership no longer matches the source.",
             details={"reason": "html.canvas_identity"},
         )
-
     for path, expected_node in expected_nodes.items():
         _validate_node_evidence(actual_nodes[path], expected_node, path)
-
     return parsed.text, actual_nodes, expected_nodes
 
 
 def _semantic_value(node: Node) -> object:
-    if not isinstance(node.payload, Mapping):
-        return None
-    return node.payload.get("value")
+    return node.payload.get("value") if isinstance(node.payload, Mapping) else None
 
 
 def _validate_preconditions(
@@ -289,12 +261,14 @@ def _validate_preconditions(
                     "actual": old_value,
                 },
             )
-        generic_precondition = EditPrecondition(
-            expected_semantic_digest=precondition.expected_semantic_digest,
-            expected_native_locator_digest=precondition.expected_native_locator_digest,
-            expected_old_value=None,
+        edit = replace(
+            edit,
+            precondition=EditPrecondition(
+                expected_semantic_digest=precondition.expected_semantic_digest,
+                expected_native_locator_digest=precondition.expected_native_locator_digest,
+                expected_old_value=None,
+            ),
         )
-        edit = replace(edit, precondition=generic_precondition)
     validate_edit_preconditions(document, node, edit, format_label="html")
 
 
@@ -326,12 +300,8 @@ def _preflight_edit(
             "HTML edit target is missing from fresh source ownership.",
             details={"reason": "html.target_source", "path": path},
         )
-
     kind = node.metadata.get("html.kind")
-    expected_type = {
-        "text": "replace_html_text",
-        "attribute": "replace_html_attribute",
-    }.get(kind)
+    expected_type = {"text": "replace_html_text", "attribute": "replace_html_attribute"}.get(kind)
     if expected_type is None or edit.type != expected_type:
         raise UnsupportedEditError(
             "HTML edit operation does not match a writable native owner.",
@@ -342,32 +312,23 @@ def _preflight_edit(
                 "edit_type": edit.type,
             },
         )
-
     capability = capabilities_for_node(node).for_operation(expected_type)
     if capability.state is not CapabilityState.WRITABLE:
         raise UnsupportedEditError(
             "HTML target is read-only for the requested edit.",
-            details={
-                "reason": capability.reason_code or "html.target.read_only",
-                "path": path,
-            },
+            details={"reason": capability.reason_code or "html.target.read_only", "path": path},
         )
     if set(edit.payload) != {"value"}:
         raise UnsupportedEditError(
             "HTML edits require exactly one 'value' payload field.",
             details={"reason": "html.value.payload_shape", "path": path},
         )
-
     requested = edit.payload["value"]
     if not isinstance(requested, str):
         raise UnsupportedEditError(
             "HTML replacement value must be a string.",
-            details={
-                "reason": "html.value.type",
-                "value_type": type(requested).__name__,
-            },
+            details={"reason": "html.value.type", "value_type": type(requested).__name__},
         )
-
     old_value = _semantic_value(expected)
     _validate_preconditions(document, node, edit, old_value)
     if requested == old_value:
@@ -445,12 +406,9 @@ def _build_candidate(
         parts.append(token)
         candidate_cursor += len(token)
         cursor = end
-
     suffix = source_text[cursor:]
     parts.append(suffix)
-    untouched.append(
-        (cursor, len(source_text), candidate_cursor, candidate_cursor + len(suffix))
-    )
+    untouched.append((cursor, len(source_text), candidate_cursor, candidate_cursor + len(suffix)))
     return "".join(parts), tuple(untouched)
 
 
@@ -476,11 +434,18 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
             )
         )
     else:
-        evidence.append(
-            FidelityEvidence(
-                check_code="html.lexical_span_patch",
-                status=FidelityStatus.PASSED,
-                description="Requested HTML scalar values were replaced only at recorded lexical value spans.",
+        evidence.extend(
+            (
+                FidelityEvidence(
+                    check_code="html.lexical_span_patch",
+                    status=FidelityStatus.PASSED,
+                    description="Requested HTML scalar values were replaced only at recorded lexical value spans.",
+                ),
+                FidelityEvidence(
+                    check_code="html.untouched_bytes",
+                    status=FidelityStatus.PASSED,
+                    description="Encoded bytes outside authorized target spans were verified unchanged.",
+                ),
             )
         )
     return WriterResult(
@@ -508,17 +473,11 @@ def patch_html(
             "HTML DocumentIR failed structural validation.",
             details={"reason": "html.document_ir_invalid"},
         ) from exc
-
     source = _read_source_bytes(source_stream)
     _validate_source_authority(document, source)
     edits = tuple(edits)
     representation = _representation(document, require_writable=bool(edits))
-    source_text, path_nodes, expected_nodes = _validate_source_model(
-        document,
-        source,
-        representation,
-    )
-
+    source_text, path_nodes, expected_nodes = _validate_source_model(document, source, representation)
     if not edits:
         output.write(source)
         return _result(len(source), zero_edit=True)
@@ -526,12 +485,7 @@ def patch_html(
     seen_paths: set[str] = set()
     replacements: list[tuple[int, int, str, str]] = []
     for edit in edits:
-        expected, path, requested = _preflight_edit(
-            document,
-            edit,
-            path_nodes,
-            expected_nodes,
-        )
+        expected, path, requested = _preflight_edit(document, edit, path_nodes, expected_nodes)
         if path in seen_paths:
             raise UnsupportedEditError(
                 "HTML edit set contains a duplicate target.",
@@ -539,10 +493,9 @@ def patch_html(
             )
         seen_paths.add(path)
         start, end = _replacement_span(expected, path)
-        token = _render_value(expected, path, requested)
-        replacements.append((start, end, token, path))
+        replacements.append((start, end, _render_value(expected, path, requested), path))
 
-    candidate_text, _untouched = _build_candidate(source_text, replacements)
+    candidate_text, untouched = _build_candidate(source_text, replacements)
     try:
         candidate = encode_text_source(candidate_text, representation)
     except UnicodeError as exc:
@@ -556,5 +509,13 @@ def patch_html(
             details={"reason": "html.encoding.candidate"},
         ) from exc
 
+    verify_untouched_bytes(
+        source,
+        candidate,
+        source_text,
+        candidate_text,
+        representation,
+        untouched,
+    )
     output.write(candidate)
     return _result(len(candidate), zero_edit=False)

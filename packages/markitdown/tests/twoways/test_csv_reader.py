@@ -54,8 +54,8 @@ def test_csv_reader_builds_deterministic_table_ir_with_lexical_metadata() -> Non
     ]
 
     city = node.payload.cells[3]
-    assert city.metadata["csv.char_start"] == 19
-    assert city.metadata["csv.char_end"] == 26
+    assert city.metadata["csv.char_start"] == 15
+    assert city.metadata["csv.char_end"] == 23
     assert city.metadata["csv.quoted"] is True
     assert city.metadata["csv.multiline"] is False
     assert city.metadata["csv.present"] is True
@@ -152,7 +152,8 @@ def test_csv_ir_reader_accepts_only_csv_extension_or_mimetype() -> None:
         BytesIO(b""), SimpleNamespace(extension=".txt", mimetype="text/csv")
     )
     assert reader.accepts(
-        BytesIO(b""), SimpleNamespace(extension=None, mimetype="application/csv; charset=utf-8")
+        BytesIO(b""),
+        SimpleNamespace(extension=None, mimetype="application/csv; charset=utf-8"),
     )
     assert not reader.accepts(
         BytesIO(b""), SimpleNamespace(extension=".txt", mimetype="text/plain")

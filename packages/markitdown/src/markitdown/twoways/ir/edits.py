@@ -15,6 +15,8 @@ INITIAL_EDIT_TYPES = frozenset(
         "update_sheet_cells",
         "update_csv_cells",
         "replace_json_scalar",
+        "replace_xml_text",
+        "replace_xml_attribute",
         "add_node",
         "remove_node",
     }

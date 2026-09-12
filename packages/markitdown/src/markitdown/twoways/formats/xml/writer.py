@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from hashlib import sha256
@@ -545,6 +546,94 @@ def _build_candidate(
     return "".join(parts), tuple(untouched)
 
 
+def _encoded_payload_and_boundaries(
+    text: str, encoding: str
+) -> tuple[bytes, tuple[int, ...]]:
+    encoder_type = codecs.getincrementalencoder(encoding)
+    encoder = encoder_type(errors="strict")
+    payload = bytearray()
+    boundaries = [0]
+    for character in text:
+        payload.extend(encoder.encode(character, final=False))
+        boundaries.append(len(payload))
+    payload.extend(encoder.encode("", final=True))
+    boundaries[-1] = len(payload)
+    encoded = bytes(payload)
+    expected = text.encode(encoding, errors="strict")
+    if encoded != expected:
+        raise RoundTripVerificationError(
+            "Incremental XML encoding disagrees with strict whole-text encoding.",
+            details={
+                "reason": "xml.incremental_encoding_mismatch",
+                "encoding": encoding,
+            },
+        )
+    return encoded, tuple(boundaries)
+
+
+def _verify_untouched_bytes(
+    source_bytes: bytes,
+    candidate_bytes: bytes,
+    source_text: str,
+    candidate_text: str,
+    representation: TextRepresentation,
+    untouched: tuple[tuple[int, int, int, int], ...],
+) -> None:
+    original_expected, original_bounds = _encoded_payload_and_boundaries(
+        source_text, representation.encoding
+    )
+    candidate_expected, candidate_bounds = _encoded_payload_and_boundaries(
+        candidate_text, representation.encoding
+    )
+    original_bom_length = len(source_bytes) - len(original_expected)
+    candidate_bom_length = len(candidate_bytes) - len(candidate_expected)
+    if original_bom_length < 0 or candidate_bom_length < 0:
+        raise RoundTripVerificationError(
+            "XML encoded payload exceeds its byte stream.",
+            details={"reason": "xml.invalid_encoded_payload_boundary"},
+        )
+    if (
+        original_bom_length != candidate_bom_length
+        or source_bytes[:original_bom_length]
+        != candidate_bytes[:candidate_bom_length]
+    ):
+        raise RoundTripVerificationError(
+            "XML BOM or encoded payload boundary changed unexpectedly.",
+            details={"reason": "xml.encoding_boundary_mismatch"},
+        )
+
+    original_payload = source_bytes[original_bom_length:]
+    candidate_payload = candidate_bytes[candidate_bom_length:]
+    if original_payload != original_expected:
+        raise RoundTripVerificationError(
+            "XML source bytes disagree with the recorded strict encoding.",
+            details={"reason": "xml.source_encoded_payload_mismatch"},
+        )
+
+    for old_start, old_end, new_start, new_end in untouched:
+        old_bytes = original_payload[
+            original_bounds[old_start] : original_bounds[old_end]
+        ]
+        new_bytes = candidate_payload[
+            candidate_bounds[new_start] : candidate_bounds[new_end]
+        ]
+        if old_bytes != new_bytes:
+            raise RoundTripVerificationError(
+                "XML bytes outside authorized target spans changed.",
+                details={
+                    "reason": "xml.untouched_bytes_changed",
+                    "source_span": (old_start, old_end),
+                    "candidate_span": (new_start, new_end),
+                },
+            )
+
+    if candidate_payload != candidate_expected:
+        raise RoundTripVerificationError(
+            "XML candidate bytes disagree with strict candidate encoding.",
+            details={"reason": "xml.candidate_encoded_payload_mismatch"},
+        )
+
+
 def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
     evidence = [
         FidelityEvidence(
@@ -567,11 +656,18 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
             )
         )
     else:
-        evidence.append(
-            FidelityEvidence(
-                check_code="xml.lexical_span_patch",
-                status=FidelityStatus.PASSED,
-                description="Requested XML values were replaced only at exact lexical source spans.",
+        evidence.extend(
+            (
+                FidelityEvidence(
+                    check_code="xml.lexical_span_patch",
+                    status=FidelityStatus.PASSED,
+                    description="Requested XML values were replaced only at exact lexical source spans.",
+                ),
+                FidelityEvidence(
+                    check_code="xml.untouched_byte_segments",
+                    status=FidelityStatus.PASSED,
+                    description="Every encoded byte segment outside authorized value spans was preserved exactly.",
+                ),
             )
         )
     return WriterResult(
@@ -637,7 +733,7 @@ def patch_xml(
         start, end = _replacement_span(lexical)
         replacements.append((start, end, token, lexical.path))
 
-    candidate_text, _untouched = _build_candidate(source_text, replacements)
+    candidate_text, untouched = _build_candidate(source_text, replacements)
     try:
         candidate = encode_text_source(candidate_text, representation)
     except UnicodeError as exc:
@@ -651,5 +747,13 @@ def patch_xml(
             details={"reason": "xml.encoding.candidate"},
         ) from exc
 
+    _verify_untouched_bytes(
+        source,
+        candidate,
+        source_text,
+        candidate_text,
+        representation,
+        untouched,
+    )
     output.write(candidate)
     return _result(len(candidate), zero_edit=False)

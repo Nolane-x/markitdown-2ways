@@ -36,11 +36,7 @@ def _read_source_bytes(source: BinaryIO) -> bytes:
 def _validate_source_authority(document: DocumentIR, source_bytes: bytes) -> str:
     source = document.source
     actual_digest = sha256(source_bytes).hexdigest()
-    if (
-        source is None
-        or source.format not in {"text", "markdown"}
-        or not source.sha256
-    ):
+    if source is None or source.format not in {"text", "markdown"} or not source.sha256:
         raise SourcePackageMismatchError(
             "DocumentIR does not contain authoritative text source metadata.",
             details={"reason": "missing_source_authority", "actual": actual_digest},

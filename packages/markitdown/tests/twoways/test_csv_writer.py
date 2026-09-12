@@ -336,11 +336,7 @@ def test_forged_csv_locator_fails_before_output() -> None:
         operation_id="edit",
         type="update_csv_cells",
         target_node_id=node.node_id,
-        payload={
-            "cells": [
-                {"row": 1, "column": 1, "old_text": "d", "text": "x"}
-            ]
-        },
+        payload={"cells": [{"row": 1, "column": 1, "old_text": "d", "text": "x"}]},
     )
 
     with pytest.raises(PatchPreconditionError, match="authoritative"):
@@ -378,9 +374,7 @@ def test_csv_patch_preserves_source_encoding_and_bom(
     replacement: str,
     expected: bytes,
 ) -> None:
-    document = read_csv_ir(
-        BytesIO(source), filename="people.csv", encoding=encoding
-    )
+    document = read_csv_ir(BytesIO(source), filename="people.csv", encoding=encoding)
     output = BytesIO()
 
     patch_csv(

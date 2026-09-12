@@ -74,7 +74,11 @@ def _authoritative_table(document: DocumentIR) -> Node:
         )
     node_id = document.canvases[0].root_node_ids[0]
     node = document.nodes.get(node_id)
-    if node is None or not isinstance(node.payload, TablePayload) or node.kind != "table":
+    if (
+        node is None
+        or not isinstance(node.payload, TablePayload)
+        or node.kind != "table"
+    ):
         raise PatchPreconditionError(
             "CSV IR root is not an authoritative table.",
             details={"reason": "invalid_csv_table"},
@@ -283,7 +287,9 @@ def _prepare_changes(
         )
     validate_edit_preconditions(document, node, edit, format_label="csv")
 
-    if set(edit.payload) != {"cells"} or not isinstance(edit.payload.get("cells"), list):
+    if set(edit.payload) != {"cells"} or not isinstance(
+        edit.payload.get("cells"), list
+    ):
         raise UnsupportedEditError(
             "update_csv_cells payload must contain exactly one cells list.",
             details={"reason": "invalid_csv_edit_payload"},
@@ -367,11 +373,15 @@ def _build_candidate(
 
     suffix = source_text[cursor:]
     parts.append(suffix)
-    untouched.append((cursor, len(source_text), candidate_cursor, candidate_cursor + len(suffix)))
+    untouched.append(
+        (cursor, len(source_text), candidate_cursor, candidate_cursor + len(suffix))
+    )
     return "".join(parts), tuple(untouched), targets
 
 
-def _encoded_payload_and_boundaries(text: str, encoding: str) -> tuple[bytes, tuple[int, ...]]:
+def _encoded_payload_and_boundaries(
+    text: str, encoding: str
+) -> tuple[bytes, tuple[int, ...]]:
     encoder_type = codecs.getincrementalencoder(encoding)
     encoder = encoder_type(errors="strict")
     payload = bytearray()
@@ -424,8 +434,12 @@ def _verify_untouched_bytes(
         )
 
     for old_start, old_end, new_start, new_end in untouched:
-        old_bytes = original_payload[original_bounds[old_start] : original_bounds[old_end]]
-        new_bytes = candidate_payload[candidate_bounds[new_start] : candidate_bounds[new_end]]
+        old_bytes = original_payload[
+            original_bounds[old_start] : original_bounds[old_end]
+        ]
+        new_bytes = candidate_payload[
+            candidate_bounds[new_start] : candidate_bounds[new_end]
+        ]
         if old_bytes != new_bytes:
             raise RoundTripVerificationError(
                 "CSV bytes outside authorized target fields changed.",
@@ -495,7 +509,9 @@ def _verify_candidate(
             )
         if coordinate not in requested:
             for key in ("csv.quoted", "csv.multiline", "csv.raw_digest"):
-                if candidate_cells[coordinate].metadata.get(key) != original_cell.metadata.get(key):
+                if candidate_cells[coordinate].metadata.get(
+                    key
+                ) != original_cell.metadata.get(key):
                     raise RoundTripVerificationError(
                         "CSV output changed an unrequested field lexeme.",
                         details={

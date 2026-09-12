@@ -68,6 +68,31 @@ def _patch(shape, *, run_index: int, old_style, new_style):
     )
 
 
+def _style_edit(node) -> EditOperation:
+    return EditOperation(
+        operation_id="pptx-style-run-0",
+        type="set_text_style",
+        target_node_id=node.node_id,
+        precondition=EditPrecondition(
+            expected_semantic_digest=node_semantic_digest(node),
+            expected_native_locator_digest=native_locator_digest(node),
+            expected_old_value=node.payload.text,
+        ),
+        payload={
+            "run_index": 0,
+            "old_style": _direct_style(node, 0),
+            "style": {
+                "bold": False,
+                "italic": True,
+                "underline": "double",
+                "font_size_pt": 26.5,
+                "font_family": "Aptos Display",
+                "color": "#336699",
+            },
+        },
+    )
+
+
 def test_patch_pptx_run_style_changes_only_target_rpr():
     from lxml import etree
 
@@ -188,28 +213,7 @@ def test_pptx_writer_roundtrips_direct_run_style_without_changing_text():
         "color": "#0A141E",
     }
 
-    edit = EditOperation(
-        operation_id="pptx-style-run-0",
-        type="set_text_style",
-        target_node_id=node.node_id,
-        precondition=EditPrecondition(
-            expected_semantic_digest=node_semantic_digest(node),
-            expected_native_locator_digest=native_locator_digest(node),
-            expected_old_value=node.payload.text,
-        ),
-        payload={
-            "run_index": 0,
-            "old_style": _direct_style(node, 0),
-            "style": {
-                "bold": False,
-                "italic": True,
-                "underline": "double",
-                "font_size_pt": 26.5,
-                "font_family": "Aptos Display",
-                "color": "#336699",
-            },
-        },
-    )
+    edit = _style_edit(node)
     output = BytesIO()
     result = patch_pptx(document, BytesIO(source), output, edits=(edit,))
 
@@ -227,3 +231,32 @@ def test_pptx_writer_roundtrips_direct_run_style_without_changing_text():
     assert _direct_style(updated, 1) == {"italic": True, "font_size_pt": 24.0}
     assert result.metadata["touched_parts"] == ("ppt/slides/slide1.xml",)
     assert result.fidelity.claimed_tier == "high"
+
+
+def test_pptx_style_verifier_rejects_extra_native_target_mutation(monkeypatch):
+    from markitdown.twoways import RoundTripVerificationError
+    from markitdown.twoways.formats.pptx import patch_pptx, read_pptx_ir
+    from markitdown.twoways.formats.pptx import writer as writer_module
+
+    source = make_pptx_bytes()
+    document = read_pptx_ir(BytesIO(source))
+    node = next(
+        item
+        for item in document.nodes.values()
+        if item.kind == "text" and item.payload.text == "Revenue 38%"
+    )
+    edit = _style_edit(node)
+    original = writer_module.patch_text_run_style
+
+    def tampering_patch(shape_element, **kwargs):
+        original(shape_element, **kwargs)
+        run = _runs(shape_element)[kwargs["run_index"]]
+        rpr = run.xpath('./*[local-name()="rPr"]')[0]
+        rpr.set("lang", "en-US")
+
+    monkeypatch.setattr(writer_module, "patch_text_run_style", tampering_patch)
+    output = BytesIO()
+    with pytest.raises(RoundTripVerificationError) as exc:
+        patch_pptx(document, BytesIO(source), output, edits=(edit,))
+    assert exc.value.details["check"] == "native.target_structure"
+    assert output.getvalue() == b""

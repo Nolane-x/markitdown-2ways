@@ -50,6 +50,21 @@ def _patch(shape, current: Geometry, target: Geometry) -> None:
     patch_shape_geometry(shape, current=current, target=target)
 
 
+def _move_edit(node) -> EditOperation:
+    assert node.geometry is not None
+    return EditOperation(
+        operation_id="pptx-move-resize-revenue",
+        type="move_resize",
+        target_node_id=node.node_id,
+        payload={
+            "x": node.geometry.x + 914400,
+            "y": node.geometry.y + 457200,
+            "width": node.geometry.width + 914400,
+            "height": node.geometry.height + 457200,
+        },
+    )
+
+
 def test_patch_shape_geometry_changes_only_native_coordinates():
     from lxml import etree
 
@@ -109,18 +124,7 @@ def test_pptx_writer_roundtrips_move_resize_without_semantic_change():
         for item in document.nodes.values()
         if item.kind == "text" and item.payload.text == "Revenue 38%"
     )
-    assert node.geometry is not None
-    edit = EditOperation(
-        operation_id="pptx-move-resize-revenue",
-        type="move_resize",
-        target_node_id=node.node_id,
-        payload={
-            "x": node.geometry.x + 914400,
-            "y": node.geometry.y + 457200,
-            "width": node.geometry.width + 914400,
-            "height": node.geometry.height + 457200,
-        },
-    )
+    edit = _move_edit(node)
     output = BytesIO()
     result = patch_pptx(document, BytesIO(source), output, edits=(edit,))
     reread = read_pptx_ir(BytesIO(output.getvalue()))
@@ -160,4 +164,32 @@ def test_pptx_writer_rejects_group_child_geometry_edits():
     with pytest.raises(UnsupportedEditError) as exc:
         patch_pptx(document, BytesIO(source), output, edits=(edit,))
     assert exc.value.details["reason"] == "pptx.geometry.group_coordinate_space"
+    assert output.getvalue() == b""
+
+
+def test_pptx_geometry_verifier_rejects_extra_native_target_mutation(monkeypatch):
+    from markitdown.twoways import RoundTripVerificationError
+    from markitdown.twoways.formats.pptx import patch_pptx, read_pptx_ir
+    from markitdown.twoways.formats.pptx import writer as writer_module
+
+    source = make_pptx_bytes()
+    document = read_pptx_ir(BytesIO(source))
+    node = next(
+        item
+        for item in document.nodes.values()
+        if item.kind == "text" and item.payload.text == "Revenue 38%"
+    )
+    edit = _move_edit(node)
+    original = writer_module.patch_shape_geometry
+
+    def tampering_patch(shape_element, **kwargs):
+        original(shape_element, **kwargs)
+        xfrm = shape_element.xpath('.//*[local-name()="xfrm"]')[0]
+        xfrm.set("flipH", "1")
+
+    monkeypatch.setattr(writer_module, "patch_shape_geometry", tampering_patch)
+    output = BytesIO()
+    with pytest.raises(RoundTripVerificationError) as exc:
+        patch_pptx(document, BytesIO(source), output, edits=(edit,))
+    assert exc.value.details["check"] == "native.target_structure"
     assert output.getvalue() == b""

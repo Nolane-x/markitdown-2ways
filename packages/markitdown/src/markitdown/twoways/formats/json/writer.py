@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import codecs
 from decimal import Decimal
 from hashlib import sha256
 import json
@@ -375,21 +376,119 @@ def _preflight_edit(
 def _build_candidate(
     source_text: str,
     replacements: Sequence[tuple[JsonLexicalNode, str]],
-) -> str:
+) -> tuple[str, tuple[tuple[int, int, int, int], ...]]:
     ordered = sorted(replacements, key=lambda item: item[0].start)
     parts: list[str] = []
+    untouched: list[tuple[int, int, int, int]] = []
     cursor = 0
+    candidate_cursor = 0
     for lexical, token in ordered:
         if lexical.start < cursor:
             raise UnsupportedEditError(
                 "JSON scalar edit spans overlap.",
                 details={"reason": "json.scalar.overlapping_targets"},
             )
-        parts.append(source_text[cursor : lexical.start])
+        prefix = source_text[cursor : lexical.start]
+        parts.append(prefix)
+        untouched.append(
+            (cursor, lexical.start, candidate_cursor, candidate_cursor + len(prefix))
+        )
+        candidate_cursor += len(prefix)
         parts.append(token)
+        candidate_cursor += len(token)
         cursor = lexical.end
-    parts.append(source_text[cursor:])
-    return "".join(parts)
+
+    suffix = source_text[cursor:]
+    parts.append(suffix)
+    untouched.append(
+        (cursor, len(source_text), candidate_cursor, candidate_cursor + len(suffix))
+    )
+    return "".join(parts), tuple(untouched)
+
+
+def _encoded_payload_and_boundaries(
+    text: str, encoding: str
+) -> tuple[bytes, tuple[int, ...]]:
+    encoder_type = codecs.getincrementalencoder(encoding)
+    encoder = encoder_type(errors="strict")
+    payload = bytearray()
+    boundaries = [0]
+    for character in text:
+        payload.extend(encoder.encode(character, final=False))
+        boundaries.append(len(payload))
+    payload.extend(encoder.encode("", final=True))
+    boundaries[-1] = len(payload)
+    encoded = bytes(payload)
+    expected = text.encode(encoding, errors="strict")
+    if encoded != expected:
+        raise RoundTripVerificationError(
+            "Incremental JSON encoding disagrees with strict whole-text encoding.",
+            details={"reason": "json.incremental_encoding_mismatch", "encoding": encoding},
+        )
+    return encoded, tuple(boundaries)
+
+
+def _verify_untouched_bytes(
+    source_bytes: bytes,
+    candidate_bytes: bytes,
+    source_text: str,
+    candidate_text: str,
+    representation: TextRepresentation,
+    untouched: tuple[tuple[int, int, int, int], ...],
+) -> None:
+    original_expected, original_bounds = _encoded_payload_and_boundaries(
+        source_text, representation.encoding
+    )
+    candidate_expected, candidate_bounds = _encoded_payload_and_boundaries(
+        candidate_text, representation.encoding
+    )
+    original_bom_length = len(source_bytes) - len(original_expected)
+    candidate_bom_length = len(candidate_bytes) - len(candidate_expected)
+    if original_bom_length < 0 or candidate_bom_length < 0:
+        raise RoundTripVerificationError(
+            "JSON encoded payload exceeds its byte stream.",
+            details={"reason": "json.invalid_encoded_payload_boundary"},
+        )
+    if (
+        original_bom_length != candidate_bom_length
+        or source_bytes[:original_bom_length]
+        != candidate_bytes[:candidate_bom_length]
+    ):
+        raise RoundTripVerificationError(
+            "JSON BOM or encoded payload boundary changed unexpectedly.",
+            details={"reason": "json.encoding_boundary_mismatch"},
+        )
+
+    original_payload = source_bytes[original_bom_length:]
+    candidate_payload = candidate_bytes[candidate_bom_length:]
+    if original_payload != original_expected:
+        raise RoundTripVerificationError(
+            "JSON source bytes disagree with the recorded strict encoding.",
+            details={"reason": "json.source_encoded_payload_mismatch"},
+        )
+
+    for old_start, old_end, new_start, new_end in untouched:
+        old_bytes = original_payload[
+            original_bounds[old_start] : original_bounds[old_end]
+        ]
+        new_bytes = candidate_payload[
+            candidate_bounds[new_start] : candidate_bounds[new_end]
+        ]
+        if old_bytes != new_bytes:
+            raise RoundTripVerificationError(
+                "JSON bytes outside authorized target spans changed.",
+                details={
+                    "reason": "json.untouched_bytes_changed",
+                    "source_span": (old_start, old_end),
+                    "candidate_span": (new_start, new_end),
+                },
+            )
+
+    if candidate_payload != candidate_expected:
+        raise RoundTripVerificationError(
+            "JSON candidate bytes disagree with strict candidate encoding.",
+            details={"reason": "json.candidate_encoded_payload_mismatch"},
+        )
 
 
 def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
@@ -421,13 +520,21 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
                     status=FidelityStatus.PASSED,
                     description="Requested scalars were replaced by exact lexical source spans.",
                 ),
+                FidelityEvidence(
+                    check_code="json.untouched_byte_segments",
+                    status=FidelityStatus.PASSED,
+                    description="All encoded byte segments outside target scalars stayed exact.",
+                ),
             )
         )
     return WriterResult(
         format="json",
         mode="patch",
         bytes_written=bytes_written,
-        fidelity=FidelityReport(claimed_tier="exact-preserve", evidence=tuple(checks)),
+        fidelity=FidelityReport(
+            claimed_tier="exact-preserve" if zero_edit else "high",
+            evidence=tuple(checks),
+        ),
     )
 
 
@@ -475,7 +582,7 @@ def patch_json(
         target_pointers.add(lexical_node.pointer)
         replacements.append((lexical_node, token))
 
-    candidate_text = _build_candidate(source_text, replacements)
+    candidate_text, untouched = _build_candidate(source_text, replacements)
     try:
         candidate = encode_text_source(candidate_text, representation)
     except UnicodeError as exc:
@@ -489,5 +596,13 @@ def patch_json(
             details={"reason": "json.encoding.candidate"},
         ) from exc
 
+    _verify_untouched_bytes(
+        source,
+        candidate,
+        source_text,
+        candidate_text,
+        representation,
+        untouched,
+    )
     output.write(candidate)
     return _result(len(candidate), zero_edit=False)

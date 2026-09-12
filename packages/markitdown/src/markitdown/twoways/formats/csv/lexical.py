@@ -65,7 +65,9 @@ def _validate_semantic_parity(
     expected = [[field.value for field in row.fields] for row in rows]
     observed = _strict_reader_rows(text, delimiter)
     if observed != expected:
-        raise CsvLexicalError("CSV lexical spans disagree with strict csv.reader semantics")
+        raise CsvLexicalError(
+            "CSV lexical spans disagree with strict csv.reader semantics"
+        )
 
 
 def scan_csv_text(text: str, *, delimiter: str) -> CsvLexicalDocument:

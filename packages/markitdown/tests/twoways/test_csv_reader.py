@@ -17,12 +17,8 @@ def _table(document):
 def test_csv_reader_builds_deterministic_table_ir_with_lexical_metadata() -> None:
     source = codecs.BOM_UTF8 + 'name,city\r\nAda,"Hà Nội"\r\n'.encode("utf-8")
 
-    first = read_csv_ir(
-        BytesIO(source), filename="people.csv", mimetype="text/csv"
-    )
-    second = read_csv_ir(
-        BytesIO(source), filename="people.csv", mimetype="text/csv"
-    )
+    first = read_csv_ir(BytesIO(source), filename="people.csv", mimetype="text/csv")
+    second = read_csv_ir(BytesIO(source), filename="people.csv", mimetype="text/csv")
 
     validate_document(first)
     assert canonical_json_digest(first) == canonical_json_digest(second)

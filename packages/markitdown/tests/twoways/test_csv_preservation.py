@@ -9,7 +9,9 @@ from markitdown.twoways.formats.csv.writer import patch_csv
 from markitdown.twoways.ir.edits import EditOperation
 
 
-def _edit(document, *, row: int, column: int, old_text: str, text: str) -> EditOperation:
+def _edit(
+    document, *, row: int, column: int, old_text: str, text: str
+) -> EditOperation:
     node_id = document.canvases[0].root_node_ids[0]
     return EditOperation(
         operation_id="edit-1",
@@ -37,9 +39,7 @@ def test_patch_preserves_mixed_physical_row_terminators_and_blank_record() -> No
         document,
         BytesIO(source),
         output,
-        edits=(
-            _edit(document, row=2, column=1, old_text="d", text="z"),
-        ),
+        edits=(_edit(document, row=2, column=1, old_text="d", text="z"),),
     )
 
     assert output.getvalue() == b"a,b\r\n\r\nc,z\nx,y\r"
@@ -54,9 +54,7 @@ def test_patch_preserves_existing_multiline_quoted_neighbor_exactly() -> None:
         document,
         BytesIO(source),
         output,
-        edits=(
-            _edit(document, row=1, column=1, old_text="tail", text="done"),
-        ),
+        edits=(_edit(document, row=1, column=1, old_text="tail", text="done"),),
     )
 
     assert output.getvalue() == b'left,right\r\n"alpha\nbeta",done\r\n'
@@ -76,9 +74,7 @@ def test_unencodable_replacement_fails_before_destination_output() -> None:
             document,
             BytesIO(source),
             output,
-            edits=(
-                _edit(document, row=1, column=1, old_text="Paris", text="東京"),
-            ),
+            edits=(_edit(document, row=1, column=1, old_text="Paris", text="東京"),),
         )
 
     assert output.getvalue() == b""

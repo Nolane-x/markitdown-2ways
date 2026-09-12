@@ -10,8 +10,4 @@ def test_existing_one_way_csv_converter_output_is_unchanged() -> None:
         StreamInfo(extension=".csv", mimetype="text/csv", charset="utf-8"),
     )
 
-    assert result.markdown == (
-        "| name | city |\n"
-        "| --- | --- |\n"
-        "| Ada | North |"
-    )
+    assert result.markdown == ("| name | city |\n" "| --- | --- |\n" "| Ada | North |")

@@ -49,7 +49,9 @@ class CsvLexicalDocument:
 
     def __post_init__(self) -> None:
         if len(self.delimiter) != 1 or self.delimiter in {"\r", "\n", '"'}:
-            raise ValueError("CSV delimiter must be one non-newline, non-quote character")
+            raise ValueError(
+                "CSV delimiter must be one non-newline, non-quote character"
+            )
         object.__setattr__(self, "rows", tuple(self.rows))
         if self.dialect_proven and self.reason_code is not None:
             raise ValueError("proven CSV dialect cannot carry a read-only reason")

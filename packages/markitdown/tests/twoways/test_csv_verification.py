@@ -16,7 +16,9 @@ def _table(document):
     return document.nodes[document.canvases[0].root_node_ids[0]]
 
 
-def _edit(document, *, row: int, column: int, old_text: str, text: str) -> EditOperation:
+def _edit(
+    document, *, row: int, column: int, old_text: str, text: str
+) -> EditOperation:
     return EditOperation(
         operation_id="edit-1",
         type="update_csv_cells",
@@ -43,9 +45,7 @@ def test_utf16_be_bom_is_preserved_by_target_only_patch() -> None:
         document,
         BytesIO(source),
         output,
-        edits=(
-            _edit(document, row=1, column=1, old_text="Paris", text="Lyon"),
-        ),
+        edits=(_edit(document, row=1, column=1, old_text="Paris", text="Lyon"),),
     )
 
     assert output.getvalue() == (
@@ -68,9 +68,7 @@ def test_stateful_encoding_leakage_outside_target_is_rejected_before_output() ->
             document,
             BytesIO(source),
             output,
-            edits=(
-                _edit(document, row=1, column=0, old_text="A", text="日本"),
-            ),
+            edits=(_edit(document, row=1, column=0, old_text="A", text="日本"),),
         )
 
     assert output.getvalue() == b""

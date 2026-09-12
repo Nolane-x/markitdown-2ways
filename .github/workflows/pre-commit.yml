@@ -18,3 +18,18 @@ jobs:
 
       - name: Run pre-commit
         run: pre-commit run --all-files
+
+      - name: Capture formatted H5 files
+        if: always()
+        run: |
+          tar -czf h5-formatted.tar.gz \
+            packages/markitdown/src/markitdown/twoways/formats/html \
+            packages/markitdown/tests/twoways/test_html_*.py
+
+      - name: Upload formatted H5 files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: h5-formatted
+          path: h5-formatted.tar.gz
+          if-no-files-found: error

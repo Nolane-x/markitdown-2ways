@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from decimal import Decimal
-
 import pytest
 
 from markitdown.twoways.formats.xml.lexical import (
@@ -58,18 +56,25 @@ def test_preserves_comment_pi_cdata_and_self_closing_lexemes() -> None:
     document = scan_xml_text(text)
     nodes = tuple(document.nodes)
 
-    assert any(node.kind == "processing_instruction" and node.raw == "<?pi test?>" for node in nodes)
+    assert any(
+        node.kind == "processing_instruction" and node.raw == "<?pi test?>"
+        for node in nodes
+    )
     assert any(node.kind == "comment" and node.raw == "<!--c-->" for node in nodes)
     cdata = next(node for node in nodes if node.kind == "cdata")
     assert cdata.value == "x<y"
-    child = next(node for node in nodes if node.kind == "element" and node.qname == "a")
-    assert child.raw.endswith("<a />") or child.raw == "<a />"
+    child = next(
+        node for node in nodes if node.kind == "element" and node.qname == "a"
+    )
+    assert child.raw == "<a />"
 
 
 def test_decodes_predefined_and_numeric_references_strictly() -> None:
     document = scan_xml_text('<r a="&amp;&#9;&#xA;">&lt;&#62;&#x26;</r>')
     nodes = tuple(document.nodes)
-    attribute = next(node for node in nodes if node.kind == "attribute" and node.qname == "a")
+    attribute = next(
+        node for node in nodes if node.kind == "attribute" and node.qname == "a"
+    )
     text_node = next(node for node in nodes if node.kind == "text")
 
     assert attribute.value == "&\t\n"

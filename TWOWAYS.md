@@ -1,7 +1,8 @@
 # MarkItDown 2Ways
 
 MarkItDown 2Ways is the focused two-way layer in this fork. It keeps the existing
-one-way `MarkItDown` API and CLI intact, and adds bounded, evidence-driven round trips:
+one-way `MarkItDown` API and CLI intact while adding bounded, evidence-driven round
+trips:
 
 ```text
 native document -> DocumentIR -> Markdown / typed edits -> native document
@@ -9,9 +10,10 @@ native document -> DocumentIR -> Markdown / typed edits -> native document
 
 The production scope is intentionally narrow: Core IR, capability reporting,
 identity/clean Markdown projection, PPTX, DOCX, conservative XLSX mutation, native
-text/Markdown source preservation, target-only CSV cell mutation, and target-only JSON
-scalar mutation. This project is not an Office automation platform, workflow engine,
-document-management service, or general application framework.
+text/Markdown source preservation, target-only CSV cell mutation, target-only JSON
+scalar mutation, and target-only XML text/attribute mutation. It is not an Office
+automation platform, workflow engine, document-management service, or general
+application framework.
 
 ## Install this fork
 
@@ -30,11 +32,24 @@ result = MarkItDown().convert("report.pdf")
 print(result.markdown)
 ```
 
-## Capability model
+## Safety model
 
-2Ways does not treat successful parsing as proof that an edit is safe. Readers publish
-deterministic capability decisions, and unknown or unadvertised operations default to
-read-only. Reason codes are stable machine-readable diagnostics.
+2Ways does not treat successful parsing as proof that mutation is safe. Readers expose
+capability decisions; writers revalidate source authority, native ownership and edit
+preconditions before constructing a candidate; format-specific preservation proofs and
+semantic re-read verification run before destination bytes are emitted.
+
+Core rules are:
+
+- source SHA-256 and byte size are bound to `DocumentIR` and checked again by writers;
+- unknown or unadvertised operations default to read-only;
+- typed edits may carry semantic, native-locator and expected-old-value preconditions;
+- complete edit sets are preflighted before output is written;
+- zero-edit writes preserve exact source bytes where the format contract permits it;
+- untouched native members, subtrees or encoded byte segments are verified according to
+  the format's preservation model;
+- malformed, ambiguous or unsupported ownership fails closed;
+- the 2Ways core performs no network or subprocess I/O.
 
 ```python
 from markitdown.twoways import build_capability_report, capabilities_for_node
@@ -77,32 +92,16 @@ with open("README-edited.md", "wb") as output_file:
     patch_text(document, BytesIO(source), output_file, edits=(edit,))
 ```
 
-The reader records source SHA-256/size plus exact representation metadata: encoding,
-BOM, newline convention and byte-roundtrip proof. The writer verifies source identity,
-native locator, capability and edit preconditions; it preserves the recorded
-representation, re-reads the candidate, and writes destination bytes only after
-verification succeeds. Zero-edit and semantic no-op writes remain byte-identical.
-
-Mixed-newline files remain readable but direct `replace_text` is read-only with
-`text.newline.mixed`. A representation that cannot be proven byte-roundtrippable is
-read-only with `text.encoding.not_roundtrippable`. A source with no existing newline
-convention cannot introduce a line break because choosing LF/CRLF/CR would be a guess.
-
-### Native source and identity Markdown
-
-Existing identity-Markdown text import is intentionally semantic: for Office-derived
-text it may interpret supported Markdown formatting and normalize paragraph whitespace.
-That is not an exact lexical protocol for arbitrary `.txt` or `.md` source. Native
-source therefore remains directly writable through typed `replace_text`, while its
-identity-Markdown projection is inspection-only until a raw-source protocol can prove
-lexical preservation.
+The reader records source SHA-256/size plus encoding, BOM, newline convention and
+byte-roundtrip evidence. Mixed-newline or non-roundtrippable representations become
+read-only where choosing a writable representation would require guessing. Native text
+identity Markdown remains inspection-only; direct typed `replace_text` is authoritative.
 
 ## CSV source-preserving cell edits
 
-Phase H2 adds direct `update_csv_cells` edits without turning CSV into a regenerated
-table. The native adapter first proves reversible text representation and CSV lexical
-ownership, then records each materialized field's exact character span, semantic value,
-quote state, multiline state and raw lexical digest.
+Phase H2 adds direct `update_csv_cells` edits without regenerating the document through
+`csv.writer`, pandas or another table serializer. Each materialized field has exact
+lexical ownership, raw evidence and native coordinates.
 
 ```python
 from io import BytesIO
@@ -130,35 +129,17 @@ with open("people-edited.csv", "wb") as output_file:
     patch_csv(document, BytesIO(source), output_file, edits=(edit,))
 ```
 
-H2 never uses `csv.writer`, pandas, or whole-document CSV serialization. It patches only
-authorized field spans in the decoded lexical source, encodes the result using the
-original representation, proves every untouched encoded byte segment stayed exact,
-re-reads the candidate, verifies requested and unrequested cells plus structure and
-representation, and only then emits destination bytes.
-
-Supported auto-detected delimiters are comma, semicolon, tab and pipe. Auto-detection
-must produce one unique supported candidate; ambiguous sources fail closed. A
-single-column source without an explicit delimiter is readable but mutation is
-read-only with `csv.dialect.unproven_single_column`. An explicit one-character delimiter
-can make such a source authoritative.
-
-Existing quoted targets remain quoted. An unquoted target stays unquoted unless the new
-value contains the delimiter or a quote, in which case H2 introduces the required quote
-wrapper and doubles embedded quote characters. Replacement CR/LF is deliberately
-unsupported in H2. Existing multiline quoted neighboring fields and physical
-CR/LF/CRLF/mixed record terminators are preserved rather than regenerated.
-
-CSV identity-Markdown is read-only in H2. A Markdown table is not enough evidence to
-reconstruct original quoting, blank records, ragged rows, physical terminators or exact
-lexical spans. Direct typed CSV edits are the only H2 mutation path.
+Supported auto-detected delimiters are comma, semicolon, tab and pipe. Ambiguous
+dialects fail closed. The writer patches only requested field spans, preserves physical
+row terminators and neighboring lexical form, proves untouched encoded byte segments,
+and strictly re-reads the candidate before output. CSV identity Markdown is
+inspection-only in H2.
 
 ## JSON source-preserving scalar edits
 
-Phase H3 adds strict JSON lexical ownership and direct `replace_json_scalar` edits.
-Every JSON value receives an RFC 6901 pointer, exact character span, native locator,
-raw-token digest and deterministic hierarchy evidence. Scalar nodes are writable only
-when the source representation is byte-roundtrippable; object and array nodes remain
-structural read-only.
+Phase H3 adds strict JSON lexical ownership and direct `replace_json_scalar` edits. Each
+JSON value receives an RFC 6901 pointer, exact span, native locator, raw-token digest and
+deterministic hierarchy evidence.
 
 ```python
 from io import BytesIO
@@ -186,24 +167,69 @@ with open("config-edited.json", "wb") as output_file:
     patch_json(document, BytesIO(source), output_file, edits=(edit,))
 ```
 
-H3 never serializes an object, array or complete document. It renders only the requested
-scalar token, patches its exact source span, re-encodes using the original encoding/BOM,
-and proves every encoded byte segment outside authorized targets stayed unchanged. A
-strict candidate re-read then verifies the complete pointer set and parent/child order,
-requested scalar semantics, every unrequested scalar semantic value and raw lexical
-digest, plus representation metadata before destination output is emitted.
+H3 never serializes an object, array or whole document. It patches only requested scalar
+tokens, proves untouched encoded byte segments, then re-reads the candidate and verifies
+pointer topology, requested semantics and unrequested scalar raw evidence. Structural
+object/array mutation, JSON5, comments, trailing commas, duplicate decoded keys,
+JSONL/NDJSON and non-finite numbers are outside H3. JSON identity Markdown is
+inspection-only.
 
-Supported replacement values are JSON strings, integers, finite floats, booleans and
-null. Object/array replacement, member insertion/deletion/reordering, key rename, array
-structural edits, JSON Patch/merge patch, JSONL/NDJSON and JSON extensions are outside
-H3. Comments, trailing commas, single quotes, NaN/Infinity and duplicate decoded object
-keys fail closed. A semantically equal replacement is rejected even when its lexical
-spelling differs, such as changing `1e2` to `100`.
+## XML source-preserving text and attribute edits
 
-JSON identity-Markdown is inspection-only. JSON nodes project as `unknown_native` and do
-not advertise `replace_json_scalar` through the Markdown manifest; typed native edits
-are the only H3 mutation path. Existing one-way `.json` behavior through
-`PlainTextConverter` remains unchanged.
+Phase H4 adds strict XML 1.0 lexical ownership with namespace-aware native paths. Direct
+mutation is intentionally limited to **existing text owners** and **existing ordinary
+attribute values** through `replace_xml_text` and `replace_xml_attribute`.
+
+```python
+from io import BytesIO
+
+from markitdown.twoways import EditOperation
+from markitdown.twoways.formats.xml import patch_xml, read_xml_ir
+
+with open("config.xml", "rb") as source_file:
+    source = source_file.read()
+
+document = read_xml_ir(BytesIO(source), filename="config.xml")
+name_node = next(
+    node
+    for node in document.nodes.values()
+    if node.metadata.get("xml.kind") == "text"
+    and node.payload.get("value") == "Ada"
+)
+edit = EditOperation(
+    operation_id="rename",
+    type="replace_xml_text",
+    target_node_id=name_node.node_id,
+    payload={"value": "Nolane"},
+)
+
+with open("config-edited.xml", "wb") as output_file:
+    patch_xml(document, BytesIO(source), output_file, edits=(edit,))
+```
+
+H4 does not serialize or pretty-print the XML document. The lexical scanner records
+exact owner/value spans, QName and expanded-name identity, in-scope namespace bindings,
+quote style, raw digests, XML declaration evidence and source representation. The writer
+renders only a requested scalar token, patches its exact span, re-encodes using the
+recorded representation, proves every encoded byte segment outside authorized spans,
+and performs a strict candidate re-read before destination output.
+
+The candidate verifier compares the complete ownership path set, parent/child and sibling
+order, namespace bindings, qualified and expanded names, XML declaration, representation,
+requested semantics, and raw/semantic evidence for every unrequested leaf/native owner.
+Ancestor element raw digests are not required to remain equal when a legitimate
+descendant edit changes bytes inside that element.
+
+H4 security is fail-closed: XML 1.1, DTDs, entity declarations, external entities and
+unsupported markup declarations are rejected. The base runtime uses `defusedxml` as an
+independent security/semantic cross-check and does not require `lxml`.
+
+Element structure, element/attribute insertion or deletion, namespace declaration
+mutation, prefix rewrite, CDATA mutation, comments and processing-instruction mutation
+are not writable in H4. These regions remain preserved/read-only. Sources that can be
+read safely but cannot prove byte-roundtrip representation are also read-only. XML
+identity Markdown remains inspection-only; direct typed XML edits are authoritative.
+Existing one-way plain-text conversion behavior is unchanged.
 
 ## PPTX and DOCX round trips
 
@@ -214,16 +240,14 @@ silently rebuilt.
 
 Both formats expose bounded deep edits through the same capability kernel:
 
-- `set_text_style` on safe existing native runs, with direct bold/italic/underline,
-  font size, font family and RGB color where representation is exact;
+- `set_text_style` on safe existing native runs, including bounded direct formatting;
 - PPTX `move_resize` on safe non-group slide shapes using integer EMUs;
 - picture alt-text edits where native carriers are unambiguous;
-- simple table-cell text updates where every changed coordinate is bound to expected
-  old text.
+- simple table-cell text updates bound to expected old text.
 
-Inherited/theme style synthesis, rotation/group-coordinate rewriting, structural table
-editing, theme/master/SmartArt/macros/OLE mutation, DOCX numbering/field/tracked-change
-mutation and other ambiguous surfaces remain outside the writable boundary.
+Inherited/theme style synthesis, group-coordinate rewriting, structural table editing,
+theme/master/SmartArt/macros/OLE mutation, DOCX numbering/field/tracked-change mutation
+and other ambiguous surfaces remain outside the writable boundary.
 
 ## XLSX tranche-one round trip
 
@@ -264,52 +288,43 @@ a serializer; `openpyxl` is an independent regression oracle.
 
 ## Current capability boundary
 
-| Area | Native text / Markdown H1 | CSV H2 | JSON H3 | PPTX | DOCX | XLSX tranche one |
-| --- | --- | --- | --- | --- | --- | --- |
-| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict value spans + RFC 6901 pointers + hierarchy | slides, groups, notes, text, pictures, tables, charts | body, headers, footers, text, hyperlinks, pictures, tables | worksheets and typed cells |
-| Primary patch | whole-source `replace_text` when representation is provable | target-only `update_csv_cells` | target-only `replace_json_scalar` | compatible slide/group/notes text | compatible body/header/footer/hyperlink text | scalar non-formula, non-merged cells |
-| Identity Markdown edit | read-only for native lexical source | read-only in H2 | read-only in H3 | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
-| Representation proof | encoding/BOM/newline | encoding/BOM + delimiter + field spans + row terminators | encoding/BOM + pointer/span/raw-token evidence | OPC/XML native ownership | OPC/XML native ownership | OPC/XML + typed cell ownership |
-| Structural edits | unsupported | unsupported | unsupported | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
+| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | PPTX | DOCX | XLSX tranche one |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
+| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
+| Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
+| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
+| Structural edits | unsupported | unsupported | unsupported | unsupported | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
 
-XML and HTML are not writable through H3. Their v0.5 tranches must independently prove
-syntax-aware lexical/subtree ownership rather than route parsed content through a
-generic serializer.
+HTML remains the next independent v0.5 structured-text tranche. It must use a
+parser-recovery-aware ownership contract rather than inherit XML well-formedness rules.
 
-## Fidelity and safety model
+## Fidelity details
 
-The round-trip layer is designed around explicit proof rather than best-effort rebuilds:
+Format-specific proof strengthens the common safety model:
 
-- source SHA-256 is bound to `DocumentIR` and writers verify the supplied source;
 - native text binds source size, encoding, BOM and newline policy;
-- CSV binds source size, encoding/BOM, delimiter, native coordinate set, exact field
-  spans/raw digests and physical row terminator evidence;
-- JSON binds source size, encoding/BOM, exact RFC 6901 pointer ownership, hierarchy,
-  lexical value spans and raw-token digests;
-- edits can carry semantic, native-locator and expected-old-value preconditions;
-- no-op patching preserves the original file byte-for-byte;
-- native text, CSV and JSON candidates are re-read before destination emission;
-- CSV and JSON prove every encoded byte segment outside requested targets is exact;
-- JSON additionally verifies requested semantics and all unrequested scalar raw evidence
-  after re-read;
+- CSV binds delimiter, field spans/raw digests and physical row terminators;
+- JSON binds RFC 6901 paths, hierarchy, lexical value spans and raw-token digests;
+- XML binds namespace-aware ownership paths, exact lexical/value spans, QName and
+  expanded-name identity, declaration and representation evidence;
+- CSV, JSON and XML prove every encoded byte segment outside requested targets remains
+  exact;
+- text, CSV, JSON and XML candidates are re-read before destination emission;
+- XML additionally rejects DTD/entity/external-resolution surfaces before mutation;
 - OOXML writers start from the original package and restrict mutation to authorized
-  parts/subtrees;
-- unrelated package members/native subtrees are verified after writes;
-- malformed or ambiguous native ownership fails closed;
-- XML parsing disables DTD/entity/network resolution;
-- the 2Ways core does not perform network or subprocess I/O.
+  parts/subtrees, with unrelated package members verified after writes.
 
 ## Clean Markdown vs identity Markdown
 
-Use clean mode when Markdown is the final projection. Use identity mode when a supported
-semantic region will be edited and re-imported. Do not remove or forge `m2w` identity
-comments: the importer validates projection manifest, document/node identity, source
-semantic digests and native locator evidence before emitting typed edits.
+Use clean mode when Markdown is the final projection. Use identity mode only where the
+format adapter advertises a reversible semantic Markdown path. Do not remove or forge
+`m2w` identity comments: the importer validates projection manifest, document/node
+identity, semantic digests and native locator evidence before emitting typed edits.
 
-Native lexical text/Markdown, CSV and JSON are explicit v0.5 exceptions: their current
-identity projections are inspection-only because generic Markdown semantics do not
-prove exact native lexical reconstruction. Their direct typed native paths remain
-available where source evidence is sufficient.
+Native lexical text/Markdown, CSV, JSON and XML are explicit v0.5 inspection-only
+identity projections. Their direct typed native paths remain writable only where native
+source evidence is sufficient.
 
 ## Scope discipline and roadmap
 
@@ -319,7 +334,7 @@ ceiling around roughly twice the upstream MarkItDown implementation.
 
 The approved broader parity program is in
 `docs/superpowers/specs/2026-09-11-markitdown-2ways-full-parity-program-design.md`.
-Current v0.5 execution documents are:
+Current v0.5 execution documents include:
 
 - `docs/superpowers/specs/2026-09-12-markitdown-2ways-phase-h1-text-source-preservation-design.md`
 - `docs/superpowers/plans/2026-09-12-phase-h1-text-source-preservation-implementation.md`
@@ -327,8 +342,10 @@ Current v0.5 execution documents are:
 - `docs/superpowers/plans/2026-09-12-phase-h2-csv-source-preservation-implementation.md`
 - `docs/superpowers/specs/2026-09-12-markitdown-2ways-phase-h3-json-source-preservation-design.md`
 - `docs/superpowers/plans/2026-09-12-phase-h3-json-source-preservation-implementation.md`
+- `docs/superpowers/specs/2026-09-12-markitdown-2ways-phase-h4-xml-source-preservation-design.md`
+- `docs/superpowers/plans/2026-09-12-phase-h4-xml-source-preservation-implementation.md`
 
-After H3 is exact-head green, Phase H4 adds XML source preservation with namespace-aware
-lexical ownership and target-only subtree/attribute/text mutation boundaries. HTML
-follows with its own parser-recovery-aware source-preservation contract. Parser support
-alone is never evidence that mutation is allowed.
+H4 is considered complete only after its exact final branch head passes pre-commit plus
+the package and OCR matrices on Python 3.10–3.13. H5 HTML follows on a new stacked
+branch and receives a separate parser-recovery-aware design rather than reusing XML
+well-formedness assumptions.

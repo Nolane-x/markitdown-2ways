@@ -50,7 +50,11 @@ def render_text(
         body = f"{'#' * level} {body}"
     elif role == "code":
         body = f"```\n{body}\n```"
-    return RenderedNode(body, semantic_text_for_node(node), ("replace_text",))
+
+    editable_capabilities = (
+        () if node.metadata.get("text.native_source") is True else ("replace_text",)
+    )
+    return RenderedNode(body, semantic_text_for_node(node), editable_capabilities)
 
 
 def render_image(

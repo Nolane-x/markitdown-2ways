@@ -1,7 +1,8 @@
 """Native source-preserving JSON round-trip support."""
 
 from .reader import JsonIRReader, read_json_ir
-from .writer import JsonPatchWriter, patch_json
+from .writer import patch_json
+from .writer_adapter import JsonPatchWriter
 
 __all__ = [
     "JsonIRReader",

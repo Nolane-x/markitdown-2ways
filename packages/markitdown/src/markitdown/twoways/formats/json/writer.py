@@ -3,10 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from hashlib import sha256
-from io import BytesIO
 import json
 import math
-from typing import Any, BinaryIO
+from typing import BinaryIO
 
 from ..._errors import (
     PatchPreconditionError,
@@ -25,7 +24,7 @@ from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ir.nodes import Node
 from ...ir.semantics import validate_edit_preconditions
-from ...ir.validation import validate_document
+from ...ir.serialization import validate_document
 from ..text.codec import decode_text_source, encode_text_source
 from ..text.model import TextRepresentation
 from .lexical import scan_json_text

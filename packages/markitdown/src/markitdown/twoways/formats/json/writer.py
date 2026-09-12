@@ -40,7 +40,7 @@ def _read_source_bytes(source_stream: BinaryIO) -> bytes:
 
 def _source_mismatch(reason: str, *, expected: object, actual: object) -> None:
     raise SourcePackageMismatchError(
-        "JSON source does not match the DocumentIR source authority.",
+        f"JSON source does not match the DocumentIR source authority ({reason}).",
         details={"reason": reason, "expected": expected, "actual": actual},
     )
 

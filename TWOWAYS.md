@@ -11,9 +11,10 @@ native document -> DocumentIR -> Markdown / typed edits -> native document
 The production scope is intentionally narrow: Core IR, capability reporting,
 identity/clean Markdown projection, PPTX, DOCX, conservative XLSX mutation, native
 text/Markdown source preservation, target-only CSV cell mutation, target-only JSON
-scalar mutation, and target-only XML text/attribute mutation. It is not an Office
-automation platform, workflow engine, document-management service, or general
-application framework.
+scalar mutation, target-only XML text/attribute mutation, and recovery-aware target-only
+HTML text/quoted-attribute mutation. It is not an Office automation platform, workflow
+engine, document-management service, browser automation layer, or general application
+framework.
 
 ## Install this fork
 
@@ -231,6 +232,68 @@ read safely but cannot prove byte-roundtrip representation are also read-only. X
 identity Markdown remains inspection-only; direct typed XML edits are authoritative.
 Existing one-way plain-text conversion behavior is unchanged.
 
+## HTML recovery-aware source-preserving edits
+
+Phase H5 treats HTML as a separate recovery-aware format rather than reusing XML
+well-formedness assumptions. The writable entry points accept `.html`, `.htm`, and
+`text/html`; XHTML, XML, SVG, MathML and generic XML-like surfaces are not accepted as
+writable HTML targets.
+
+Direct mutation is intentionally limited to normal data-state text and existing quoted,
+non-duplicate attribute values through `replace_html_text` and
+`replace_html_attribute`.
+
+```python
+from io import BytesIO
+
+from markitdown.twoways import EditOperation
+from markitdown.twoways.formats.html import patch_html, read_html_ir
+
+with open("page.html", "rb") as source_file:
+    source = source_file.read()
+
+document = read_html_ir(BytesIO(source), filename="page.html", mimetype="text/html")
+text_node = next(
+    node
+    for node in document.nodes.values()
+    if node.metadata.get("html.kind") == "text"
+    and node.payload.get("value") == "Ada"
+)
+edit = EditOperation(
+    operation_id="rename",
+    type="replace_html_text",
+    target_node_id=text_node.node_id,
+    payload={"value": "Nolane"},
+)
+
+with open("page-edited.html", "wb") as output_file:
+    patch_html(document, BytesIO(source), output_file, edits=(edit,))
+```
+
+H5 separates **lexical source authority** from an independent parser-recovery oracle. A
+pure-Python scanner owns exact source spans, names, quote style, raw digests and native
+paths. BeautifulSoup with Python's `html.parser` is used only to build an independent
+recovery signature; DOM serialization is never a production write path.
+
+Before mutation, the writer revalidates source SHA/size, source representation, fresh
+native ownership, capability metadata and typed edit preconditions. It patches only the
+recorded text/value spans, preserves the original attribute quote style, re-encodes using
+the source representation, and proves every encoded byte segment outside authorized
+spans remains exact. Immediately before destination output, the candidate is re-read and
+must preserve lexical path/kind/name/topology, attribute quote shape, encoding/meta
+declaration evidence, and the independent recovery signature. Requested owners must have
+the requested semantic values; unrequested scalar/comment/doctype/rawtext/RCDATA owners
+must retain their raw and semantic evidence.
+
+H5 fails closed on recovery-sensitive or structurally ambiguous sources. Unquoted and
+boolean attributes, duplicate normalized attributes, script/style raw text,
+title/textarea RCDATA, comments, doctypes, encoding declarations, template content,
+table-recovery-sensitive cases, foreign SVG/MathML content, structural edits, tag rename,
+insertion/deletion/reordering and any source whose byte-roundtrip or recovery stability
+cannot be proven are read-only. Identity Markdown is inspection-only; direct typed HTML
+edits are authoritative. The existing one-way `HtmlConverter`, including its current
+XHTML acceptance behavior, remains unchanged.
+
 ## PPTX and DOCX round trips
 
 PPTX and DOCX use identity Markdown where the projection/importer can prove a semantic
@@ -288,16 +351,17 @@ a serializer; `openpyxl` is an independent regression oracle.
 
 ## Current capability boundary
 
-| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | PPTX | DOCX | XLSX tranche one |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
-| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
-| Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
-| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
-| Structural edits | unsupported | unsupported | unsupported | unsupported | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
+| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | PPTX | DOCX | XLSX tranche one |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
+| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
+| Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
+| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
+| Structural edits | unsupported | unsupported | unsupported | unsupported | unsupported | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
 
-HTML remains the next independent v0.5 structured-text tranche. It must use a
-parser-recovery-aware ownership contract rather than inherit XML well-formedness rules.
+H1-H5 together form the v0.5 text/structured-text parity tranche. Later notebook,
+publication and container work belongs to a separate v0.6 branch rather than extending
+H5's writable boundary.
 
 ## Fidelity details
 
@@ -308,10 +372,14 @@ Format-specific proof strengthens the common safety model:
 - JSON binds RFC 6901 paths, hierarchy, lexical value spans and raw-token digests;
 - XML binds namespace-aware ownership paths, exact lexical/value spans, QName and
   expanded-name identity, declaration and representation evidence;
-- CSV, JSON and XML prove every encoded byte segment outside requested targets remains
-  exact;
-- text, CSV, JSON and XML candidates are re-read before destination emission;
+- HTML binds recovery-aware native paths, exact lexical/value spans, original/normalized
+  names, quote shape, encoding/meta declarations and an independent recovery signature;
+- CSV, JSON, XML and HTML prove every encoded byte segment outside requested targets
+  remains exact;
+- text, CSV, JSON, XML and HTML candidates are re-read before destination emission;
 - XML additionally rejects DTD/entity/external-resolution surfaces before mutation;
+- HTML additionally rejects recovery-sensitive/foreign/template/table/rawtext/RCDATA
+  mutation surfaces before mutation;
 - OOXML writers start from the original package and restrict mutation to authorized
   parts/subtrees, with unrelated package members verified after writes.
 
@@ -322,7 +390,7 @@ format adapter advertises a reversible semantic Markdown path. Do not remove or 
 `m2w` identity comments: the importer validates projection manifest, document/node
 identity, semantic digests and native locator evidence before emitting typed edits.
 
-Native lexical text/Markdown, CSV, JSON and XML are explicit v0.5 inspection-only
+Native lexical text/Markdown, CSV, JSON, XML and HTML are explicit v0.5 inspection-only
 identity projections. Their direct typed native paths remain writable only where native
 source evidence is sufficient.
 
@@ -344,8 +412,10 @@ Current v0.5 execution documents include:
 - `docs/superpowers/plans/2026-09-12-phase-h3-json-source-preservation-implementation.md`
 - `docs/superpowers/specs/2026-09-12-markitdown-2ways-phase-h4-xml-source-preservation-design.md`
 - `docs/superpowers/plans/2026-09-12-phase-h4-xml-source-preservation-implementation.md`
+- `docs/superpowers/specs/2026-09-12-markitdown-2ways-phase-h5-html-source-preservation-design.md`
+- `docs/superpowers/plans/2026-09-12-phase-h5-html-source-preservation-implementation.md`
 
-H4 is considered complete only after its exact final branch head passes pre-commit plus
-the package and OCR matrices on Python 3.10–3.13. H5 HTML follows on a new stacked
-branch and receives a separate parser-recovery-aware design rather than reusing XML
-well-formedness assumptions.
+Each tranche is complete only after its exact final branch head passes pre-commit plus
+the package and OCR matrices on Python 3.10-3.13. H5 uses a separate recovery-aware
+contract and does not change the existing one-way HTML converter, API or CLI. After the
+H5 exact-head gate, v0.6 notebook/publication/container work must start on a new branch.

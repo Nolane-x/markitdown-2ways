@@ -17,6 +17,8 @@ INITIAL_EDIT_TYPES = frozenset(
         "replace_json_scalar",
         "replace_xml_text",
         "replace_xml_attribute",
+        "replace_html_text",
+        "replace_html_attribute",
         "add_node",
         "remove_node",
     }

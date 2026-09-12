@@ -10,6 +10,8 @@ from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ir.nodes import ImagePayload, TablePayload, TextPayload
 from ...ir.semantics import node_semantic_text
+from ...ir.style_edits import validate_text_style_update
+from ._style_patch import patch_docx_run_style
 from .locators import (
     resolve_paragraph_element,
     resolve_picture_docpr,
@@ -68,6 +70,37 @@ def _apply_edit(
             paragraph,
             old_text=node_semantic_text(node),
             new_text=new_text,
+        )
+        return
+
+    if edit.type == "set_text_style":
+        if not isinstance(node.payload, TextPayload):
+            raise UnsupportedEditError(
+                "set_text_style requires a DOCX text node.",
+                details={"reason": "wrong_node_kind", "target_node_id": node.node_id},
+            )
+        if node.metadata.get("docx:patch_text_compatible") is not True:
+            raise UnsupportedEditError(
+                "DOCX paragraph structure is read-only for run styling.",
+                details={
+                    "reason": "docx.text.ambiguous_run_layout",
+                    "target_node_id": node.node_id,
+                },
+            )
+        run_index, old_style, new_style = validate_text_style_update(
+            node.payload,
+            edit.payload,
+        )
+        paragraph = resolve_paragraph_element(
+            root,
+            node.native_locator,
+            part_uri=part_uri,
+        )
+        patch_docx_run_style(
+            paragraph,
+            run_index=run_index,
+            old_style=old_style,
+            new_style=new_style,
         )
         return
 

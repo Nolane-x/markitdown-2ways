@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from io import BytesIO
+from typing import Any
 
 from ..._errors import RoundTripVerificationError
 from ...ir.document import DocumentIR
@@ -76,14 +77,17 @@ def _topology(
                 path=path,
             )
         parent_path = _path_for_node(document, node.parent_id)
-        child_paths = tuple(_path_for_node(document, child_id) for child_id in node.children)
-        if any(child_path is None for child_path in child_paths):
-            _failure(
-                "HTML candidate contains invalid child ownership.",
-                "html.candidate.child_path",
-                path=path,
-            )
-        result[path] = (kind, parent_path, child_paths)  # type: ignore[arg-type]
+        child_paths_list: list[str] = []
+        for child_id in node.children:
+            child_path = _path_for_node(document, child_id)
+            if child_path is None:
+                _failure(
+                    "HTML candidate contains invalid child ownership.",
+                    "html.candidate.child_path",
+                    path=path,
+                )
+            child_paths_list.append(child_path)
+        result[path] = (kind, parent_path, tuple(child_paths_list))
     return result
 
 
@@ -95,6 +99,23 @@ def _root(document: DocumentIR, nodes: Mapping[str, Node]) -> Node:
             "html.candidate.root",
         )
     return root
+
+
+def _declaration_identity(value: object) -> tuple[tuple[object, ...], ...] | None:
+    if not isinstance(value, (tuple, list)):
+        return None
+    identity: list[tuple[object, ...]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            return None
+        identity.append(
+            (
+                item.get("raw"),
+                item.get("raw_digest"),
+                item.get("encoding"),
+            )
+        )
+    return tuple(identity)
 
 
 def _compare_root_evidence(source_root: Node, candidate_root: Node) -> None:
@@ -109,7 +130,6 @@ def _compare_root_evidence(source_root: Node, candidate_root: Node) -> None:
         "html.encoding",
         "html.bom",
         "html.byte_roundtrip",
-        "html.encoding_declarations",
         "html.recovery_signature",
         "html.native_source",
         "html.identity_markdown",
@@ -124,6 +144,25 @@ def _compare_root_evidence(source_root: Node, candidate_root: Node) -> None:
                 expected=expected,
                 actual=actual,
             )
+
+    expected_declarations = _declaration_identity(
+        source_root.metadata.get("html.encoding_declarations")
+    )
+    actual_declarations = _declaration_identity(
+        candidate_root.metadata.get("html.encoding_declarations")
+    )
+    if expected_declarations is None or actual_declarations is None:
+        _failure(
+            "HTML candidate contains malformed encoding-declaration evidence.",
+            "html.candidate.encoding_declaration_shape",
+        )
+    if actual_declarations != expected_declarations:
+        _failure(
+            "HTML candidate changed encoding declaration spelling or meaning.",
+            "html.candidate.encoding_declarations",
+            expected=expected_declarations,
+            actual=actual_declarations,
+        )
 
 
 def _compare_owner_identity(path: str, source: Node, candidate: Node) -> None:
@@ -221,7 +260,10 @@ def verify_html_candidate(
             "html.candidate.missing_source_descriptor",
         )
 
-    if any(not isinstance(path, str) or not isinstance(value, str) for path, value in requested.items()):
+    if any(
+        not isinstance(path, str) or not isinstance(value, str)
+        for path, value in requested.items()
+    ):
         _failure(
             "HTML candidate verification received malformed requested values.",
             "html.candidate.requested_shape",

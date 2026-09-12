@@ -215,10 +215,7 @@ def _verify_edited_targets(
 ) -> tuple[str, ...]:
     edits_by_target: dict[str, list[EditOperation]] = {}
     for edit in edits:
-        if (
-            edit.type not in _TARGET_NATIVE_EDIT_TYPES
-            or edit.target_node_id is None
-        ):
+        if edit.type not in _TARGET_NATIVE_EDIT_TYPES or edit.target_node_id is None:
             continue
         edits_by_target.setdefault(edit.target_node_id, []).append(edit)
     if not edits_by_target:
@@ -325,7 +322,10 @@ def _expected_edit_value(original_document: DocumentIR, edit: EditOperation) -> 
         return edit.payload.get("text")
     if edit.type == "set_alt_text":
         return edit.payload.get("alt_text")
-    if edit.type in {"set_text_style", "move_resize"} and edit.target_node_id is not None:
+    if (
+        edit.type in {"set_text_style", "move_resize"}
+        and edit.target_node_id is not None
+    ):
         source_node = original_document.nodes.get(edit.target_node_id)
         if source_node is not None:
             return node_semantic_text(source_node)

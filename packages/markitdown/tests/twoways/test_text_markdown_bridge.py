@@ -12,7 +12,9 @@ from markitdown.twoways.markdown import (
 
 
 def test_native_text_source_is_read_only_through_identity_markdown() -> None:
-    document = read_text_ir(BytesIO(b"literal **stars**  \n\nbody\n"), filename="notes.txt")
+    document = read_text_ir(
+        BytesIO(b"literal **stars**  \n\nbody\n"), filename="notes.txt"
+    )
 
     projection = project_markdown(
         document,

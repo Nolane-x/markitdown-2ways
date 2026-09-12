@@ -77,8 +77,10 @@ def _representation_for_node(node: Node) -> TextRepresentation:
             "Text edit target is missing source representation metadata.",
             details={"reason": "missing_representation_metadata", "field": str(exc)},
         ) from exc
-    if not isinstance(encoding, str) or not isinstance(bom, str) or not isinstance(
-        newline, str
+    if (
+        not isinstance(encoding, str)
+        or not isinstance(bom, str)
+        or not isinstance(newline, str)
     ):
         raise PatchPreconditionError(
             "Text edit target contains invalid source representation metadata.",
@@ -163,7 +165,9 @@ def _prepare_replace(
     if not edits:
         return None
     if len(edits) != 1:
-        target_ids = [edit.target_node_id for edit in edits if edit.type == "replace_text"]
+        target_ids = [
+            edit.target_node_id for edit in edits if edit.type == "replace_text"
+        ]
         if len(target_ids) != len(set(target_ids)):
             raise UnsupportedEditError(
                 "Text patch contains duplicate replace_text targets.",
@@ -352,7 +356,9 @@ def patch_text(
         mode="patch",
         bytes_written=len(output_bytes) if written is None else written,
         fidelity=fidelity,
-        metadata={"touched_nodes": () if prepared is None else (prepared[0].node_id,)},
+        metadata={
+            "touched_nodes": () if prepared is None else (prepared[0].node_id,)
+        },
     )
 
 

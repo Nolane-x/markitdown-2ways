@@ -401,3 +401,116 @@ def test_non_roundtrippable_xml_is_not_writable() -> None:
         )
 
     assert output.getvalue() == b""
+
+
+def test_text_replacement_uses_xml_safe_exact_rendering() -> None:
+    source = b"<r>old</r>"
+    document = read_xml_ir(BytesIO(source), filename="data.xml")
+    output = BytesIO()
+
+    result = patch_xml(
+        document,
+        BytesIO(source),
+        output,
+        edits=(
+            _edit(
+                document,
+                "/r[1]/#text[1]",
+                "A&B<C>D\rE\n\u03a9",
+            ),
+        ),
+    )
+
+    assert output.getvalue() == "<r>A&amp;B&lt;C&gt;D&#13;E\n\u03a9</r>".encode("utf-8")
+    assert result.fidelity.claimed_tier == "high"
+
+
+def test_double_quoted_attribute_replacement_preserves_quote_style() -> None:
+    source = b'<r a="old"/>'
+    document = read_xml_ir(BytesIO(source), filename="data.xml")
+    output = BytesIO()
+
+    patch_xml(
+        document,
+        BytesIO(source),
+        output,
+        edits=(
+            _edit(
+                document,
+                "/r[1]/@a",
+                '"&<>\t\n\r',
+            ),
+        ),
+    )
+
+    assert output.getvalue() == b'<r a="&quot;&amp;&lt;&gt;&#9;&#10;&#13;"/>'
+
+
+def test_single_quoted_attribute_replacement_preserves_quote_style() -> None:
+    source = b"<r a='old'/>"
+    document = read_xml_ir(BytesIO(source), filename="data.xml")
+    output = BytesIO()
+
+    patch_xml(
+        document,
+        BytesIO(source),
+        output,
+        edits=(_edit(document, "/r[1]/@a", "x'y"),),
+    )
+
+    assert output.getvalue() == b"<r a='x&apos;y'/>"
+
+
+def test_text_renderer_neutralizes_cdata_close_sequence() -> None:
+    source = b"<r>old</r>"
+    document = read_xml_ir(BytesIO(source), filename="data.xml")
+    output = BytesIO()
+
+    patch_xml(
+        document,
+        BytesIO(source),
+        output,
+        edits=(_edit(document, "/r[1]/#text[1]", "a]]>b"),),
+    )
+
+    assert output.getvalue() == b"<r>a]]&gt;b</r>"
+
+
+def test_multiple_targets_patch_only_owned_value_spans() -> None:
+    source = (
+        b'<?xml version="1.0"?><r a="x"><c>much longer</c>'
+        b"<keep k='v'>stay</keep></r>"
+    )
+    document = read_xml_ir(BytesIO(source), filename="data.xml")
+    output = BytesIO()
+
+    patch_xml(
+        document,
+        BytesIO(source),
+        output,
+        edits=(
+            _edit(
+                document,
+                "/r[1]/c[1]/#text[1]",
+                "z",
+                operation_id="text",
+            ),
+            _edit(
+                document,
+                "/r[1]/@a",
+                "a much longer value",
+                operation_id="root-attr",
+            ),
+            _edit(
+                document,
+                "/r[1]/keep[1]/@k",
+                "changed",
+                operation_id="keep-attr",
+            ),
+        ),
+    )
+
+    assert output.getvalue() == (
+        b'<?xml version="1.0"?><r a="a much longer value"><c>z</c>'
+        b"<keep k='changed'>stay</keep></r>"
+    )

@@ -5,6 +5,7 @@ from typing import Any
 from ...ir.nodes import Paragraph, TextPayload, TextRun
 from ...ir.style import Style
 from .locators import stable_run_id
+from .style import direct_run_style
 
 
 def _local_name(tag: str) -> str:
@@ -12,22 +13,7 @@ def _local_name(tag: str) -> str:
 
 
 def _direct_run_style(run: Any) -> Style | None:
-    direct: dict[str, object] = {}
-    font = run.font
-    if font.bold is not None:
-        direct["bold"] = bool(font.bold)
-    if font.italic is not None:
-        direct["italic"] = bool(font.italic)
-    if font.size is not None:
-        direct["font_size_pt"] = float(font.size.pt)
-    if font.name is not None:
-        direct["font_family"] = font.name
-    try:
-        rgb = font.color.rgb
-    except (AttributeError, ValueError):
-        rgb = None
-    if rgb is not None:
-        direct["color"] = f"#{rgb}"
+    direct = direct_run_style(run._r)
     return Style(direct=direct) if direct else None
 
 

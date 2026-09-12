@@ -12,15 +12,19 @@ from ..._errors import (
 from ..._results import FidelityEvidence, FidelityReport, FidelityStatus, WriterResult
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
+from ...ir.geometry_edits import validate_move_resize
 from ...ir.nodes import ImagePayload, TablePayload, TextPayload
 from ...ir.semantics import node_semantic_text
 from ...ir.serialization import validate_document
+from ...ir.style_edits import validate_text_style_update
 from ...ooxml import parse_xml_part, serialize_xml_part, snapshot_package, write_package
 from ...ooxml.package import read_binary_stream, validate_source_authority
 from ...writers.base import DocumentWriter, TargetInfo
+from .geometry import patch_shape_geometry
 from .locators import resolve_shape_element
 from .model import PptxPatchOptions
 from .patch import patch_picture_alt_text, validate_edit_preconditions
+from .style import patch_text_run_style
 from .table import patch_pptx_table_cells
 from .text import patch_text_shape
 from .verify import verify_pptx_output
@@ -79,6 +83,62 @@ def _apply_edit(
             shape_element,
             old_text=node_semantic_text(node),
             new_text=new_text,
+        )
+        return
+
+    if edit.type == "set_text_style":
+        if not isinstance(node.payload, TextPayload):
+            raise UnsupportedEditError(
+                "set_text_style requires a PPTX text node.",
+                details={"reason": "wrong_node_kind", "target_node_id": node.node_id},
+            )
+        if node.metadata.get("pptx:patch_text_compatible") is not True:
+            raise UnsupportedEditError(
+                "PPTX text node is not structurally safe for direct style editing.",
+                details={
+                    "reason": "unsupported_text_structure",
+                    "target_node_id": node.node_id,
+                },
+            )
+        run_index, source_style, target_style = validate_text_style_update(
+            node.payload,
+            edit.payload,
+        )
+        patch_text_run_style(
+            shape_element,
+            run_index=run_index,
+            old_style=source_style,
+            new_style=target_style,
+        )
+        return
+
+    if edit.type == "move_resize":
+        if node.geometry is None:
+            raise UnsupportedEditError(
+                "move_resize requires source geometry.",
+                details={"reason": "missing_geometry", "target_node_id": node.node_id},
+            )
+        if node.kind == "group" or node.parent_id is not None:
+            raise UnsupportedEditError(
+                "PPTX group and group-child geometry requires group-coordinate editing.",
+                details={
+                    "reason": "pptx.geometry.group_coordinate_space",
+                    "target_node_id": node.node_id,
+                },
+            )
+        if not part_uri.startswith("/ppt/slides/"):
+            raise UnsupportedEditError(
+                "PPTX move_resize is limited to slide shapes in this tranche.",
+                details={
+                    "reason": "pptx.geometry.unsupported_part",
+                    "part_uri": part_uri,
+                },
+            )
+        target_geometry = validate_move_resize(node.geometry, edit.payload)
+        patch_shape_geometry(
+            shape_element,
+            current=node.geometry,
+            target=target_geometry,
         )
         return
 

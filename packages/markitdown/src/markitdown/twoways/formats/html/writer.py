@@ -9,6 +9,7 @@ from typing import BinaryIO
 from ..._errors import (
     IRValidationError,
     PatchPreconditionError,
+    RoundTripVerificationError,
     SourcePackageMismatchError,
     UnsupportedEditError,
 )
@@ -28,8 +29,11 @@ from ...ir.edits import EditOperation, EditPrecondition
 from ...ir.nodes import Node
 from ...ir.semantics import validate_edit_preconditions
 from ...ir.serialization import validate_document
+from ..text.codec import encode_text_source
 from ..text.model import TextRepresentation
+from .lexical import parse_html_source
 from .reader import read_html_ir
+from .render import render_html_attribute, render_html_text
 
 
 def _read_source_bytes(source_stream: BinaryIO) -> bytes:
@@ -216,10 +220,11 @@ def _validate_source_model(
     document: DocumentIR,
     source: bytes,
     representation: TextRepresentation,
-) -> tuple[dict[str, Node], dict[str, Node]]:
+) -> tuple[str, dict[str, Node], dict[str, Node]]:
     descriptor = document.source
     assert descriptor is not None
     try:
+        parsed = parse_html_source(source, encoding=representation.encoding)
         expected_document = read_html_ir(
             BytesIO(source),
             filename=descriptor.filename,
@@ -257,7 +262,7 @@ def _validate_source_model(
     for path, expected_node in expected_nodes.items():
         _validate_node_evidence(actual_nodes[path], expected_node, path)
 
-    return actual_nodes, expected_nodes
+    return parsed.text, actual_nodes, expected_nodes
 
 
 def _semantic_value(node: Node) -> object:
@@ -298,7 +303,7 @@ def _preflight_edit(
     edit: EditOperation,
     path_nodes: Mapping[str, Node],
     expected_nodes: Mapping[str, Node],
-) -> tuple[str, str]:
+) -> tuple[Node, str, str]:
     if edit.target_node_id is None or edit.target_node_id not in document.nodes:
         raise PatchPreconditionError(
             "HTML edit target does not exist in the DocumentIR.",
@@ -370,7 +375,83 @@ def _preflight_edit(
             "HTML edit is a semantic no-op.",
             details={"reason": "html.value.semantic_noop", "path": path},
         )
-    return path, requested
+    return expected, path, requested
+
+
+def _replacement_span(node: Node, path: str) -> tuple[int, int]:
+    kind = node.metadata.get("html.kind")
+    if kind == "text":
+        start = node.metadata.get("html.char_start")
+        end = node.metadata.get("html.char_end")
+    elif kind == "attribute":
+        start = node.metadata.get("html.value_start")
+        end = node.metadata.get("html.value_end")
+    else:
+        raise UnsupportedEditError(
+            "HTML target has no writable scalar span.",
+            details={"reason": "html.value.span_kind", "path": path},
+        )
+    if not isinstance(start, int) or not isinstance(end, int) or start < 0 or end < start:
+        raise PatchPreconditionError(
+            "HTML target value span evidence is invalid.",
+            details={"reason": "html.value.span", "path": path},
+        )
+    return start, end
+
+
+def _render_value(node: Node, path: str, requested: str) -> str:
+    kind = node.metadata.get("html.kind")
+    try:
+        if kind == "text":
+            return render_html_text(requested)
+        if kind == "attribute":
+            quote = node.metadata.get("html.quote")
+            if not isinstance(quote, str):
+                raise UnsupportedEditError(
+                    "HTML writable attribute is missing quote evidence.",
+                    details={"reason": "html.attribute.quote", "path": path},
+                )
+            return render_html_attribute(requested, quote)
+    except (TypeError, ValueError) as exc:
+        raise UnsupportedEditError(
+            "HTML replacement could not be rendered without changing semantics.",
+            details={"reason": "html.rendering.semantic", "path": path},
+        ) from exc
+    raise UnsupportedEditError(
+        "HTML target is not a writable scalar owner.",
+        details={"reason": "html.rendering.kind", "path": path},
+    )
+
+
+def _build_candidate(
+    source_text: str,
+    replacements: Sequence[tuple[int, int, str, str]],
+) -> tuple[str, tuple[tuple[int, int, int, int], ...]]:
+    ordered = sorted(replacements, key=lambda item: (item[0], item[1], item[3]))
+    parts: list[str] = []
+    untouched: list[tuple[int, int, int, int]] = []
+    cursor = 0
+    candidate_cursor = 0
+    for start, end, token, path in ordered:
+        if start < cursor or end < start or end > len(source_text):
+            raise UnsupportedEditError(
+                "HTML edit spans overlap or are invalid.",
+                details={"reason": "html.value.overlapping_targets", "path": path},
+            )
+        prefix = source_text[cursor:start]
+        parts.append(prefix)
+        untouched.append((cursor, start, candidate_cursor, candidate_cursor + len(prefix)))
+        candidate_cursor += len(prefix)
+        parts.append(token)
+        candidate_cursor += len(token)
+        cursor = end
+
+    suffix = source_text[cursor:]
+    parts.append(suffix)
+    untouched.append(
+        (cursor, len(source_text), candidate_cursor, candidate_cursor + len(suffix))
+    )
+    return "".join(parts), tuple(untouched)
 
 
 def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
@@ -392,6 +473,14 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
                 check_code="html.zero_edit_identity",
                 status=FidelityStatus.PASSED,
                 description="Zero-edit output reused the exact source bytes.",
+            )
+        )
+    else:
+        evidence.append(
+            FidelityEvidence(
+                check_code="html.lexical_span_patch",
+                status=FidelityStatus.PASSED,
+                description="Requested HTML scalar values were replaced only at recorded lexical value spans.",
             )
         )
     return WriterResult(
@@ -424,7 +513,7 @@ def patch_html(
     _validate_source_authority(document, source)
     edits = tuple(edits)
     representation = _representation(document, require_writable=bool(edits))
-    path_nodes, expected_nodes = _validate_source_model(
+    source_text, path_nodes, expected_nodes = _validate_source_model(
         document,
         source,
         representation,
@@ -435,8 +524,9 @@ def patch_html(
         return _result(len(source), zero_edit=True)
 
     seen_paths: set[str] = set()
+    replacements: list[tuple[int, int, str, str]] = []
     for edit in edits:
-        path, _requested = _preflight_edit(
+        expected, path, requested = _preflight_edit(
             document,
             edit,
             path_nodes,
@@ -448,8 +538,23 @@ def patch_html(
                 details={"reason": "html.value.duplicate_target", "path": path},
             )
         seen_paths.add(path)
+        start, end = _replacement_span(expected, path)
+        token = _render_value(expected, path, requested)
+        replacements.append((start, end, token, path))
 
-    raise UnsupportedEditError(
-        "HTML scalar rendering is not implemented until H5 Task 4.",
-        details={"reason": "html.rendering.not_implemented"},
-    )
+    candidate_text, _untouched = _build_candidate(source_text, replacements)
+    try:
+        candidate = encode_text_source(candidate_text, representation)
+    except UnicodeError as exc:
+        raise UnsupportedEditError(
+            "HTML replacement cannot be represented in the source encoding.",
+            details={"reason": "html.encoding.replacement_unencodable"},
+        ) from exc
+    except ValueError as exc:
+        raise RoundTripVerificationError(
+            "HTML source representation could not be encoded safely.",
+            details={"reason": "html.encoding.candidate"},
+        ) from exc
+
+    output.write(candidate)
+    return _result(len(candidate), zero_edit=False)

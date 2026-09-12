@@ -356,9 +356,7 @@ def patch_text(
         mode="patch",
         bytes_written=len(output_bytes) if written is None else written,
         fidelity=fidelity,
-        metadata={
-            "touched_nodes": () if prepared is None else (prepared[0].node_id,)
-        },
+        metadata={"touched_nodes": () if prepared is None else (prepared[0].node_id,)},
     )
 
 

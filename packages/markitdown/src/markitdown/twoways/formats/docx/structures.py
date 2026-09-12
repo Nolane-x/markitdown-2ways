@@ -6,6 +6,7 @@ import posixpath
 from typing import Any, Mapping
 
 from ..._errors import UnsupportedEditError
+from ...capabilities import CapabilityDecision, CapabilityState, encode_capabilities
 from ...ir.document import Diagnostic
 from ...ir.nodes import ImagePayload, Node, TableCell, TablePayload, TextPayload
 from ...ir.provenance import NativeLocator, Provenance
@@ -25,6 +26,7 @@ _DRAWING_NAMESPACES = (
     "http://schemas.openxmlformats.org/drawingml/2006/main",
     "http://purl.oclc.org/ooxml/drawingml/main",
 )
+_CAPABILITY_KEY = "twoways.capabilities.v1"
 
 
 def _local_name(tag: str) -> str:
@@ -46,6 +48,22 @@ def _provenance(*, canvas_index: int, part_uri: str) -> tuple[Provenance, ...]:
             part_uri=part_uri,
             extraction_method="wordprocessingml",
         ),
+    )
+
+
+def _writable(operation: str, **constraints: object) -> CapabilityDecision:
+    return CapabilityDecision(
+        operation=operation,
+        state=CapabilityState.WRITABLE,
+        constraints=constraints,
+    )
+
+
+def _read_only(operation: str, reason_code: str) -> CapabilityDecision:
+    return CapabilityDecision(
+        operation=operation,
+        state=CapabilityState.READ_ONLY,
+        reason_code=reason_code,
     )
 
 
@@ -71,6 +89,29 @@ def build_paragraph_node(
         payload = TextPayload(
             text="".join(paragraph_element.xpath('.//*[local-name()="t"]/text()')),
         )
+    run_count = sum(len(paragraph.runs) for paragraph in payload.paragraphs)
+    replace_capability = (
+        _writable("replace_text", preserve_run_structure=True)
+        if compatible
+        else _read_only("replace_text", "docx.text.unsupported_native_structure")
+    )
+    style_capability = (
+        _writable(
+            "set_text_style",
+            direct_run_style=True,
+            run_indexed=True,
+            font_size_unit="half-point",
+        )
+        if compatible and run_count
+        else _read_only(
+            "set_text_style",
+            (
+                "docx.style.no_direct_runs"
+                if compatible
+                else "docx.style.ambiguous_direct_style"
+            ),
+        )
+    )
     return Node(
         node_id=stable_docx_node_id(locator, "text"),
         kind="text",
@@ -82,6 +123,9 @@ def build_paragraph_node(
         metadata={
             "docx:patch_text_compatible": compatible,
             "docx:patch_capabilities": ("replace_text",) if compatible else (),
+            _CAPABILITY_KEY: encode_capabilities(
+                (replace_capability, style_capability)
+            ),
         },
     )
 
@@ -117,6 +161,13 @@ def build_table_node(
         attributes={"table_index": table_index},
     )
     compatible = docx_table_patch_compatible(table_element)
+    table_capability = (
+        _writable("update_table_cells", preserve_cell_wrappers=True)
+        if compatible
+        else _read_only(
+            "update_table_cells", "docx.table.unsupported_native_structure"
+        )
+    )
     return Node(
         node_id=stable_docx_node_id(locator, "table"),
         kind="table",
@@ -127,7 +178,8 @@ def build_table_node(
         provenance=_provenance(canvas_index=canvas_index, part_uri=part_uri),
         payload=TablePayload(rows=len(rows), columns=max_columns, cells=tuple(cells)),
         metadata={
-            "docx:patch_capabilities": (("update_table_cells",) if compatible else ())
+            "docx:patch_capabilities": (("update_table_cells",) if compatible else ()),
+            _CAPABILITY_KEY: encode_capabilities((table_capability,)),
         },
     )
 
@@ -237,7 +289,12 @@ def build_picture_nodes(
                 resource_id=resource_id,
                 alt_text=docpr.get("descr") or None,
             ),
-            metadata={"docx:patch_capabilities": ("set_alt_text",)},
+            metadata={
+                "docx:patch_capabilities": ("set_alt_text",),
+                _CAPABILITY_KEY: encode_capabilities(
+                    (_writable("set_alt_text", preserve_relationships=True),)
+                ),
+            },
         )
         nodes.append(node)
     return nodes, resources, diagnostics

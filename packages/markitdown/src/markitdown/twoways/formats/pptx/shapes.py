@@ -3,6 +3,7 @@ from __future__ import annotations
 from hashlib import sha256
 from typing import Any
 
+from ...capabilities import CapabilityDecision, CapabilityState, encode_capabilities
 from ...ir.geometry import Geometry
 from ...ir.nodes import (
     ChartPayload,
@@ -13,10 +14,14 @@ from ...ir.nodes import (
 )
 from ...ir.provenance import BoundingBox, Provenance
 from ...ir.resources import NativePayload
+from .geometry import geometry_patchability
 from .locators import shape_locator, stable_node_id
 from .resources import extract_picture
+from .style import style_patchability
 from .table import pptx_table_patch_compatible
 from .text import extract_text_payload, text_patch_compatible
+
+_CAPABILITY_KEY = "twoways.capabilities.v1"
 
 
 def _geometry(shape: Any) -> Geometry:
@@ -62,6 +67,47 @@ def _provenance(
     )
 
 
+def _writable(operation: str, **constraints: object) -> CapabilityDecision:
+    return CapabilityDecision(
+        operation=operation,
+        state=CapabilityState.WRITABLE,
+        constraints=constraints,
+    )
+
+
+def _read_only(operation: str, reason_code: str) -> CapabilityDecision:
+    return CapabilityDecision(
+        operation=operation,
+        state=CapabilityState.READ_ONLY,
+        reason_code=reason_code,
+    )
+
+
+def _geometry_capability(
+    shape: Any,
+    geometry: Geometry,
+    *,
+    part_uri: str,
+    parent_id: str | None,
+) -> CapabilityDecision:
+    if parent_id is not None:
+        return _read_only("move_resize", "pptx.geometry.group_coordinate_space")
+    if not part_uri.startswith("/ppt/slides/"):
+        return _read_only("move_resize", "pptx.geometry.unsupported_part")
+    compatible, reason = geometry_patchability(shape._element, geometry)
+    if not compatible:
+        return _read_only(
+            "move_resize",
+            reason or "pptx.geometry.unsupported_native_transform",
+        )
+    return _writable(
+        "move_resize",
+        group_coordinate_space=False,
+        rotation=False,
+        unit="emu",
+    )
+
+
 def build_shape_node(
     shape: Any,
     *,
@@ -75,6 +121,12 @@ def build_shape_node(
 ) -> tuple[Node, dict[str, Any], NativePayload | None]:
     locator = shape_locator(shape, part_uri=part_uri, z_order=z_order)
     geometry = _geometry(shape)
+    geometry_capability = _geometry_capability(
+        shape,
+        geometry,
+        part_uri=part_uri,
+        parent_id=parent_id,
+    )
     common = {
         "canvas_id": canvas_id,
         "parent_id": parent_id,
@@ -88,13 +140,20 @@ def build_shape_node(
     if shape.shape_type == picture_shape_type:
         payload, resource = extract_picture(shape)
         node_id = stable_node_id(locator, "image")
+        metadata = dict(common["metadata"])
+        metadata[_CAPABILITY_KEY] = encode_capabilities(
+            (
+                _writable("set_alt_text", preserve_relationships=True),
+                geometry_capability,
+            )
+        )
         return (
             Node(
                 node_id=node_id,
                 kind="image",
                 payload=payload,
                 semantic_role="image",
-                **common,
+                **{**common, "metadata": metadata},
             ),
             {resource.resource_id: resource},
             None,
@@ -114,8 +173,19 @@ def build_shape_node(
                 )
         node_id = stable_node_id(locator, "table")
         metadata = dict(common["metadata"])
+        table_compatible = pptx_table_patch_compatible(table)
         metadata["pptx:patch_capabilities"] = (
-            ("update_table_cells",) if pptx_table_patch_compatible(table) else ()
+            ("update_table_cells",) if table_compatible else ()
+        )
+        table_capability = (
+            _writable("update_table_cells", preserve_cell_wrappers=True)
+            if table_compatible
+            else _read_only(
+                "update_table_cells", "pptx.table.unsupported_native_structure"
+            )
+        )
+        metadata[_CAPABILITY_KEY] = encode_capabilities(
+            (table_capability, geometry_capability)
         )
         return (
             Node(
@@ -163,6 +233,7 @@ def build_shape_node(
         node_id = stable_node_id(locator, "chart")
         metadata = dict(common["metadata"])
         metadata["pptx:patch_capabilities"] = ()
+        metadata[_CAPABILITY_KEY] = encode_capabilities((geometry_capability,))
         return (
             Node(
                 node_id=node_id,
@@ -185,7 +256,32 @@ def build_shape_node(
         payload = extract_text_payload(shape, locator)
         node_id = stable_node_id(locator, "text")
         metadata = dict(common["metadata"])
-        metadata["pptx:patch_text_compatible"] = text_patch_compatible(shape)
+        text_compatible = text_patch_compatible(shape)
+        style_compatible, style_reason = style_patchability(shape._element)
+        metadata["pptx:patch_text_compatible"] = text_compatible
+        replace_capability = (
+            _writable("replace_text", preserve_run_structure=True)
+            if text_compatible
+            else _read_only(
+                "replace_text", "pptx.text.unsupported_native_structure"
+            )
+        )
+        style_capability = (
+            _writable(
+                "set_text_style",
+                direct_run_style=True,
+                run_indexed=True,
+                font_size_unit="hundredth-point",
+            )
+            if style_compatible
+            else _read_only(
+                "set_text_style",
+                style_reason or "pptx.style.ambiguous_direct_style",
+            )
+        )
+        metadata[_CAPABILITY_KEY] = encode_capabilities(
+            (replace_capability, style_capability, geometry_capability)
+        )
         return (
             Node(
                 node_id=node_id,
@@ -210,6 +306,14 @@ def build_shape_node(
         storage_ref=f"{part_uri}#shape={locator.object_id}",
         scope="shape",
     )
+    metadata = dict(common["metadata"])
+    metadata[_CAPABILITY_KEY] = encode_capabilities(
+        (
+            _read_only(
+                "move_resize", "pptx.geometry.unknown_native_shape_read_only"
+            ),
+        )
+    )
     return (
         Node(
             node_id=node_id,
@@ -218,7 +322,7 @@ def build_shape_node(
                 native_payload_ref=payload_id,
                 summary=f"Unsupported PPTX shape {shape.name}",
             ),
-            **common,
+            **{**common, "metadata": metadata},
         ),
         {},
         native_payload,
@@ -234,6 +338,27 @@ def build_note_node(
     order: int,
 ) -> Node:
     locator = shape_locator(shape, part_uri=part_uri, z_order=order)
+    payload = extract_text_payload(shape, locator)
+    text_compatible = text_patch_compatible(shape)
+    style_compatible, style_reason = style_patchability(shape._element)
+    replace_capability = (
+        _writable("replace_text", preserve_run_structure=True)
+        if text_compatible
+        else _read_only("replace_text", "pptx.text.unsupported_native_structure")
+    )
+    style_capability = (
+        _writable(
+            "set_text_style",
+            direct_run_style=True,
+            run_indexed=True,
+            font_size_unit="hundredth-point",
+        )
+        if style_compatible
+        else _read_only(
+            "set_text_style",
+            style_reason or "pptx.style.ambiguous_direct_style",
+        )
+    )
     return Node(
         node_id=stable_node_id(locator, "note"),
         kind="note",
@@ -242,11 +367,18 @@ def build_note_node(
         geometry=_geometry(shape),
         native_locator=locator,
         provenance=_provenance(shape, slide_index=slide_index, part_uri=part_uri),
-        payload=extract_text_payload(shape, locator),
+        payload=payload,
         order=order,
         metadata={
             "pptx:z_order": order,
-            "pptx:patch_text_compatible": text_patch_compatible(shape),
+            "pptx:patch_text_compatible": text_compatible,
+            _CAPABILITY_KEY: encode_capabilities(
+                (
+                    replace_capability,
+                    style_capability,
+                    _read_only("move_resize", "pptx.geometry.unsupported_part"),
+                )
+            ),
         },
     )
 
@@ -318,6 +450,13 @@ def build_shape_tree(
         metadata={
             "pptx:z_order": z_order,
             "pptx:patch_capabilities": (),
+            _CAPABILITY_KEY: encode_capabilities(
+                (
+                    _read_only(
+                        "move_resize", "pptx.geometry.group_coordinate_space"
+                    ),
+                )
+            ),
         },
     )
     nodes[group.node_id] = group

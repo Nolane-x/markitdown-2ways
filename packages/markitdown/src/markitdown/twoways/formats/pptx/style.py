@@ -60,7 +60,7 @@ def _require_run_namespace(run_element: Any) -> str:
     return namespace
 
 
-def _run_property_element(run_element: Any) -> Any | None:
+def _run_property_element(run_element: Any, *, strict: bool) -> Any | None:
     namespace = _require_run_namespace(run_element)
     matches = [
         child
@@ -68,7 +68,7 @@ def _run_property_element(run_element: Any) -> Any | None:
         if isinstance(getattr(child, "tag", None), str)
         and child.tag == f"{{{namespace}}}rPr"
     ]
-    if len(matches) > 1:
+    if len(matches) > 1 and strict:
         raise UnsupportedEditError(
             "PPTX text run contains multiple run-property containers.",
             details={"reason": "pptx.text.ambiguous_run_layout"},
@@ -76,8 +76,12 @@ def _run_property_element(run_element: Any) -> Any | None:
     return matches[0] if matches else None
 
 
-def direct_run_style(run_element: Any) -> dict[str, object]:
-    rpr = _run_property_element(run_element)
+def direct_run_style(
+    run_element: Any,
+    *,
+    strict: bool = False,
+) -> dict[str, object]:
+    rpr = _run_property_element(run_element, strict=strict)
     if rpr is None:
         return {}
 
@@ -104,27 +108,35 @@ def direct_run_style(run_element: Any) -> dict[str, object]:
 
     latin = _direct_child(rpr, "latin")
     if len(latin) > 1:
-        raise UnsupportedEditError(
-            "PPTX run contains multiple direct Latin font declarations.",
-            details={"reason": "pptx.style.ambiguous_font_family"},
-        )
-    if latin:
+        if strict:
+            raise UnsupportedEditError(
+                "PPTX run contains multiple direct Latin font declarations.",
+                details={"reason": "pptx.style.ambiguous_font_family"},
+            )
+    elif latin:
         typeface = latin[0].get("typeface")
         if typeface:
             direct["font_family"] = typeface
 
     solid_fills = _direct_child(rpr, "solidFill")
     if len(solid_fills) > 1:
-        raise UnsupportedEditError(
-            "PPTX run contains multiple direct text fills.",
-            details={"reason": "pptx.style.ambiguous_color"},
-        )
+        if strict:
+            raise UnsupportedEditError(
+                "PPTX run contains multiple direct text fills.",
+                details={"reason": "pptx.style.ambiguous_color"},
+            )
+        return direct
     if solid_fills:
         colors = _direct_child(solid_fills[0], "srgbClr")
-        if len(colors) == 1:
+        if len(colors) == 1 and len(solid_fills[0]) == 1:
             value = colors[0].get("val")
             if value and len(value) == 6:
                 direct["color"] = f"#{value.upper()}"
+        elif strict:
+            raise UnsupportedEditError(
+                "PPTX theme/complex text color requires an explicit theme-aware edit.",
+                details={"reason": "pptx.style.theme_color_requires_explicit_edit"},
+            )
 
     return direct
 
@@ -183,6 +195,18 @@ def _flatten_native_runs(shape_element: Any) -> list[Any]:
     return runs
 
 
+def style_patchability(shape_element: Any) -> tuple[bool, str | None]:
+    try:
+        runs = _flatten_native_runs(shape_element)
+        if not runs:
+            return False, "pptx.style.no_direct_runs"
+        for run in runs:
+            direct_run_style(run, strict=True)
+    except UnsupportedEditError:
+        return False, "pptx.style.ambiguous_direct_style"
+    return True, None
+
+
 def _native_run(shape_element: Any, run_index: int) -> Any:
     runs = _flatten_native_runs(shape_element)
     if run_index < 0 or run_index >= len(runs):
@@ -194,7 +218,7 @@ def _native_run(shape_element: Any, run_index: int) -> Any:
 
 
 def _ensure_rpr(run_element: Any) -> Any:
-    rpr = _run_property_element(run_element)
+    rpr = _run_property_element(run_element, strict=True)
     if rpr is not None:
         return rpr
     from lxml import etree
@@ -317,7 +341,7 @@ def patch_text_run_style(
         require_non_empty=False,
     )
     run = _native_run(shape_element, run_index)
-    native_style = direct_run_style(run)
+    native_style = direct_run_style(run, strict=True)
     if native_style != canonical_old:
         raise PatchPreconditionError(
             "PPTX native run style no longer matches the source IR.",

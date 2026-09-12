@@ -95,6 +95,21 @@ def _geometry_values(geometry: Geometry) -> tuple[int, int, int, int]:
     )
 
 
+def geometry_patchability(
+    shape_element: Any,
+    current: Geometry,
+) -> tuple[bool, str | None]:
+    try:
+        current_values = _geometry_values(current)
+        native_values = _native_values(shape_element)
+    except UnsupportedEditError as exc:
+        reason = exc.details.get("reason")
+        return False, str(reason or "pptx.geometry.unsupported_native_transform")
+    if current_values != native_values:
+        return False, "pptx.geometry.native_mismatch"
+    return True, None
+
+
 def patch_shape_geometry(
     shape_element: Any,
     *,

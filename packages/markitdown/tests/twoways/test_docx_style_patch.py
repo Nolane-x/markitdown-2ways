@@ -22,9 +22,7 @@ def _document_root(source: bytes):
 
 
 def _paragraph(root, index: int = 0):
-    paragraphs = root.xpath(
-        './*[local-name()="body"]/*[local-name()="p"]'
-    )
+    paragraphs = root.xpath('./*[local-name()="body"]/*[local-name()="p"]')
     return paragraphs[index]
 
 
@@ -81,9 +79,10 @@ def test_patch_docx_run_style_changes_only_target_run_properties():
     )
 
     first_after, second_after = _runs(paragraph)
-    assert tuple(
-        child.text for child in first_after if child.tag == f"{{{_W_NS}}}t"
-    ) == first_text_before
+    assert (
+        tuple(child.text for child in first_after if child.tag == f"{{{_W_NS}}}t")
+        == first_text_before
+    )
     assert etree.tostring(second_after) == second_before
 
     rpr = next(child for child in first_after if child.tag == f"{{{_W_NS}}}rPr")

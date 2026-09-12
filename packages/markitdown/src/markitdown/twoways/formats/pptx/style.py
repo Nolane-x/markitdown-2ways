@@ -151,14 +151,20 @@ def _flatten_native_runs(shape_element: Any) -> list[Any]:
             if name in {"br", "fld"}:
                 raise UnsupportedEditError(
                     "PPTX style editing does not support line-break or field runs.",
-                    details={"reason": "pptx.text.ambiguous_run_layout", "element": name},
+                    details={
+                        "reason": "pptx.text.ambiguous_run_layout",
+                        "element": name,
+                    },
                 )
             if name in {"pPr", "endParaRPr"}:
                 continue
             if name != "r":
                 raise UnsupportedEditError(
                     "PPTX text paragraph contains unsupported native run structure.",
-                    details={"reason": "pptx.text.ambiguous_run_layout", "element": name},
+                    details={
+                        "reason": "pptx.text.ambiguous_run_layout",
+                        "element": name,
+                    },
                 )
             text_nodes = _direct_child(child, "t")
             rpr_nodes = _direct_child(child, "rPr")
@@ -383,7 +389,9 @@ def verify_text_style_readback(
                 "PPTX style target identity did not survive round trip.",
                 details={"check": "pptx.style.readback", "target": edit.target_node_id},
             )
-        run_index, _, expected = validate_text_style_update(source_node.payload, edit.payload)
+        run_index, _, expected = validate_text_style_update(
+            source_node.payload, edit.payload
+        )
         actual = _ir_direct_style(output_node.payload, run_index)
         if actual != expected:
             raise RoundTripVerificationError(

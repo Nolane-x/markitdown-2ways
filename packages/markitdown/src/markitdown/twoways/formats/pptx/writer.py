@@ -129,7 +129,10 @@ def _apply_edit(
         if not part_uri.startswith("/ppt/slides/"):
             raise UnsupportedEditError(
                 "PPTX move_resize is limited to slide shapes in this tranche.",
-                details={"reason": "pptx.geometry.unsupported_part", "part_uri": part_uri},
+                details={
+                    "reason": "pptx.geometry.unsupported_part",
+                    "part_uri": part_uri,
+                },
             )
         target_geometry = validate_move_resize(node.geometry, edit.payload)
         patch_shape_geometry(
@@ -191,7 +194,10 @@ def _verification_edits(
 ) -> tuple[EditOperation, ...]:
     result: list[EditOperation] = []
     for edit in edits:
-        if edit.type not in {"set_text_style", "move_resize"} or edit.target_node_id is None:
+        if (
+            edit.type not in {"set_text_style", "move_resize"}
+            or edit.target_node_id is None
+        ):
             result.append(edit)
             continue
         node = document.nodes[edit.target_node_id]

@@ -166,7 +166,9 @@ def test_patch_pptx_run_style_rejects_theme_color_replacement():
                 "color": "#112233",
             },
         )
-    assert exc.value.details["reason"] == "pptx.style.theme_color_requires_explicit_edit"
+    assert (
+        exc.value.details["reason"] == "pptx.style.theme_color_requires_explicit_edit"
+    )
 
 
 def test_pptx_writer_roundtrips_direct_run_style_without_changing_text():

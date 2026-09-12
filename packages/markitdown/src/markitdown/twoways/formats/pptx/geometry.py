@@ -151,14 +151,20 @@ def verify_geometry_readback(
         if source_node is None or output_node is None or source_node.geometry is None:
             raise RoundTripVerificationError(
                 "PPTX geometry target identity did not survive round trip.",
-                details={"check": "pptx.geometry.readback", "target": edit.target_node_id},
+                details={
+                    "check": "pptx.geometry.readback",
+                    "target": edit.target_node_id,
+                },
             )
         expected = validate_move_resize(source_node.geometry, edit.payload)
         actual = output_node.geometry
         if actual is None:
             raise RoundTripVerificationError(
                 "PPTX geometry target lost its geometry during readback.",
-                details={"check": "pptx.geometry.readback", "target": edit.target_node_id},
+                details={
+                    "check": "pptx.geometry.readback",
+                    "target": edit.target_node_id,
+                },
             )
         expected_values = (
             expected.x,

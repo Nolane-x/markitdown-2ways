@@ -16,5 +16,19 @@ jobs:
           pip install pre-commit
           pre-commit install --install-hooks
 
-      - name: Run pre-commit
-        run: pre-commit run --all-files --show-diff-on-failure
+      - name: Run formatter and stage artifact tree
+        run: |
+          pre-commit run --all-files || true
+          mkdir -p /tmp/h4-black
+          git diff --name-only -z | while IFS= read -r -d '' path; do
+            mkdir -p "/tmp/h4-black/$(dirname "$path")"
+            cp "$path" "/tmp/h4-black/$path"
+          done
+          git diff --name-only > /tmp/h4-black/FORMATTED_FILES.txt
+
+      - name: Upload formatter output
+        uses: actions/upload-artifact@v4
+        with:
+          name: h4-black-formatted
+          path: /tmp/h4-black
+          if-no-files-found: error

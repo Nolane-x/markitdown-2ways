@@ -41,6 +41,7 @@ def test_reads_text_source_into_deterministic_ir() -> None:
     assert node.metadata["text.newline"] == "crlf"
     assert node.metadata["text.byte_roundtrip"] is True
     assert node.metadata["text.format"] == "text"
+    assert node.metadata["text.native_source"] is True
 
 
 def test_markdown_filename_is_classified_as_native_markdown_source() -> None:
@@ -53,11 +54,12 @@ def test_markdown_filename_is_classified_as_native_markdown_source() -> None:
     assert document.source.format == "markdown"
     node = document.nodes[document.canvases[0].root_node_ids[0]]
     assert node.metadata["text.format"] == "markdown"
+    assert node.metadata["text.native_source"] is True
     assert isinstance(node.payload, TextPayload)
     assert node.payload.text == "# Title\n\nBody\n"
 
 
-def test_roundtrippable_source_advertises_replace_text() -> None:
+def test_roundtrippable_source_advertises_direct_replace_text() -> None:
     document = read_text_ir(BytesIO(b"alpha\nbeta\n"), filename="notes.txt")
     node = document.nodes[document.canvases[0].root_node_ids[0]]
     decision = capabilities_for_node(node).for_operation("replace_text")
@@ -65,7 +67,7 @@ def test_roundtrippable_source_advertises_replace_text() -> None:
     assert decision.state is CapabilityState.WRITABLE
     assert decision.reason_code is None
     assert decision.constraints == {
-        "identity_markdown": True,
+        "identity_markdown": False,
         "source_preservation": "encoding-bom-newline",
         "whole_document": True,
     }

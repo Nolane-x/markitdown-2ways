@@ -62,7 +62,7 @@ def _replace_text_capability(
         operation="replace_text",
         state=CapabilityState.WRITABLE,
         constraints={
-            "identity_markdown": True,
+            "identity_markdown": False,
             "source_preservation": "encoding-bom-newline",
             "whole_document": True,
         },
@@ -116,6 +116,7 @@ def read_text_ir(
             "text.newline": representation.newline,
             "text.byte_roundtrip": representation.byte_roundtrip,
             "text.format": source_format,
+            "text.native_source": True,
             CAPABILITY_METADATA_KEY: encode_capabilities((capability,)),
         },
     )

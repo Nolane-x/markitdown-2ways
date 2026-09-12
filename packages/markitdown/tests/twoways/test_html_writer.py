@@ -71,9 +71,7 @@ def _edit(
 
 
 def test_zero_edit_patch_is_byte_identical() -> None:
-    source = (
-        b'<!DOCTYPE html><HTML><body><p CLASS="hero">A&amp;B</p></body></HTML>\r\n'
-    )
+    source = b'<!DOCTYPE html><HTML><body><p CLASS="hero">A&amp;B</p></body></HTML>\r\n'
     document = read_html_ir(BytesIO(source), filename="page.html", mimetype="text/html")
     output = BytesIO()
 
@@ -121,7 +119,11 @@ def test_source_size_metadata_mismatch_fails_before_output() -> None:
 @pytest.mark.parametrize(
     ("path", "metadata_key", "forged_value"),
     [
-        ("/html[1]/body[1]/p[1]/#text[1]", "html.path", "/html[1]/body[1]/p[1]/#text[9]"),
+        (
+            "/html[1]/body[1]/p[1]/#text[1]",
+            "html.path",
+            "/html[1]/body[1]/p[1]/#text[9]",
+        ),
         ("/html[1]/body[1]/p[1]/#text[1]", "html.kind", "rawtext"),
         ("/html[1]/body[1]/p[1]/@class", "html.normalized_name", "other"),
         ("/html[1]/body[1]/p[1]/@class", "html.qname", "OTHER"),

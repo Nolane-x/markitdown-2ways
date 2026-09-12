@@ -50,7 +50,9 @@ def test_preserves_doctype_comment_void_and_attribute_shapes() -> None:
     document = scan_html_text(text)
     nodes = tuple(document.nodes)
 
-    assert any(node.kind == "doctype" and node.raw == "<!DOCTYPE html>" for node in nodes)
+    assert any(
+        node.kind == "doctype" and node.raw == "<!DOCTYPE html>" for node in nodes
+    )
     assert any(node.kind == "comment" and node.raw == "<!--lead-->" for node in nodes)
 
     by_path = {node.path: node for node in nodes}
@@ -73,10 +75,34 @@ def test_rawtext_and_rcdata_are_distinct_owners() -> None:
     text = "<html><head><title>A&amp;B</title><style>a<b{c:d}</style></head><body><textarea>x&amp;y</textarea><script>if(a<b){x&y}</script></body></html>"
     _, nodes = _nodes_by_path(text)
 
-    title = next(node for node in nodes.values() if node.kind == "rcdata" and node.parent_path and "/title[1]" in node.parent_path)
-    textarea = next(node for node in nodes.values() if node.kind == "rcdata" and node.parent_path and "/textarea[1]" in node.parent_path)
-    style = next(node for node in nodes.values() if node.kind == "rawtext" and node.parent_path and "/style[1]" in node.parent_path)
-    script = next(node for node in nodes.values() if node.kind == "rawtext" and node.parent_path and "/script[1]" in node.parent_path)
+    title = next(
+        node
+        for node in nodes.values()
+        if node.kind == "rcdata"
+        and node.parent_path
+        and "/title[1]" in node.parent_path
+    )
+    textarea = next(
+        node
+        for node in nodes.values()
+        if node.kind == "rcdata"
+        and node.parent_path
+        and "/textarea[1]" in node.parent_path
+    )
+    style = next(
+        node
+        for node in nodes.values()
+        if node.kind == "rawtext"
+        and node.parent_path
+        and "/style[1]" in node.parent_path
+    )
+    script = next(
+        node
+        for node in nodes.values()
+        if node.kind == "rawtext"
+        and node.parent_path
+        and "/script[1]" in node.parent_path
+    )
 
     assert title.value == "A&B"
     assert textarea.value == "x&y"
@@ -92,7 +118,10 @@ def test_duplicate_normalized_attributes_are_recorded_as_ambiguous() -> None:
 
 
 def test_utf8_bom_and_meta_charset_are_authoritative() -> None:
-    source = codecs.BOM_UTF8 + b'<html><head><meta charset="utf-8"></head><body>x</body></html>'
+    source = (
+        codecs.BOM_UTF8
+        + b'<html><head><meta charset="utf-8"></head><body>x</body></html>'
+    )
     text, representation, declarations = decode_html_source(source)
 
     assert text.startswith("<html>")
@@ -107,7 +136,9 @@ def test_explicit_legacy_encoding_with_matching_meta_roundtrips() -> None:
     text = '<html><head><meta charset="windows-1252"></head><body>caf\xe9</body></html>'
     source = text.encode("windows-1252")
 
-    decoded, representation, declarations = decode_html_source(source, encoding="windows-1252")
+    decoded, representation, declarations = decode_html_source(
+        source, encoding="windows-1252"
+    )
 
     assert "caf\xe9" in decoded
     assert representation.byte_roundtrip is True

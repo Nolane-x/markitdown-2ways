@@ -22,7 +22,9 @@ def test_existing_one_way_html_behavior_is_unchanged() -> None:
     assert result.title == "T"
 
 
-def test_existing_one_way_html_extension_and_xhtml_acceptance_remain_unchanged() -> None:
+def test_existing_one_way_html_extension_and_xhtml_acceptance_remain_unchanged() -> (
+    None
+):
     converter = HtmlConverter()
 
     assert converter.accepts(

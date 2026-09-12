@@ -14,7 +14,11 @@ from ..._errors import (
     UnsupportedEditError,
 )
 from ..._results import FidelityEvidence, FidelityReport, FidelityStatus, WriterResult
-from ...capabilities import CAPABILITY_METADATA_KEY, CapabilityState, capabilities_for_node
+from ...capabilities import (
+    CAPABILITY_METADATA_KEY,
+    CapabilityState,
+    capabilities_for_node,
+)
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation, EditPrecondition
 from ...ir.nodes import Node

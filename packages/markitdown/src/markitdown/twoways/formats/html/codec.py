@@ -24,12 +24,12 @@ _CONTENT_RE = re.compile(
 )
 _CONTENT_CHARSET_RE = re.compile(r"\bcharset\s*=\s*([^\s;\"']+)", re.IGNORECASE)
 _BYTES_META_CHARSET_RE = re.compile(
-    br"<meta\b[^>]*\bcharset\s*=\s*(?:\"([^\"]+)\"|'([^']+)'|([^\s/>]+))[^>]*>",
+    rb"<meta\b[^>]*\bcharset\s*=\s*(?:\"([^\"]+)\"|'([^']+)'|([^\s/>]+))[^>]*>",
     re.IGNORECASE,
 )
 _BYTES_HTTP_EQUIV_RE = re.compile(
-    br"<meta\b(?=[^>]*\bhttp-equiv\s*=\s*(?:\"content-type\"|'content-type'|content-type)(?=\s|/?>))"
-    br"(?=[^>]*\bcontent\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s>]+)))[^>]*>",
+    rb"<meta\b(?=[^>]*\bhttp-equiv\s*=\s*(?:\"content-type\"|'content-type'|content-type)(?=\s|/?>))"
+    rb"(?=[^>]*\bcontent\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s>]+)))[^>]*>",
     re.IGNORECASE,
 )
 _PREFIX_LIMIT = 4096
@@ -42,7 +42,9 @@ def _canonical_encoding(value: str) -> str:
         raise HtmlLexicalError(f"HTML encoding is unsupported: {value!r}") from exc
 
 
-def _extract_group(match: re.Match[str] | re.Match[bytes], names: tuple[str, ...] = ()) -> str:
+def _extract_group(
+    match: re.Match[str] | re.Match[bytes], names: tuple[str, ...] = ()
+) -> str:
     if names:
         for name in names:
             value = match.groupdict().get(name)
@@ -61,12 +63,16 @@ def _raw_prefix_encoding_hints(source: bytes) -> tuple[str, ...]:
         try:
             hints.append(_canonical_encoding(_extract_group(match)))
         except UnicodeDecodeError as exc:
-            raise HtmlLexicalError("HTML meta encoding must be ASCII-compatible") from exc
+            raise HtmlLexicalError(
+                "HTML meta encoding must be ASCII-compatible"
+            ) from exc
     for match in _BYTES_HTTP_EQUIV_RE.finditer(prefix):
         try:
             content = _extract_group(match)
         except UnicodeDecodeError as exc:
-            raise HtmlLexicalError("HTML content-type declaration must be ASCII-compatible") from exc
+            raise HtmlLexicalError(
+                "HTML content-type declaration must be ASCII-compatible"
+            ) from exc
         charset_match = _CONTENT_CHARSET_RE.search(content)
         if charset_match:
             hints.append(_canonical_encoding(charset_match.group(1)))
@@ -136,17 +142,25 @@ def decode_html_source(
     try:
         text, representation = decode_text_source(source, encoding=hint)
     except (UnicodeError, LookupError, ValueError) as exc:
-        raise HtmlLexicalError(f"HTML source encoding could not be decoded safely: {exc}") from exc
+        raise HtmlLexicalError(
+            f"HTML source encoding could not be decoded safely: {exc}"
+        ) from exc
 
     declarations = _text_encoding_declarations(text)
     declared = _one_declared_encoding(tuple(item.encoding for item in declarations))
     resolved = _canonical_encoding(representation.encoding)
 
     if explicit is not None and declared is not None and explicit != declared:
-        raise HtmlLexicalError("HTML explicit encoding conflicts with meta encoding declaration")
+        raise HtmlLexicalError(
+            "HTML explicit encoding conflicts with meta encoding declaration"
+        )
     if declared is not None and resolved != declared:
-        raise HtmlLexicalError("HTML source encoding conflicts with meta encoding declaration")
+        raise HtmlLexicalError(
+            "HTML source encoding conflicts with meta encoding declaration"
+        )
     if raw_declared is not None and declared is not None and raw_declared != declared:
-        raise HtmlLexicalError("HTML raw and decoded encoding declaration evidence conflicts")
+        raise HtmlLexicalError(
+            "HTML raw and decoded encoding declaration evidence conflicts"
+        )
 
     return text, representation, declarations

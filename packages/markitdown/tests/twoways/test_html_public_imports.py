@@ -23,7 +23,9 @@ def test_html_adapter_public_imports_are_stable() -> None:
 
 def test_html_patch_writer_accepts_only_html_backed_html_targets() -> None:
     writer = HtmlPatchWriter()
-    html_document = read_html_ir(BytesIO(b"<html><body>x</body></html>"), filename="page.html")
+    html_document = read_html_ir(
+        BytesIO(b"<html><body>x</body></html>"), filename="page.html"
+    )
     json_document = read_json_ir(BytesIO(b"{}"), filename="data.json")
 
     assert writer.accepts(html_document, TargetInfo(format="html"))
@@ -41,7 +43,9 @@ def test_html_patch_writer_accepts_only_html_backed_html_targets() -> None:
 
 def test_html_patch_writer_requires_source_stream_and_edits() -> None:
     writer = HtmlPatchWriter()
-    document = read_html_ir(BytesIO(b"<html><body>x</body></html>"), filename="page.html")
+    document = read_html_ir(
+        BytesIO(b"<html><body>x</body></html>"), filename="page.html"
+    )
 
     with pytest.raises(TypeError, match="source_stream=.*edits="):
         writer.write(document, BytesIO(), TargetInfo(format="html"))

@@ -54,8 +54,7 @@ def verify_untouched_bytes(
         )
     if (
         original_bom_length != candidate_bom_length
-        or source_bytes[:original_bom_length]
-        != candidate_bytes[:candidate_bom_length]
+        or source_bytes[:original_bom_length] != candidate_bytes[:candidate_bom_length]
     ):
         raise RoundTripVerificationError(
             "HTML BOM or encoded payload boundary changed unexpectedly.",

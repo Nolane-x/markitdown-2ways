@@ -98,8 +98,7 @@ def test_patch_html_renders_text_and_preserves_source_outside_target() -> None:
     )
 
     assert output.getvalue() == (
-        "<html><body><p>A&amp;B&lt;C&gt;D&#13;E\nΩ</p>"
-        "<div>stay</div></body></html>"
+        "<html><body><p>A&amp;B&lt;C&gt;D&#13;E\nΩ</p>" "<div>stay</div></body></html>"
     ).encode("utf-8")
     assert result.fidelity.claimed_tier == "high"
 

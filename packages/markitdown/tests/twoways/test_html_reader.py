@@ -19,7 +19,7 @@ def _by_path(document):
 def test_html_reader_builds_deterministic_recovery_stable_ir() -> None:
     source = (
         b'<!DOCTYPE html><!--lead--><html><body><p class="hero">'
-        b'A&amp;B<br>tail</p></body></html>'
+        b"A&amp;B<br>tail</p></body></html>"
     )
 
     first = read_html_ir(BytesIO(source), filename="page.html", mimetype="text/html")
@@ -90,12 +90,18 @@ def test_html_capabilities_are_narrow_and_kind_specific() -> None:
     unquoted = nodes["/html[1]/body[1]/p[1]/@data-x"]
     boolean = nodes["/html[1]/body[1]/p[1]/@disabled"]
     element = nodes["/html[1]/body[1]/p[1]"]
-    rcdata = next(node for node in document.nodes.values() if node.semantic_role == "html-rcdata")
-    rawtext = next(node for node in document.nodes.values() if node.semantic_role == "html-rawtext")
+    rcdata = next(
+        node for node in document.nodes.values() if node.semantic_role == "html-rcdata"
+    )
+    rawtext = next(
+        node for node in document.nodes.values() if node.semantic_role == "html-rawtext"
+    )
     charset = nodes["/html[1]/head[1]/meta[1]/@charset"]
 
     text_decision = capabilities_for_node(text).for_operation("replace_html_text")
-    attr_decision = capabilities_for_node(quoted).for_operation("replace_html_attribute")
+    attr_decision = capabilities_for_node(quoted).for_operation(
+        "replace_html_attribute"
+    )
     assert text_decision.state is CapabilityState.WRITABLE
     assert text_decision.constraints == {
         "identity_markdown": False,
@@ -107,12 +113,36 @@ def test_html_capabilities_are_narrow_and_kind_specific() -> None:
     assert attr_decision.state is CapabilityState.WRITABLE
     assert attr_decision.constraints == text_decision.constraints
 
-    assert capabilities_for_node(unquoted).for_operation("replace_html_attribute").reason_code == "html.attribute.requires_quote_transition"
-    assert capabilities_for_node(boolean).for_operation("replace_html_attribute").reason_code == "html.attribute.boolean_read_only"
-    assert capabilities_for_node(element).for_operation("replace_html_text").reason_code == "html.element.structural_edit_unsupported"
-    assert capabilities_for_node(rawtext).for_operation("replace_html_text").reason_code == "html.raw_text.read_only"
-    assert capabilities_for_node(rcdata).for_operation("replace_html_text").reason_code == "html.rcdata.read_only"
-    assert capabilities_for_node(charset).for_operation("replace_html_attribute").reason_code == "html.encoding.declaration_read_only"
+    assert (
+        capabilities_for_node(unquoted)
+        .for_operation("replace_html_attribute")
+        .reason_code
+        == "html.attribute.requires_quote_transition"
+    )
+    assert (
+        capabilities_for_node(boolean)
+        .for_operation("replace_html_attribute")
+        .reason_code
+        == "html.attribute.boolean_read_only"
+    )
+    assert (
+        capabilities_for_node(element).for_operation("replace_html_text").reason_code
+        == "html.element.structural_edit_unsupported"
+    )
+    assert (
+        capabilities_for_node(rawtext).for_operation("replace_html_text").reason_code
+        == "html.raw_text.read_only"
+    )
+    assert (
+        capabilities_for_node(rcdata).for_operation("replace_html_text").reason_code
+        == "html.rcdata.read_only"
+    )
+    assert (
+        capabilities_for_node(charset)
+        .for_operation("replace_html_attribute")
+        .reason_code
+        == "html.encoding.declaration_read_only"
+    )
 
 
 def test_non_roundtrippable_html_representation_is_read_only() -> None:
@@ -144,9 +174,18 @@ def test_recovery_unstable_html_collapses_to_document_level_read_only_ir() -> No
     assert root.metadata["html.path"] == "/"
     assert root.metadata["html.recovery_stable"] is False
     assert root.metadata["html.recovery_reason"] == "html.recovery.optional_end_tag"
-    assert capabilities_for_node(root).for_operation("replace_html_text").state is CapabilityState.READ_ONLY
-    assert capabilities_for_node(root).for_operation("replace_html_text").reason_code == "html.recovery.optional_end_tag"
-    assert capabilities_for_node(root).for_operation("replace_html_attribute").state is CapabilityState.READ_ONLY
+    assert (
+        capabilities_for_node(root).for_operation("replace_html_text").state
+        is CapabilityState.READ_ONLY
+    )
+    assert (
+        capabilities_for_node(root).for_operation("replace_html_text").reason_code
+        == "html.recovery.optional_end_tag"
+    )
+    assert (
+        capabilities_for_node(root).for_operation("replace_html_attribute").state
+        is CapabilityState.READ_ONLY
+    )
 
 
 def test_duplicate_attributes_collapse_to_read_only_fallback() -> None:
@@ -163,13 +202,19 @@ def test_duplicate_attributes_collapse_to_read_only_fallback() -> None:
 def test_html_ir_reader_accepts_only_exact_html_surfaces() -> None:
     reader = HtmlIRReader()
 
-    assert reader.accepts(BytesIO(b""), SimpleNamespace(extension=".html", mimetype=None))
-    assert reader.accepts(BytesIO(b""), SimpleNamespace(extension=".HTM", mimetype=None))
     assert reader.accepts(
-        BytesIO(b""), SimpleNamespace(extension=".txt", mimetype="text/html; charset=utf-8")
+        BytesIO(b""), SimpleNamespace(extension=".html", mimetype=None)
+    )
+    assert reader.accepts(
+        BytesIO(b""), SimpleNamespace(extension=".HTM", mimetype=None)
+    )
+    assert reader.accepts(
+        BytesIO(b""),
+        SimpleNamespace(extension=".txt", mimetype="text/html; charset=utf-8"),
     )
     assert not reader.accepts(
-        BytesIO(b""), SimpleNamespace(extension=".xhtml", mimetype="application/xhtml+xml")
+        BytesIO(b""),
+        SimpleNamespace(extension=".xhtml", mimetype="application/xhtml+xml"),
     )
     assert not reader.accepts(
         BytesIO(b""), SimpleNamespace(extension=".svg", mimetype="image/svg+xml")

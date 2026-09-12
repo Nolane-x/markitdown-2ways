@@ -80,7 +80,9 @@ def test_utf16_bom_and_unrelated_bytes_are_preserved(bom, encoding) -> None:
     ).encode(encoding)
 
 
-def test_reversible_cp1252_source_is_patched_without_reencoding_unrelated_bytes() -> None:
+def test_reversible_cp1252_source_is_patched_without_reencoding_unrelated_bytes() -> (
+    None
+):
     text = (
         '<html><head><meta charset="cp1252"></head>'
         "<body><p>café</p><div>£ stay</div></body></html>"
@@ -104,8 +106,7 @@ def test_reversible_cp1252_source_is_patched_without_reencoding_unrelated_bytes(
 
 def test_unencodable_replacement_fails_before_output() -> None:
     text = (
-        '<html><head><meta charset="cp1252"></head>'
-        "<body><p>café</p></body></html>"
+        '<html><head><meta charset="cp1252"></head>' "<body><p>café</p></body></html>"
     )
     source = text.encode("cp1252")
     document = read_html_ir(BytesIO(source), filename="page.html")

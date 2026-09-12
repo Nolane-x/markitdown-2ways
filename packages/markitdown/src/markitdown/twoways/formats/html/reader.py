@@ -159,7 +159,9 @@ def _payload(lexeme: HtmlLexicalNode) -> dict[str, Any]:
     raise AssertionError(f"unreachable HTML kind: {lexeme.kind}")
 
 
-def _encoding_declaration_metadata(parsed: ParsedHtmlSource) -> tuple[dict[str, Any], ...]:
+def _encoding_declaration_metadata(
+    parsed: ParsedHtmlSource,
+) -> tuple[dict[str, Any], ...]:
     return tuple(
         {
             "start": item.start,
@@ -172,7 +174,9 @@ def _encoding_declaration_metadata(parsed: ParsedHtmlSource) -> tuple[dict[str, 
     )
 
 
-def _recovery_signature_metadata(parsed: ParsedHtmlSource) -> tuple[dict[str, Any], ...]:
+def _recovery_signature_metadata(
+    parsed: ParsedHtmlSource,
+) -> tuple[dict[str, Any], ...]:
     return tuple(
         {
             "kind": entry.kind,

@@ -30,11 +30,26 @@ def test_recovery_signature_ignores_scalar_values_but_not_structure() -> None:
     [
         ("<html><body><p>one<p>two</body></html>", "html.recovery.optional_end_tag"),
         ("<html><body><p><div>x</div></p></body></html>", "html.recovery.nested_p"),
-        ("<html><body><ul><li>one<li>two</ul></body></html>", "html.recovery.optional_end_tag"),
-        ("<html><body><table><td>x</td></table></body></html>", "html.table.recovery_sensitive"),
-        ("<html><body><template><p>x</p></template></body></html>", "html.template.recovery_sensitive"),
-        ("<html><body><svg><text>x</text></svg></body></html>", "html.foreign_content.unsupported"),
-        ("<html><body><math><mi>x</mi></math></body></html>", "html.foreign_content.unsupported"),
+        (
+            "<html><body><ul><li>one<li>two</ul></body></html>",
+            "html.recovery.optional_end_tag",
+        ),
+        (
+            "<html><body><table><td>x</td></table></body></html>",
+            "html.table.recovery_sensitive",
+        ),
+        (
+            "<html><body><template><p>x</p></template></body></html>",
+            "html.template.recovery_sensitive",
+        ),
+        (
+            "<html><body><svg><text>x</text></svg></body></html>",
+            "html.foreign_content.unsupported",
+        ),
+        (
+            "<html><body><math><mi>x</mi></math></body></html>",
+            "html.foreign_content.unsupported",
+        ),
     ],
 )
 def test_recovery_sensitive_html_is_read_only(text: str, reason: str) -> None:

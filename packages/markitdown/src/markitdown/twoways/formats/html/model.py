@@ -136,7 +136,9 @@ class ParsedHtmlSource:
     recovery_reason: str | None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "encoding_declarations", tuple(self.encoding_declarations))
+        object.__setattr__(
+            self, "encoding_declarations", tuple(self.encoding_declarations)
+        )
         if self.recovery_stable and self.recovery_reason is not None:
             raise ValueError("stable HTML recovery cannot carry a failure reason")
         if not self.recovery_stable and not self.recovery_reason:

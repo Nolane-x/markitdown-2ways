@@ -179,7 +179,9 @@ class _Scanner:
 
     def _append_owner(self, owner: _Owner) -> None:
         if owner.path in self.by_path:
-            raise HtmlLexicalError(f"HTML lexical ownership path is ambiguous: {owner.path}")
+            raise HtmlLexicalError(
+                f"HTML lexical ownership path is ambiguous: {owner.path}"
+            )
         self.owners.append(owner)
         self.by_path[owner.path] = owner
         if owner.parent_path is not None:
@@ -190,14 +192,18 @@ class _Scanner:
 
     def _next_element_path(self, normalized_name: str) -> tuple[str, str | None]:
         parent = self._current_parent()
-        counts = parent.element_counts if parent is not None else self.top_element_counts
+        counts = (
+            parent.element_counts if parent is not None else self.top_element_counts
+        )
         counts[normalized_name] = counts.get(normalized_name, 0) + 1
         segment = f"{_path_name(normalized_name)}[{counts[normalized_name]}]"
         if parent is None:
             return f"/{segment}", None
         return f"{parent.owner.path}/{segment}", parent.owner.path
 
-    def _next_kind_path(self, kind: str, parent: _Frame | None) -> tuple[str, str | None]:
+    def _next_kind_path(
+        self, kind: str, parent: _Frame | None
+    ) -> tuple[str, str | None]:
         counts = parent.kind_counts if parent is not None else self.top_kind_counts
         counts[kind] = counts.get(kind, 0) + 1
         segment = f"#{kind}[{counts[kind]}]"
@@ -263,7 +269,9 @@ class _Scanner:
                     value_start = position
                     end = self.text.find(quote_character, position)
                     if end < 0:
-                        raise HtmlLexicalError("HTML quoted attribute value is unterminated")
+                        raise HtmlLexicalError(
+                            "HTML quoted attribute value is unterminated"
+                        )
                     value_end = end
                     value = unescape(self.text[value_start:value_end])
                     position = end + 1
@@ -319,7 +327,7 @@ class _Scanner:
         end_tag_end: int | None = None,
     ) -> None:
         frame.owner.end = end
-        frame.owner.raw = self.text[frame.owner.start:end]
+        frame.owner.raw = self.text[frame.owner.start : end]
         frame.owner.end_tag_start = end_tag_start
         frame.owner.end_tag_end = end_tag_end
 
@@ -360,7 +368,9 @@ class _Scanner:
             self._set_reason("html.attribute.duplicate_name")
 
         for token in attributes:
-            occurrences[token.normalized_name] = occurrences.get(token.normalized_name, 0) + 1
+            occurrences[token.normalized_name] = (
+                occurrences.get(token.normalized_name, 0) + 1
+            )
             suffix = (
                 f"[{occurrences[token.normalized_name]}]"
                 if totals[token.normalized_name] > 1
@@ -479,7 +489,9 @@ class _Scanner:
 
     def _parse_start(self) -> None:
         start = self.position
-        qname, normalized_name, end, attributes, self_closing = self._parse_start_tag(start)
+        qname, normalized_name, end, attributes, self_closing = self._parse_start_tag(
+            start
+        )
         self._apply_start_recovery_rules(normalized_name, start)
         path, parent_path = self._next_element_path(normalized_name)
         owner = _Owner(

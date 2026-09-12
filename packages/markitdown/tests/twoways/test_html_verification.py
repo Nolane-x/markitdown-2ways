@@ -136,12 +136,10 @@ def test_candidate_unrequested_reference_spelling_drift_is_rejected() -> None:
 
 def test_candidate_encoding_declaration_raw_drift_is_rejected() -> None:
     source = (
-        b'<html><head><meta charset="utf-8"></head>'
-        b"<body><p>old</p></body></html>"
+        b'<html><head><meta charset="utf-8"></head>' b"<body><p>old</p></body></html>"
     )
     candidate = (
-        b'<html><head><meta charset="UTF-8"></head>'
-        b"<body><p>new</p></body></html>"
+        b'<html><head><meta charset="UTF-8"></head>' b"<body><p>new</p></body></html>"
     )
 
     with pytest.raises(RoundTripVerificationError):

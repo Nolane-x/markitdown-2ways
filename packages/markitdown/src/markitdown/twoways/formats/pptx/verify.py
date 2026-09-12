@@ -19,7 +19,13 @@ from .locators import resolve_shape_element
 
 _XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
 _TARGET_NATIVE_EDIT_TYPES = frozenset(
-    {"update_table_cells", "set_text_style", "move_resize"}
+    {
+        "replace_text",
+        "set_alt_text",
+        "update_table_cells",
+        "set_text_style",
+        "move_resize",
+    }
 )
 
 
@@ -60,6 +66,24 @@ def _local_name(element) -> str | None:
 
 def _direct_children(element, name: str) -> list[object]:
     return [child for child in element if _local_name(child) == name]
+
+
+def _mask_text_update(shape_element) -> bool:
+    text_nodes = list(shape_element.xpath('.//*[local-name()="t"]'))
+    if not text_nodes:
+        return False
+    for text_node in text_nodes:
+        text_node.text = ""
+        text_node.attrib.pop(_XML_SPACE, None)
+    return True
+
+
+def _mask_alt_text_update(shape_element) -> bool:
+    c_nv_prs = list(shape_element.xpath('.//*[local-name()="cNvPr"]'))
+    if len(c_nv_prs) != 1:
+        return False
+    c_nv_prs[0].attrib.pop("descr", None)
+    return True
 
 
 def _table_cell(shape_element, row: int, column: int):
@@ -175,7 +199,13 @@ def _mask_geometry_update(shape_element) -> bool:
 def _normalize_target(shape_element, edits: tuple[EditOperation, ...]):
     clone = deepcopy(shape_element)
     for edit in edits:
-        if edit.type == "update_table_cells":
+        if edit.type == "replace_text":
+            if not _mask_text_update(clone):
+                return None
+        elif edit.type == "set_alt_text":
+            if not _mask_alt_text_update(clone):
+                return None
+        elif edit.type == "update_table_cells":
             if not _mask_table_update_values(clone, edit):
                 return None
         elif edit.type == "set_text_style":
@@ -481,7 +511,7 @@ def verify_pptx_output(
             status=FidelityStatus.PASSED,
             description=(
                 "Edited PPTX targets preserve native structure outside explicitly "
-                "authorized table, direct-style, or geometry fields."
+                "authorized text, alt-text, table, direct-style, or geometry fields."
             ),
             affected_node_ids=target_native_affected,
         ),

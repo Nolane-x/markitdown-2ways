@@ -9,6 +9,7 @@ from typing import BinaryIO
 from ..._errors import (
     IRValidationError,
     PatchPreconditionError,
+    RoundTripVerificationError,
     SourcePackageMismatchError,
     UnsupportedEditError,
 )
@@ -28,6 +29,7 @@ from ...ir.edits import EditOperation, EditPrecondition
 from ...ir.nodes import Node
 from ...ir.semantics import validate_edit_preconditions
 from ...ir.serialization import validate_document
+from ..text.codec import encode_text_source
 from ..text.model import TextRepresentation
 from .lexical import parse_xml_source
 from .model import XmlLexicalNode
@@ -194,7 +196,11 @@ def _validate_node_evidence(node: Node, expected: Node, path: str) -> None:
         ("provenance", expected.provenance, node.provenance),
         ("parent", expected.parent_id, node.parent_id),
         ("children", expected.children, node.children),
-        ("semantic_kind", (expected.kind, expected.semantic_role), (node.kind, node.semantic_role)),
+        (
+            "semantic_kind",
+            (expected.kind, expected.semantic_role),
+            (node.kind, node.semantic_role),
+        ),
         ("payload", expected.payload, node.payload),
     )
     for reason, expected_value, actual_value in checks:
@@ -212,7 +218,7 @@ def _validate_source_model(
     document: DocumentIR,
     source: bytes,
     representation: TextRepresentation,
-) -> tuple[dict[str, Node], dict[str, XmlLexicalNode]]:
+) -> tuple[str, dict[str, Node], dict[str, XmlLexicalNode]]:
     descriptor = document.source
     assert descriptor is not None
     try:
@@ -255,6 +261,7 @@ def _validate_source_model(
         _validate_node_evidence(actual_nodes[path], expected_node, path)
 
     lexical_by_path: dict[str, XmlLexicalNode] = {}
+    source_text = ""
     if representation.byte_roundtrip:
         try:
             parsed = parse_xml_source(source, encoding=representation.encoding)
@@ -263,6 +270,7 @@ def _validate_source_model(
                 "XML source fails strict lexical authority reparse.",
                 details={"reason": "xml.source_lexical_reparse"},
             ) from exc
+        source_text = parsed.text
         lexical_by_path = {item.path: item for item in parsed.lexical.nodes}
         if set(lexical_by_path) != set(expected_nodes):
             raise PatchPreconditionError(
@@ -270,7 +278,7 @@ def _validate_source_model(
                 details={"reason": "xml.lexical_path_set"},
             )
 
-    return actual_nodes, lexical_by_path
+    return source_text, actual_nodes, lexical_by_path
 
 
 def _is_xml_char(character: str) -> bool:
@@ -393,6 +401,150 @@ def _preflight_edit(
     return lexical, requested
 
 
+def _render_text_value(value: str) -> str:
+    parts: list[str] = []
+    for character in value:
+        if character == "&":
+            parts.append("&amp;")
+        elif character == "<":
+            parts.append("&lt;")
+        elif character == ">":
+            parts.append("&gt;")
+        elif character == "\r":
+            parts.append("&#13;")
+        else:
+            parts.append(character)
+    token = "".join(parts)
+    _validate_rendered_fragment("text", token, value, quote=None)
+    return token
+
+
+def _render_attribute_value(value: str, quote: str | None) -> str:
+    if quote not in {"'", '"'}:
+        raise PatchPreconditionError(
+            "XML attribute quote evidence is invalid.",
+            details={"reason": "xml.attribute.quote"},
+        )
+    parts: list[str] = []
+    for character in value:
+        if character == "&":
+            parts.append("&amp;")
+        elif character == "<":
+            parts.append("&lt;")
+        elif character == ">":
+            parts.append("&gt;")
+        elif character == quote:
+            parts.append("&quot;" if quote == '"' else "&apos;")
+        elif character == "\t":
+            parts.append("&#9;")
+        elif character == "\n":
+            parts.append("&#10;")
+        elif character == "\r":
+            parts.append("&#13;")
+        else:
+            parts.append(character)
+    token = "".join(parts)
+    _validate_rendered_fragment("attribute", token, value, quote=quote)
+    return token
+
+
+def _validate_rendered_fragment(
+    kind: str,
+    token: str,
+    requested: str,
+    *,
+    quote: str | None,
+) -> None:
+    if kind == "text":
+        wrapper = f"<r>{token}</r>"
+    elif kind == "attribute" and quote in {"'", '"'}:
+        wrapper = f"<r a={quote}{token}{quote}/>"
+    else:
+        raise RoundTripVerificationError(
+            "XML renderer received an unsupported fragment kind.",
+            details={"reason": "xml.render.fragment_kind", "kind": kind},
+        )
+    try:
+        parsed = parse_xml_source(wrapper.encode("utf-8"))
+    except (UnicodeError, ValueError, TypeError) as exc:
+        raise RoundTripVerificationError(
+            "Rendered XML fragment failed strict parser validation.",
+            details={"reason": "xml.render.fragment_parse", "kind": kind},
+        ) from exc
+
+    if kind == "text":
+        values = [
+            item.value
+            for item in parsed.lexical.nodes
+            if item.kind == "text" and item.parent_path == parsed.lexical.root_path
+        ]
+        actual = "".join(str(value) for value in values)
+    else:
+        attributes = [
+            item
+            for item in parsed.lexical.nodes
+            if item.kind == "attribute" and item.qname == "a"
+        ]
+        actual = attributes[0].value if len(attributes) == 1 else None
+    if actual != requested:
+        raise RoundTripVerificationError(
+            "Rendered XML fragment changed the requested semantic value.",
+            details={
+                "reason": "xml.render.fragment_semantic",
+                "kind": kind,
+                "expected": requested,
+                "actual": actual,
+            },
+        )
+
+
+def _replacement_span(lexical: XmlLexicalNode) -> tuple[int, int]:
+    if lexical.kind == "text":
+        return lexical.start, lexical.end
+    if lexical.kind == "attribute":
+        if lexical.value_start is None or lexical.value_end is None:
+            raise PatchPreconditionError(
+                "XML attribute is missing exact value-span evidence.",
+                details={"reason": "xml.attribute.value_span", "path": lexical.path},
+            )
+        return lexical.value_start, lexical.value_end
+    raise UnsupportedEditError(
+        "XML replacement span is unavailable for this owner kind.",
+        details={"reason": "xml.value.owner_kind", "kind": lexical.kind},
+    )
+
+
+def _build_candidate(
+    source_text: str,
+    replacements: Sequence[tuple[int, int, str, str]],
+) -> tuple[str, tuple[tuple[int, int, int, int], ...]]:
+    ordered = sorted(replacements, key=lambda item: (item[0], item[1], item[3]))
+    parts: list[str] = []
+    untouched: list[tuple[int, int, int, int]] = []
+    cursor = 0
+    candidate_cursor = 0
+    for start, end, token, path in ordered:
+        if start < cursor or end < start:
+            raise UnsupportedEditError(
+                "XML edit spans overlap or are invalid.",
+                details={"reason": "xml.value.overlapping_targets", "path": path},
+            )
+        prefix = source_text[cursor:start]
+        parts.append(prefix)
+        untouched.append((cursor, start, candidate_cursor, candidate_cursor + len(prefix)))
+        candidate_cursor += len(prefix)
+        parts.append(token)
+        candidate_cursor += len(token)
+        cursor = end
+
+    suffix = source_text[cursor:]
+    parts.append(suffix)
+    untouched.append(
+        (cursor, len(source_text), candidate_cursor, candidate_cursor + len(suffix))
+    )
+    return "".join(parts), tuple(untouched)
+
+
 def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
     evidence = [
         FidelityEvidence(
@@ -412,6 +564,14 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
                 check_code="xml.zero_edit_identity",
                 status=FidelityStatus.PASSED,
                 description="Zero-edit output reused the exact source bytes.",
+            )
+        )
+    else:
+        evidence.append(
+            FidelityEvidence(
+                check_code="xml.lexical_span_patch",
+                status=FidelityStatus.PASSED,
+                description="Requested XML values were replaced only at exact lexical source spans.",
             )
         )
     return WriterResult(
@@ -444,7 +604,7 @@ def patch_xml(
     _validate_source_authority(document, source)
     edits = tuple(edits)
     representation = _representation(document, require_writable=bool(edits))
-    path_nodes, lexical_by_path = _validate_source_model(
+    source_text, path_nodes, lexical_by_path = _validate_source_model(
         document,
         source,
         representation,
@@ -455,8 +615,9 @@ def patch_xml(
         return _result(len(source), zero_edit=True)
 
     seen_paths: set[str] = set()
+    replacements: list[tuple[int, int, str, str]] = []
     for edit in edits:
-        lexical, _requested = _preflight_edit(
+        lexical, requested = _preflight_edit(
             document,
             edit,
             path_nodes,
@@ -469,7 +630,26 @@ def patch_xml(
             )
         seen_paths.add(lexical.path)
 
-    raise UnsupportedEditError(
-        "XML value rendering is not implemented until H4 Task 4.",
-        details={"reason": "xml.rendering.not_implemented"},
-    )
+        if lexical.kind == "text":
+            token = _render_text_value(requested)
+        else:
+            token = _render_attribute_value(requested, lexical.quote)
+        start, end = _replacement_span(lexical)
+        replacements.append((start, end, token, lexical.path))
+
+    candidate_text, _untouched = _build_candidate(source_text, replacements)
+    try:
+        candidate = encode_text_source(candidate_text, representation)
+    except UnicodeError as exc:
+        raise UnsupportedEditError(
+            "XML replacement cannot be represented in the source encoding.",
+            details={"reason": "xml.encoding.replacement_unencodable"},
+        ) from exc
+    except ValueError as exc:
+        raise RoundTripVerificationError(
+            "XML source representation could not be encoded safely.",
+            details={"reason": "xml.encoding.candidate"},
+        ) from exc
+
+    output.write(candidate)
+    return _result(len(candidate), zero_edit=False)

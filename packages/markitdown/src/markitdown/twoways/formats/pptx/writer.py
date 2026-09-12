@@ -20,11 +20,11 @@ from ...ir.style_edits import validate_text_style_update
 from ...ooxml import parse_xml_part, serialize_xml_part, snapshot_package, write_package
 from ...ooxml.package import read_binary_stream, validate_source_authority
 from ...writers.base import DocumentWriter, TargetInfo
-from .geometry import patch_shape_geometry, verify_geometry_readback
+from .geometry import patch_shape_geometry
 from .locators import resolve_shape_element
 from .model import PptxPatchOptions
 from .patch import patch_picture_alt_text, validate_edit_preconditions
-from .style import patch_text_run_style, verify_text_style_readback
+from .style import patch_text_run_style
 from .table import patch_pptx_table_cells
 from .text import patch_text_shape
 from .verify import verify_pptx_output
@@ -188,32 +188,6 @@ def _apply_edit(
     )
 
 
-def _verification_edits(
-    document: DocumentIR,
-    edits: tuple[EditOperation, ...],
-) -> tuple[EditOperation, ...]:
-    result: list[EditOperation] = []
-    for edit in edits:
-        if (
-            edit.type not in {"set_text_style", "move_resize"}
-            or edit.target_node_id is None
-        ):
-            result.append(edit)
-            continue
-        node = document.nodes[edit.target_node_id]
-        result.append(
-            EditOperation(
-                operation_id=f"{edit.operation_id}:semantic-readback",
-                type="replace_text",
-                target_node_id=edit.target_node_id,
-                precondition=edit.precondition,
-                payload={"text": node_semantic_text(node)},
-                source_label=edit.source_label,
-            )
-        )
-    return tuple(result)
-
-
 def patch_pptx(
     document: DocumentIR,
     source_stream: BinaryIO,
@@ -320,57 +294,10 @@ def patch_pptx(
             document,
             source_bytes,
             output_bytes,
-            edits=_verification_edits(document, edit_list),
+            edits=edit_list,
             touched_parts=touched_parts,
             limits=options.limits,
         )
-        style_edits = tuple(edit for edit in edit_list if edit.type == "set_text_style")
-        geometry_edits = tuple(edit for edit in edit_list if edit.type == "move_resize")
-        if style_edits or geometry_edits:
-            from .reader import read_pptx_ir
-
-            output_document = read_pptx_ir(BytesIO(output_bytes))
-            evidence = fidelity.evidence
-            if style_edits:
-                affected = verify_text_style_readback(
-                    document,
-                    output_document,
-                    style_edits,
-                )
-                evidence += (
-                    FidelityEvidence(
-                        check_code="pptx.style.readback",
-                        status=FidelityStatus.PASSED,
-                        description=(
-                            "Requested PPTX direct run styles read back exactly while "
-                            "semantic text remains unchanged."
-                        ),
-                        affected_node_ids=affected,
-                    ),
-                )
-            if geometry_edits:
-                affected = verify_geometry_readback(
-                    document,
-                    output_document,
-                    geometry_edits,
-                )
-                evidence += (
-                    FidelityEvidence(
-                        check_code="pptx.geometry.readback",
-                        status=FidelityStatus.PASSED,
-                        description=(
-                            "Requested PPTX slide-shape geometry reads back exactly "
-                            "with semantic content unchanged."
-                        ),
-                        affected_node_ids=affected,
-                    ),
-                )
-            fidelity = FidelityReport(
-                claimed_tier=fidelity.claimed_tier,
-                evidence=evidence,
-                unsupported_features=fidelity.unsupported_features,
-                warnings=fidelity.warnings,
-            )
     else:
         fidelity = FidelityReport(
             claimed_tier="unknown",

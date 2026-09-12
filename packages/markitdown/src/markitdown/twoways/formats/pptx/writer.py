@@ -15,12 +15,14 @@ from ...ir.edits import EditOperation
 from ...ir.nodes import ImagePayload, TablePayload, TextPayload
 from ...ir.semantics import node_semantic_text
 from ...ir.serialization import validate_document
+from ...ir.style_edits import validate_text_style_update
 from ...ooxml import parse_xml_part, serialize_xml_part, snapshot_package, write_package
 from ...ooxml.package import read_binary_stream, validate_source_authority
 from ...writers.base import DocumentWriter, TargetInfo
 from .locators import resolve_shape_element
 from .model import PptxPatchOptions
 from .patch import patch_picture_alt_text, validate_edit_preconditions
+from .style import patch_text_run_style, verify_text_style_readback
 from .table import patch_pptx_table_cells
 from .text import patch_text_shape
 from .verify import verify_pptx_output
@@ -82,6 +84,32 @@ def _apply_edit(
         )
         return
 
+    if edit.type == "set_text_style":
+        if not isinstance(node.payload, TextPayload):
+            raise UnsupportedEditError(
+                "set_text_style requires a PPTX text node.",
+                details={"reason": "wrong_node_kind", "target_node_id": node.node_id},
+            )
+        if node.metadata.get("pptx:patch_text_compatible") is not True:
+            raise UnsupportedEditError(
+                "PPTX text node is not structurally safe for direct style editing.",
+                details={
+                    "reason": "unsupported_text_structure",
+                    "target_node_id": node.node_id,
+                },
+            )
+        run_index, source_style, target_style = validate_text_style_update(
+            node.payload,
+            edit.payload,
+        )
+        patch_text_run_style(
+            shape_element,
+            run_index=run_index,
+            old_style=source_style,
+            new_style=target_style,
+        )
+        return
+
     if edit.type == "set_alt_text":
         if not isinstance(node.payload, ImagePayload):
             raise UnsupportedEditError(
@@ -126,6 +154,29 @@ def _apply_edit(
         "PPTX patch writer does not support this edit type.",
         details={"reason": "unsupported_edit_type", "edit_type": edit.type},
     )
+
+
+def _verification_edits(
+    document: DocumentIR,
+    edits: tuple[EditOperation, ...],
+) -> tuple[EditOperation, ...]:
+    result: list[EditOperation] = []
+    for edit in edits:
+        if edit.type != "set_text_style" or edit.target_node_id is None:
+            result.append(edit)
+            continue
+        node = document.nodes[edit.target_node_id]
+        result.append(
+            EditOperation(
+                operation_id=f"{edit.operation_id}:style-readback",
+                type="replace_text",
+                target_node_id=edit.target_node_id,
+                precondition=edit.precondition,
+                payload={"text": node_semantic_text(node)},
+                source_label=edit.source_label,
+            )
+        )
+    return tuple(result)
 
 
 def patch_pptx(
@@ -234,10 +285,37 @@ def patch_pptx(
             document,
             source_bytes,
             output_bytes,
-            edits=edit_list,
+            edits=_verification_edits(document, edit_list),
             touched_parts=touched_parts,
             limits=options.limits,
         )
+        style_edits = tuple(edit for edit in edit_list if edit.type == "set_text_style")
+        if style_edits:
+            from .reader import read_pptx_ir
+
+            output_document = read_pptx_ir(BytesIO(output_bytes))
+            affected = verify_text_style_readback(
+                document,
+                output_document,
+                style_edits,
+            )
+            fidelity = FidelityReport(
+                claimed_tier=fidelity.claimed_tier,
+                evidence=fidelity.evidence
+                + (
+                    FidelityEvidence(
+                        check_code="pptx.style.readback",
+                        status=FidelityStatus.PASSED,
+                        description=(
+                            "Requested PPTX direct run styles read back exactly while "
+                            "the semantic text remains unchanged."
+                        ),
+                        affected_node_ids=affected,
+                    ),
+                ),
+                unsupported_features=fidelity.unsupported_features,
+                warnings=fidelity.warnings,
+            )
     else:
         fidelity = FidelityReport(
             claimed_tier="unknown",

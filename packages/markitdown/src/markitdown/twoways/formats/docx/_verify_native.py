@@ -10,6 +10,7 @@ from ..._errors import RoundTripVerificationError
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ooxml import parse_xml_part
+from ._text_extract import _collect_carriers
 from .locators import (
     resolve_paragraph_element,
     resolve_picture_docpr,
@@ -17,6 +18,14 @@ from .locators import (
 )
 
 _XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
+_STYLE_NATIVE_FIELDS = {
+    "b": ("val",),
+    "i": ("val",),
+    "u": ("val",),
+    "sz": ("val",),
+    "color": ("val",),
+    "rFonts": ("ascii", "hAnsi"),
+}
 
 
 def _fail(check: str, message: str, *, expected=None, actual=None) -> None:
@@ -95,6 +104,47 @@ def _mask_table_update_values(clone, edit: EditOperation) -> None:
             text_node.attrib.pop(_XML_SPACE, None)
 
 
+def _mask_style_property_value(element, namespace: str, local: str) -> None:
+    for attribute in _STYLE_NATIVE_FIELDS[local]:
+        element.attrib.pop(f"{{{namespace}}}{attribute}", None)
+
+
+def _mask_text_style_update(clone, edit: EditOperation) -> None:
+    run_index = edit.payload.get("run_index")
+    if type(run_index) is not int:
+        return
+    try:
+        carriers = _collect_carriers(clone)
+    except Exception:
+        return
+    if run_index < 0 or run_index >= len(carriers):
+        return
+    run_element = carriers[run_index].run_element
+    if not isinstance(getattr(run_element, "tag", None), str):
+        return
+    namespace = run_element.tag[1:].split("}", 1)[0]
+    rpr_nodes = [
+        child
+        for child in run_element
+        if isinstance(getattr(child, "tag", None), str)
+        and child.tag == f"{{{namespace}}}rPr"
+    ]
+    if len(rpr_nodes) != 1:
+        return
+    rpr = rpr_nodes[0]
+    for child in tuple(rpr):
+        if not isinstance(getattr(child, "tag", None), str):
+            continue
+        local = child.tag.rsplit("}", 1)[-1]
+        if local not in _STYLE_NATIVE_FIELDS or child.tag != f"{{{namespace}}}{local}":
+            continue
+        _mask_style_property_value(child, namespace, local)
+        if not child.attrib and len(child) == 0 and not (child.text or ""):
+            rpr.remove(child)
+    if not rpr.attrib and len(rpr) == 0 and not (rpr.text or ""):
+        run_element.remove(rpr)
+
+
 def _normalized_target_structure(
     element,
     *,
@@ -108,6 +158,8 @@ def _normalized_target_structure(
         for text_node in clone.xpath('.//*[local-name()="t"]'):
             text_node.text = ""
             text_node.attrib.pop(_XML_SPACE, None)
+    elif edit_type == "set_text_style":
+        _mask_text_style_update(clone, edit)
     elif edit_type == "set_alt_text":
         docprs = clone.xpath('.//*[local-name()="docPr"]')
         if not docprs and clone.tag.rsplit("}", 1)[-1] == "docPr":

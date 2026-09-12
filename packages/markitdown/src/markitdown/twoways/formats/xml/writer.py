@@ -634,6 +634,277 @@ def _verify_untouched_bytes(
         )
 
 
+def _candidate_failure(
+    message: str,
+    reason: str,
+    **details: object,
+) -> None:
+    raise RoundTripVerificationError(
+        message,
+        details={"reason": reason, **details},
+    )
+
+
+def _topology_by_path(
+    document: DocumentIR,
+    nodes_by_path: Mapping[str, Node],
+) -> dict[str, tuple[str, str | None, tuple[str, ...]]]:
+    topology: dict[str, tuple[str, str | None, tuple[str, ...]]] = {}
+    for path, node in nodes_by_path.items():
+        kind = node.metadata.get("xml.kind")
+        if not isinstance(kind, str):
+            _candidate_failure(
+                "XML candidate topology contains invalid kind evidence.",
+                "xml.candidate.topology_kind",
+                path=path,
+            )
+
+        parent_path: str | None = None
+        if node.parent_id is not None:
+            parent = document.nodes.get(node.parent_id)
+            if parent is None:
+                _candidate_failure(
+                    "XML candidate topology contains a missing parent.",
+                    "xml.candidate.topology_parent",
+                    path=path,
+                )
+            parent_path_value = parent.metadata.get("xml.path")
+            if not isinstance(parent_path_value, str):
+                _candidate_failure(
+                    "XML candidate topology contains invalid parent ownership.",
+                    "xml.candidate.topology_parent_path",
+                    path=path,
+                )
+            parent_path = parent_path_value
+
+        child_paths: list[str] = []
+        for child_id in node.children:
+            child = document.nodes.get(child_id)
+            if child is None:
+                _candidate_failure(
+                    "XML candidate topology contains a missing child.",
+                    "xml.candidate.topology_child",
+                    path=path,
+                )
+            child_path = child.metadata.get("xml.path")
+            if not isinstance(child_path, str):
+                _candidate_failure(
+                    "XML candidate topology contains invalid child ownership.",
+                    "xml.candidate.topology_child_path",
+                    path=path,
+                )
+            child_paths.append(child_path)
+        topology[path] = (kind, parent_path, tuple(child_paths))
+    return topology
+
+
+def _verify_candidate(
+    document: DocumentIR,
+    candidate: bytes,
+    representation: TextRepresentation,
+    requested: Mapping[str, str],
+) -> None:
+    descriptor = document.source
+    if descriptor is None:
+        _candidate_failure(
+            "XML candidate verification requires source authority.",
+            "xml.candidate.missing_source_descriptor",
+        )
+
+    try:
+        candidate_document = read_xml_ir(
+            BytesIO(candidate),
+            filename=descriptor.filename,
+            mimetype=descriptor.mimetype,
+            encoding=representation.encoding,
+        )
+    except (UnicodeError, ValueError, TypeError) as exc:
+        raise RoundTripVerificationError(
+            "XML candidate failed strict re-read verification.",
+            details={"reason": "xml.candidate.reread"},
+        ) from exc
+
+    expected_root = _root_node(document)
+    candidate_root = _root_node(candidate_document)
+    candidate_representation = (
+        candidate_root.metadata.get("xml.encoding"),
+        candidate_root.metadata.get("xml.bom"),
+        candidate_root.metadata.get("xml.byte_roundtrip"),
+    )
+    expected_representation = (
+        representation.encoding,
+        representation.bom,
+        representation.byte_roundtrip,
+    )
+    if candidate_representation != expected_representation:
+        _candidate_failure(
+            "XML candidate representation changed unexpectedly.",
+            "xml.candidate.representation",
+            expected=expected_representation,
+            actual=candidate_representation,
+        )
+
+    expected_declaration = (
+        expected_root.metadata.get("xml.declaration_raw"),
+        expected_root.metadata.get("xml.declaration_raw_digest"),
+        expected_root.metadata.get("xml.version"),
+        expected_root.metadata.get("xml.declared_encoding"),
+        expected_root.metadata.get("xml.standalone"),
+    )
+    candidate_declaration = (
+        candidate_root.metadata.get("xml.declaration_raw"),
+        candidate_root.metadata.get("xml.declaration_raw_digest"),
+        candidate_root.metadata.get("xml.version"),
+        candidate_root.metadata.get("xml.declared_encoding"),
+        candidate_root.metadata.get("xml.standalone"),
+    )
+    if candidate_declaration != expected_declaration:
+        _candidate_failure(
+            "XML candidate declaration changed unexpectedly.",
+            "xml.candidate.declaration",
+            expected=expected_declaration,
+            actual=candidate_declaration,
+        )
+
+    expected_nodes = _nodes_by_path(document)
+    candidate_nodes = _nodes_by_path(candidate_document)
+    expected_paths = set(expected_nodes)
+    candidate_paths = set(candidate_nodes)
+    if candidate_paths != expected_paths:
+        _candidate_failure(
+            "XML candidate ownership path set changed unexpectedly.",
+            "xml.candidate.path_set",
+            expected=tuple(sorted(expected_paths)),
+            actual=tuple(sorted(candidate_paths)),
+        )
+
+    for path in sorted(expected_paths):
+        expected = expected_nodes[path]
+        actual = candidate_nodes[path]
+        expected_kind = expected.metadata.get("xml.kind")
+        actual_kind = actual.metadata.get("xml.kind")
+        if actual_kind != expected_kind:
+            _candidate_failure(
+                "XML candidate ownership kind changed unexpectedly.",
+                "xml.candidate.kind",
+                path=path,
+                expected=expected_kind,
+                actual=actual_kind,
+            )
+
+        expected_expanded = expected.metadata.get("xml.expanded_name")
+        actual_expanded = actual.metadata.get("xml.expanded_name")
+        if actual_expanded != expected_expanded:
+            _candidate_failure(
+                "XML candidate expanded-name identity changed unexpectedly.",
+                "xml.candidate.expanded_name",
+                path=path,
+                expected=expected_expanded,
+                actual=actual_expanded,
+            )
+
+        expected_qname = expected.metadata.get("xml.qname")
+        actual_qname = actual.metadata.get("xml.qname")
+        if actual_qname != expected_qname:
+            _candidate_failure(
+                "XML candidate qualified-name identity changed unexpectedly.",
+                "xml.candidate.qname",
+                path=path,
+                expected=expected_qname,
+                actual=actual_qname,
+            )
+
+        if expected_kind == "namespace":
+            expected_namespace = (
+                expected.metadata.get("xml.namespace_prefix"),
+                expected.metadata.get("xml.namespace_uri"),
+            )
+            actual_namespace = (
+                actual.metadata.get("xml.namespace_prefix"),
+                actual.metadata.get("xml.namespace_uri"),
+            )
+            if actual_namespace != expected_namespace:
+                _candidate_failure(
+                    "XML candidate namespace binding changed unexpectedly.",
+                    "xml.candidate.namespace",
+                    path=path,
+                    expected=expected_namespace,
+                    actual=actual_namespace,
+                )
+
+    expected_topology = _topology_by_path(document, expected_nodes)
+    candidate_topology = _topology_by_path(candidate_document, candidate_nodes)
+    if candidate_topology != expected_topology:
+        _candidate_failure(
+            "XML candidate topology or sibling order changed unexpectedly.",
+            "xml.candidate.topology",
+            expected=expected_topology,
+            actual=candidate_topology,
+        )
+
+    for path, requested_value in requested.items():
+        expected = expected_nodes.get(path)
+        actual = candidate_nodes.get(path)
+        if expected is None or actual is None:
+            _candidate_failure(
+                "XML requested target is missing from candidate ownership.",
+                "xml.candidate.requested_missing",
+                path=path,
+            )
+        kind = expected.metadata.get("xml.kind")
+        if kind not in {"text", "attribute"}:
+            _candidate_failure(
+                "XML requested target is not a writable scalar owner.",
+                "xml.candidate.requested_kind",
+                path=path,
+                kind=kind,
+            )
+        actual_value = (
+            actual.payload.get("value") if isinstance(actual.payload, Mapping) else None
+        )
+        if actual_value != requested_value:
+            _candidate_failure(
+                "XML requested target semantic value does not match the candidate.",
+                "xml.candidate.requested_semantic",
+                path=path,
+                expected=requested_value,
+                actual=actual_value,
+            )
+
+    raw_stable_kinds = {
+        "attribute",
+        "namespace",
+        "text",
+        "cdata",
+        "comment",
+        "processing_instruction",
+    }
+    for path in sorted(expected_paths - set(requested)):
+        expected = expected_nodes[path]
+        actual = candidate_nodes[path]
+        kind = expected.metadata.get("xml.kind")
+        if kind not in raw_stable_kinds:
+            continue
+        expected_raw_digest = expected.metadata.get("xml.raw_digest")
+        actual_raw_digest = actual.metadata.get("xml.raw_digest")
+        if actual_raw_digest != expected_raw_digest:
+            _candidate_failure(
+                "XML candidate changed raw lexical evidence for an unrequested owner.",
+                "xml.candidate.unrequested_raw",
+                path=path,
+                expected=expected_raw_digest,
+                actual=actual_raw_digest,
+            )
+        if actual.payload != expected.payload:
+            _candidate_failure(
+                "XML candidate changed semantic payload for an unrequested owner.",
+                "xml.candidate.unrequested_semantic",
+                path=path,
+                expected=expected.payload,
+                actual=actual.payload,
+            )
+
+
 def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
     evidence = [
         FidelityEvidence(
@@ -667,6 +938,11 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
                     check_code="xml.untouched_byte_segments",
                     status=FidelityStatus.PASSED,
                     description="Every encoded byte segment outside authorized value spans was preserved exactly.",
+                ),
+                FidelityEvidence(
+                    check_code="xml.candidate_reread",
+                    status=FidelityStatus.PASSED,
+                    description="Strict candidate re-read preserved XML topology, namespace identity, declaration, and requested semantics.",
                 ),
             )
         )
@@ -712,6 +988,7 @@ def patch_xml(
 
     seen_paths: set[str] = set()
     replacements: list[tuple[int, int, str, str]] = []
+    requested_values: dict[str, str] = {}
     for edit in edits:
         lexical, requested = _preflight_edit(
             document,
@@ -725,6 +1002,7 @@ def patch_xml(
                 details={"reason": "xml.value.duplicate_target", "path": lexical.path},
             )
         seen_paths.add(lexical.path)
+        requested_values[lexical.path] = requested
 
         if lexical.kind == "text":
             token = _render_text_value(requested)
@@ -754,6 +1032,12 @@ def patch_xml(
         candidate_text,
         representation,
         untouched,
+    )
+    _verify_candidate(
+        document,
+        candidate,
+        representation,
+        requested_values,
     )
     output.write(candidate)
     return _result(len(candidate), zero_edit=False)

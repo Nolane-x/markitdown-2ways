@@ -12,6 +12,7 @@ from ..._errors import (
 from ..._results import FidelityEvidence, FidelityReport, FidelityStatus, WriterResult
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
+from ...ir.geometry_edits import validate_move_resize
 from ...ir.nodes import ImagePayload, TablePayload, TextPayload
 from ...ir.semantics import node_semantic_text
 from ...ir.serialization import validate_document
@@ -19,6 +20,7 @@ from ...ir.style_edits import validate_text_style_update
 from ...ooxml import parse_xml_part, serialize_xml_part, snapshot_package, write_package
 from ...ooxml.package import read_binary_stream, validate_source_authority
 from ...writers.base import DocumentWriter, TargetInfo
+from .geometry import patch_shape_geometry, verify_geometry_readback
 from .locators import resolve_shape_element
 from .model import PptxPatchOptions
 from .patch import patch_picture_alt_text, validate_edit_preconditions
@@ -110,6 +112,33 @@ def _apply_edit(
         )
         return
 
+    if edit.type == "move_resize":
+        if node.geometry is None:
+            raise UnsupportedEditError(
+                "move_resize requires source geometry.",
+                details={"reason": "missing_geometry", "target_node_id": node.node_id},
+            )
+        if node.kind == "group" or node.parent_id is not None:
+            raise UnsupportedEditError(
+                "PPTX group and group-child geometry requires group-coordinate editing.",
+                details={
+                    "reason": "pptx.geometry.group_coordinate_space",
+                    "target_node_id": node.node_id,
+                },
+            )
+        if not part_uri.startswith("/ppt/slides/"):
+            raise UnsupportedEditError(
+                "PPTX move_resize is limited to slide shapes in this tranche.",
+                details={"reason": "pptx.geometry.unsupported_part", "part_uri": part_uri},
+            )
+        target_geometry = validate_move_resize(node.geometry, edit.payload)
+        patch_shape_geometry(
+            shape_element,
+            current=node.geometry,
+            target=target_geometry,
+        )
+        return
+
     if edit.type == "set_alt_text":
         if not isinstance(node.payload, ImagePayload):
             raise UnsupportedEditError(
@@ -162,13 +191,13 @@ def _verification_edits(
 ) -> tuple[EditOperation, ...]:
     result: list[EditOperation] = []
     for edit in edits:
-        if edit.type != "set_text_style" or edit.target_node_id is None:
+        if edit.type not in {"set_text_style", "move_resize"} or edit.target_node_id is None:
             result.append(edit)
             continue
         node = document.nodes[edit.target_node_id]
         result.append(
             EditOperation(
-                operation_id=f"{edit.operation_id}:style-readback",
+                operation_id=f"{edit.operation_id}:semantic-readback",
                 type="replace_text",
                 target_node_id=edit.target_node_id,
                 precondition=edit.precondition,
@@ -290,29 +319,49 @@ def patch_pptx(
             limits=options.limits,
         )
         style_edits = tuple(edit for edit in edit_list if edit.type == "set_text_style")
-        if style_edits:
+        geometry_edits = tuple(edit for edit in edit_list if edit.type == "move_resize")
+        if style_edits or geometry_edits:
             from .reader import read_pptx_ir
 
             output_document = read_pptx_ir(BytesIO(output_bytes))
-            affected = verify_text_style_readback(
-                document,
-                output_document,
-                style_edits,
-            )
-            fidelity = FidelityReport(
-                claimed_tier=fidelity.claimed_tier,
-                evidence=fidelity.evidence
-                + (
+            evidence = fidelity.evidence
+            if style_edits:
+                affected = verify_text_style_readback(
+                    document,
+                    output_document,
+                    style_edits,
+                )
+                evidence += (
                     FidelityEvidence(
                         check_code="pptx.style.readback",
                         status=FidelityStatus.PASSED,
                         description=(
                             "Requested PPTX direct run styles read back exactly while "
-                            "the semantic text remains unchanged."
+                            "semantic text remains unchanged."
                         ),
                         affected_node_ids=affected,
                     ),
-                ),
+                )
+            if geometry_edits:
+                affected = verify_geometry_readback(
+                    document,
+                    output_document,
+                    geometry_edits,
+                )
+                evidence += (
+                    FidelityEvidence(
+                        check_code="pptx.geometry.readback",
+                        status=FidelityStatus.PASSED,
+                        description=(
+                            "Requested PPTX slide-shape geometry reads back exactly "
+                            "with semantic content unchanged."
+                        ),
+                        affected_node_ids=affected,
+                    ),
+                )
+            fidelity = FidelityReport(
+                claimed_tier=fidelity.claimed_tier,
+                evidence=evidence,
                 unsupported_features=fidelity.unsupported_features,
                 warnings=fidelity.warnings,
             )

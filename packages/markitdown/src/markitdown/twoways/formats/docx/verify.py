@@ -7,8 +7,9 @@ from ..._errors import RoundTripVerificationError
 from ..._results import FidelityEvidence, FidelityReport, FidelityStatus
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
-from ...ir.nodes import TablePayload
+from ...ir.nodes import TablePayload, TextPayload
 from ...ir.semantics import node_semantic_digest, node_semantic_text
+from ...ir.style_edits import validate_text_style_update
 from ...ir.table_edits import table_semantic_text_after_updates
 from ...ooxml import OOXMLPackageLimits
 from ...ooxml.package import inspect_package_preservation
@@ -50,6 +51,9 @@ def _expected_edit_value(original_document: DocumentIR, edit: EditOperation) -> 
         return edit.payload.get("text")
     if edit.type == "set_alt_text":
         return edit.payload.get("alt_text")
+    if edit.type == "set_text_style" and edit.target_node_id is not None:
+        source_node = original_document.nodes.get(edit.target_node_id)
+        return None if source_node is None else node_semantic_text(source_node)
     if edit.type == "update_table_cells" and edit.target_node_id is not None:
         source_node = original_document.nodes.get(edit.target_node_id)
         if source_node is not None and isinstance(source_node.payload, TablePayload):
@@ -59,6 +63,56 @@ def _expected_edit_value(original_document: DocumentIR, edit: EditOperation) -> 
                 format_label="DOCX",
             )
     return None
+
+
+def _direct_style(payload: TextPayload, run_index: int) -> dict[str, object]:
+    runs = tuple(run for paragraph in payload.paragraphs for run in paragraph.runs)
+    if run_index < 0 or run_index >= len(runs):
+        return {}
+    style = runs[run_index].style
+    direct = {} if style is None else dict(style.direct)
+    color = direct.get("color")
+    if isinstance(color, str):
+        direct["color"] = color.upper()
+    size = direct.get("font_size_pt")
+    if type(size) in {int, float}:
+        direct["font_size_pt"] = float(size)
+    return direct
+
+
+def _verify_style_readback(
+    original_document: DocumentIR,
+    output_document: DocumentIR,
+    edit: EditOperation,
+) -> None:
+    if edit.target_node_id is None:
+        return
+    source_node = original_document.nodes.get(edit.target_node_id)
+    output_node = output_document.nodes.get(edit.target_node_id)
+    if (
+        source_node is None
+        or output_node is None
+        or not isinstance(source_node.payload, TextPayload)
+        or not isinstance(output_node.payload, TextPayload)
+    ):
+        _fail(
+            "docx.style.target_identity",
+            "DOCX style target did not survive as a text node.",
+            expected=edit.target_node_id,
+            actual=None,
+        )
+    run_index, _, expected_style = validate_text_style_update(
+        source_node.payload,
+        edit.payload,
+    )
+    actual_style = _direct_style(output_node.payload, run_index)
+    if actual_style != expected_style:
+        _fail(
+            "docx.style.readback",
+            "Patched DOCX direct run style did not read back correctly.",
+            expected=expected_style,
+            actual=actual_style,
+        )
 
 
 def verify_docx_output(
@@ -98,6 +152,7 @@ def verify_docx_output(
     output_document = read_docx_ir(BytesIO(output_bytes))
     edit_list = tuple(edits)
     edited_ids = {edit.target_node_id for edit in edit_list if edit.target_node_id}
+    style_edited_ids: set[str] = set()
     for edit in edit_list:
         if (
             edit.target_node_id is None
@@ -119,6 +174,9 @@ def verify_docx_output(
                 expected=expected_value,
                 actual=actual_value,
             )
+        if edit.type == "set_text_style":
+            _verify_style_readback(original_document, output_document, edit)
+            style_edited_ids.add(edit.target_node_id)
 
     _verify_native_subtrees(
         original_document,
@@ -150,31 +208,38 @@ def verify_docx_output(
             actual=changed_unrelated,
         )
 
-    return FidelityReport(
-        claimed_tier="high",
-        evidence=(
-            FidelityEvidence(
-                check_code="docx.package.inventory",
-                status=FidelityStatus.PASSED,
-                description="DOCX package member inventory is unchanged.",
+    evidence = [
+        FidelityEvidence(
+            check_code="docx.package.inventory",
+            status=FidelityStatus.PASSED,
+            description="DOCX package member inventory is unchanged.",
+        ),
+        FidelityEvidence(
+            check_code="docx.package.untouched_members",
+            status=FidelityStatus.PASSED,
+            description=(
+                "Untouched DOCX package members preserve identical uncompressed bytes."
             ),
+        ),
+        reopen_evidence,
+        FidelityEvidence(
+            check_code="docx.semantic.readback",
+            status=FidelityStatus.PASSED,
+            description="Requested DOCX edits read back with expected semantic values.",
+            affected_node_ids=tuple(sorted(edited_ids)),
+        ),
+    ]
+    if style_edited_ids:
+        evidence.append(
             FidelityEvidence(
-                check_code="docx.package.untouched_members",
+                check_code="docx.style.readback",
                 status=FidelityStatus.PASSED,
-                description=(
-                    "Untouched DOCX package members preserve identical "
-                    "uncompressed bytes."
-                ),
-            ),
-            reopen_evidence,
-            FidelityEvidence(
-                check_code="docx.semantic.readback",
-                status=FidelityStatus.PASSED,
-                description=(
-                    "Requested DOCX edits read back with expected semantic values."
-                ),
-                affected_node_ids=tuple(sorted(edited_ids)),
-            ),
+                description="Requested DOCX direct run styles read back exactly.",
+                affected_node_ids=tuple(sorted(style_edited_ids)),
+            )
+        )
+    evidence.extend(
+        [
             FidelityEvidence(
                 check_code="docx.native.unrelated_subtrees",
                 status=FidelityStatus.PASSED,
@@ -212,5 +277,7 @@ def verify_docx_output(
                     "Unedited DOCX semantic nodes retain identical semantic digests."
                 ),
             ),
-        ),
+        ]
     )
+
+    return FidelityReport(claimed_tier="high", evidence=tuple(evidence))

@@ -214,10 +214,15 @@ def _metadata_owners(
         if not ancestors:
             continue
         direct = _split_expanded(ancestors[0].metadata.get("xml.expanded_name"))
-        if direct is None or direct[0] != _DC_NS or direct[1] not in _SELECTED_METADATA:
+        if (
+            direct is None
+            or direct[0] != _DC_NS
+            or direct[1] not in _SELECTED_METADATA
+        ):
             continue
         if not any(
-            ancestor.metadata.get("xml.expanded_name") == _expanded(_OPF_NS, "metadata")
+            ancestor.metadata.get("xml.expanded_name")
+            == _expanded(_OPF_NS, "metadata")
             for ancestor in ancestors[1:]
         ):
             continue
@@ -329,7 +334,9 @@ def parse_epub_source(
         member_name="META-INF/container.xml",
         mimetype="application/xml",
     )
-    if getattr(container_root, "tag", None) != _expanded(_CONTAINER_NS, "container"):
+    if getattr(container_root, "tag", None) != _expanded(
+        _CONTAINER_NS, "container"
+    ):
         _fail(
             "epub.container.root",
             "EPUB container.xml has an invalid document element.",
@@ -380,7 +387,11 @@ def parse_epub_source(
     metadata_element = _direct_child(package_root, _OPF_NS, "metadata")
     manifest_element = _direct_child(package_root, _OPF_NS, "manifest")
     spine_element = _direct_child(package_root, _OPF_NS, "spine")
-    if metadata_element is None or manifest_element is None or spine_element is None:
+    if (
+        metadata_element is None
+        or manifest_element is None
+        or spine_element is None
+    ):
         _fail(
             "epub.package.structure",
             "EPUB package document requires metadata, manifest, and spine.",
@@ -389,7 +400,7 @@ def parse_epub_source(
     manifest: list[EpubManifestItemEvidence] = []
     by_id: dict[str, EpubManifestItemEvidence] = {}
     local_owners: dict[str, str] = {}
-    for index, element in enumerate(list(manifest_element)):
+    for element in list(manifest_element):
         if getattr(element, "tag", None) != _expanded(_OPF_NS, "item"):
             continue
         item_id = element.attrib.get("id")
@@ -425,7 +436,9 @@ def parse_epub_source(
                     second_item_id=item_id,
                 )
             local_owners[resolved_path] = item_id
-        properties = tuple(token for token in element.attrib.get("properties", "").split() if token)
+        properties = tuple(
+            token for token in element.attrib.get("properties", "").split() if token
+        )
         item = EpubManifestItemEvidence(
             index=len(manifest),
             item_id=item_id,

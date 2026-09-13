@@ -22,9 +22,12 @@ from ...ir.edits import EditOperation
 from ...ir.nodes import Node, TextPayload
 from ...ir.semantics import validate_edit_preconditions
 from ...ir.serialization import canonical_json_digest, validate_document
+from ..json.writer import patch_json
 from .lowering import lower_ipynb_cell_sources
+from .model import ParsedIpynbSource
 from .parser import parse_ipynb_source
 from .reader import read_ipynb_ir
+from .verification import verify_ipynb_candidate
 
 
 def _read_source_bytes(source_stream: BinaryIO) -> bytes:
@@ -132,7 +135,11 @@ def _source_node(document: DocumentIR, edit: EditOperation) -> Node:
         )
     node = document.nodes[edit.target_node_id]
     pointer = node.metadata.get("ipynb.source_pointer")
-    if node.kind != "text" or not isinstance(node.payload, TextPayload) or not isinstance(pointer, str):
+    if (
+        node.kind != "text"
+        or not isinstance(node.payload, TextPayload)
+        or not isinstance(pointer, str)
+    ):
         raise UnsupportedEditError(
             "IPYNB edit target must be a native cell-source text node.",
             details={"reason": "ipynb.target_not_cell_source"},
@@ -185,12 +192,18 @@ def _preflight_edits(
         if index in requested:
             raise UnsupportedEditError(
                 "IPYNB edit set contains a duplicate cell-source target.",
-                details={"reason": "ipynb.source.duplicate_target", "cell_index": index},
+                details={
+                    "reason": "ipynb.source.duplicate_target",
+                    "cell_index": index,
+                },
             )
         if value == node.payload.text:
             raise UnsupportedEditError(
                 "IPYNB cell-source edit is a semantic no-op.",
-                details={"reason": "ipynb.source.semantic_noop", "cell_index": index},
+                details={
+                    "reason": "ipynb.source.semantic_noop",
+                    "cell_index": index,
+                },
             )
         requested[index] = value
     return requested
@@ -219,11 +232,54 @@ def _zero_edit_result(bytes_written: int) -> WriterResult:
     )
 
 
+def _mutation_result(bytes_written: int) -> WriterResult:
+    return WriterResult(
+        format="ipynb",
+        mode="patch",
+        bytes_written=bytes_written,
+        fidelity=FidelityReport(
+            claimed_tier="high",
+            evidence=(
+                FidelityEvidence(
+                    check_code="ipynb.source_authority",
+                    status=FidelityStatus.PASSED,
+                    description="Source SHA-256 and byte size matched the IPYNB authority.",
+                ),
+                FidelityEvidence(
+                    check_code="ipynb.native_evidence",
+                    status=FidelityStatus.PASSED,
+                    description="Fresh notebook IR matched recorded native evidence before mutation.",
+                ),
+                FidelityEvidence(
+                    check_code="ipynb.json_scalar_lowering",
+                    status=FidelityStatus.PASSED,
+                    description="Cell-source edits lowered only to existing H3 JSON scalar targets.",
+                ),
+                FidelityEvidence(
+                    check_code="ipynb.untouched_bytes",
+                    status=FidelityStatus.PASSED,
+                    description="H3 proved all bytes outside authorized JSON scalar spans stayed exact.",
+                ),
+                FidelityEvidence(
+                    check_code="ipynb.candidate_reread",
+                    status=FidelityStatus.PASSED,
+                    description="Candidate notebook passed H6 semantic and preservation verification.",
+                ),
+            ),
+        ),
+    )
+
+
 def _prepare_ipynb_mutation(
     document: DocumentIR,
     source: bytes,
     edits: Sequence[EditOperation],
-) -> tuple[Mapping[int, str], DocumentIR, tuple[EditOperation, ...]]:
+) -> tuple[
+    ParsedIpynbSource,
+    Mapping[int, str],
+    DocumentIR,
+    tuple[EditOperation, ...],
+]:
     encoding = _recorded_encoding(document)
     _validate_fresh_native_evidence(document, source, encoding=encoding)
     requested = _preflight_edits(document, edits)
@@ -234,7 +290,7 @@ def _prepare_ipynb_mutation(
             "IPYNB mutation produced no authorized JSON scalar changes.",
             details={"reason": "ipynb.lowering.empty"},
         )
-    return requested, shadow, lowered
+    return parsed, requested, shadow, lowered
 
 
 def patch_ipynb(
@@ -253,8 +309,24 @@ def patch_ipynb(
         output.write(source)
         return _zero_edit_result(len(source))
 
-    _prepare_ipynb_mutation(document, source, edits)
-    raise UnsupportedEditError(
-        "IPYNB mutation is not emitted until H6 candidate verification is integrated.",
-        details={"reason": "ipynb.candidate_verification.pending"},
+    original, requested, shadow, lowered = _prepare_ipynb_mutation(
+        document,
+        source,
+        edits,
     )
+    internal = BytesIO()
+    patch_json(
+        shadow,
+        BytesIO(source),
+        internal,
+        edits=lowered,
+    )
+    candidate = internal.getvalue()
+    verify_ipynb_candidate(
+        original,
+        candidate,
+        encoding=original.representation.encoding,
+        requested=requested,
+    )
+    output.write(candidate)
+    return _mutation_result(len(candidate))

@@ -14,7 +14,7 @@
 
 - H8 starts from exact-green H7 completion head `dbb016db4797c5646e863735764243d0e5c5b2a7`.
 - H7 completion authority is immutable; do not add commits to `phase-h7-epub-package-preservation`.
-- Do not modify `packages/markitdown/src/markitdown/converters/_zip_converter.py`.
+- Do not modify `packages/markitdown/src/markitdown/converters/_zip_converter.py`; H8 base blob SHA is `3d388a7812aa6e62dcf24751a9d092144703a6b8` and must remain unchanged.
 - Do not change one-way converter registration or dispatch order.
 - Do not add `replace_zip_member`, `write_zip_member`, or another arbitrary member-bytes mutation operation.
 - ZIP structural nodes remain read-only in H8 tranche one.
@@ -96,7 +96,10 @@ def make_zip(
     archive_comment: bytes = b"",
     per_member_compression: Mapping[str, int] | None = None,
 ) -> bytes:
-    members = members or {"docs/readme.txt": b"hello\n", "data/config.json": b'{"name":"Ada"}\n'}
+    members = members or {
+        "docs/readme.txt": b"hello\n",
+        "data/config.json": b'{"name":"Ada"}\n',
+    }
     per_member_compression = per_member_compression or {}
     output = BytesIO()
     with ZipFile(output, "w") as archive:
@@ -123,13 +126,19 @@ def test_zip_snapshot_records_ordered_inventory_and_member_digests() -> None:
         "docs/readme.txt",
         "data/config.json",
     )
-    assert snapshot.entry_by_name["docs/readme.txt"].uncompressed_sha256 == sha256(b"hello\n").hexdigest()
+    assert (
+        snapshot.entry_by_name["docs/readme.txt"].uncompressed_sha256
+        == sha256(b"hello\n").hexdigest()
+    )
 ```
 
 - [ ] **Step 3: Add fail-closed package RED matrix.**
 
 ```python
-@pytest.mark.parametrize("name", ["../escape", "/absolute", "C:/drive", "dir\\evil", "a/../evil"])
+@pytest.mark.parametrize(
+    "name",
+    ["../escape", "/absolute", "C:/drive", "dir\\evil", "a/../evil"],
+)
 def test_zip_unsafe_member_paths_fail_closed(name: str) -> None:
     with pytest.raises(ZipParseError):
         snapshot_zip_package(make_zip(members={name: b"x"}))
@@ -141,7 +150,7 @@ def test_zip_bzip2_member_fails_closed() -> None:
         snapshot_zip_package(source)
 ```
 
-Add explicit tests in the same file for duplicate names, symlink mode, encryption flag, member-count limit, per-member size, archive total size, compression ratio, and malformed ZIP bytes. Each assertion must require `ZipParseError` and a stable `reason` prefix under `zip.package.*`.
+In the same file add concrete tests named `test_duplicate_member_names_fail_closed`, `test_symlink_member_fails_closed`, `test_encrypted_member_fails_closed`, `test_member_count_limit_fails_closed`, `test_member_size_limit_fails_closed`, `test_archive_total_size_limit_fails_closed`, `test_compression_ratio_limit_fails_closed`, and `test_malformed_zip_fails_closed`. Each must require `ZipParseError` and assert a stable `reason` prefix under `zip.package.*`.
 
 - [ ] **Step 4: Add zero-edit/sparse candidate RED contracts.**
 
@@ -155,7 +164,11 @@ def test_zip_candidate_zero_replacements_returns_exact_source_bytes() -> None:
 def test_zip_candidate_replaces_only_known_regular_member() -> None:
     source = make_zip()
     snapshot = snapshot_zip_package(source)
-    candidate = build_zip_candidate(snapshot, source, replacements={"docs/readme.txt": b"updated\n"})
+    candidate = build_zip_candidate(
+        snapshot,
+        source,
+        replacements={"docs/readme.txt": b"updated\n"},
+    )
     with ZipFile(BytesIO(candidate), "r") as archive:
         assert archive.read("docs/readme.txt") == b"updated\n"
         assert archive.read("data/config.json") == b'{"name":"Ada"}\n'
@@ -259,14 +272,14 @@ git commit -m "feat: add safe H8 ZIP package authority"
 - Extend: `packages/markitdown/src/markitdown/twoways/formats/zip/model.py`
 
 **Interfaces:**
-- `ZipMemberAdapter(key: str, extensions: frozenset[str], probe: Callable[[bytes, str], bool], read: Callable[[bytes, str], DocumentIR], patch: Callable[[DocumentIR, bytes, Sequence[EditOperation]], bytes], strong_package: bool = False)`.
+- `ZipMemberAdapter(key: str, extensions: frozenset[str], probe: Callable[[bytes, str], bool], read: Callable[[bytes, str], DocumentIR], patch: Callable[[DocumentIR, bytes, Sequence[EditOperation]], bytes], strong_package: bool = False)`. Registry patch callables are wrappers around existing stream-oriented writers: they allocate an internal `BytesIO`, call the existing `patch_*`, and return the resulting bytes only after that inner writer succeeds.
 - `default_zip_member_adapters() -> tuple[ZipMemberAdapter, ...]` returns deterministic priority order.
 - Strong package keys first: `epub`, `docx`, `pptx`, `xlsx`; ordinary `zip` is fallback after all strong probes decline.
 - `ZipBudgetState(global_members: int = 0, global_expanded_bytes: int = 0)` is mutable internal traversal state, never public API.
 - `ZipMemberClassification(state: Literal["typed", "opaque", "ambiguous"], adapter_key: str | None, probes: tuple[str, ...], reason_code: str | None)`.
 - `ZipMemberChain(parts: tuple[str, ...])` canonical tuple identity.
 - `ZipParsedMember(entry, chain, classification, nested_archive: ParsedZipSource | None, inner_document: DocumentIR | None)`.
-- `ParsedZipSource(snapshot, members, depth)`.
+- `ParsedZipSource(snapshot, members, depth, diagnostics: tuple[Diagnostic, ...])` where diagnostics use the existing `markitdown.twoways.ir.document.Diagnostic` type.
 - `parse_zip_source(source: bytes, *, filename: str | None = None, limits: ZipRecursiveLimits | None = None, adapters: Sequence[ZipMemberAdapter] | None = None) -> ParsedZipSource`.
 
 - [ ] **Step 1: Add test-only RED for strong package priority and ordinary ZIP fallback.**
@@ -302,7 +315,10 @@ def test_two_non_equivalent_strong_claims_are_ambiguous() -> None:
         fake_adapter("strong-a", claim=True, strong_package=True),
         fake_adapter("strong-b", claim=True, strong_package=True),
     )
-    parsed = parse_zip_source(make_zip(members={"x.bin": b"payload"}), adapters=adapters)
+    parsed = parse_zip_source(
+        make_zip(members={"x.bin": b"payload"}),
+        adapters=adapters,
+    )
     member = parsed.member_by_chain[("x.bin",)]
     assert member.classification.state == "ambiguous"
     assert member.classification.reason_code == "zip.member.ambiguous_format"
@@ -317,10 +333,13 @@ def test_global_member_budget_is_shared_across_nested_archives() -> None:
     source = make_zip(members={"a.zip": nested_a, "b.zip": nested_b})
     limits = ZipRecursiveLimits(max_global_members=4)
     parsed = parse_zip_source(source, limits=limits)
-    assert any(d.code == "zip.recursion.member_budget_exceeded" for d in parsed.diagnostics)
+    assert any(
+        diagnostic.code == "zip.recursion.member_budget_exceeded"
+        for diagnostic in parsed.diagnostics
+    )
 ```
 
-Depth exhaustion should keep the affected nested member opaque/read-only, not make unrelated safe siblings disappear. Global byte/member budget exhaustion must be deterministic and must not recurse beyond the limit.
+Depth exhaustion and global recursive budget exhaustion do not normalize or partially descend through the affected child. The affected child becomes opaque/read-only with a stable diagnostic while already-validated independent siblings remain represented. No member beyond the exhausted budget is classified writable.
 
 - [ ] **Step 4: Commit Task 3 RED tests and observe intended missing-module/API failure.**
 
@@ -333,9 +352,7 @@ Expected: RED because `registry.py` / `parser.py` APIs are missing.
 
 - [ ] **Step 5: Implement adapter registry without using the one-way converter registry.**
 
-Build explicit entries around existing public two-way functions/classes from:
-`formats.text`, `csv`, `json`, `xml`, `html`, `ipynb`, `epub`, `docx`, `pptx`, `xlsx`.
-For strong package probes, use package-level evidence/readers, not extension alone. The `zip` fallback probe calls `snapshot_zip_package` only after strong probes decline.
+Build explicit entries around existing public two-way functions/classes from `formats.text`, `csv`, `json`, `xml`, `html`, `ipynb`, `epub`, `docx`, `pptx`, `xlsx`. Each `read` wrapper passes member bytes through `BytesIO` and the member basename/extension as the format reader expects. Each `patch` wrapper constructs an internal `BytesIO` destination and calls the format's existing `patch_*` function. For strong package probes, use package-level evidence/readers, not extension alone. The `zip` fallback probe calls `snapshot_zip_package` only after strong probes decline.
 
 - [ ] **Step 6: Implement recursive parser with shared budget object.**
 
@@ -365,7 +382,7 @@ git commit -m "feat: add recursive H8 ZIP classification"
 - Root `Canvas(kind="archive")`, semantic role `zip-archive`.
 - Deterministic namespaced IDs: `sha256(canonical_json(["zip", member_chain, adapter_key, inner_canvas_or_node_id]))`-derived labels.
 - Nested canvases preserve original `kind`, `name`, width/height/unit and root topology while getting new deterministic canvas IDs and H8 routing metadata.
-- Imported nested nodes preserve payload/semantic role/native locator/provenance/capabilities, but all imported node/canvas/parent/child references are rewritten to namespaced IDs.
+- Imported nested nodes preserve payload/semantic role/native locator/provenance/capabilities. Build complete old->new canvas/node ID maps first; rewrite every node `canvas_id`, `parent_id`, `children`, every canvas `root_node_ids`, and outer relationships that point at imported nodes. For each imported inner root node, set its namespaced `parent_id` to the owning ZIP member structural node while keeping it in the corresponding namespaced nested canvas `root_node_ids`.
 
 - [ ] **Step 1: Add RED for root/archive/member structure and deterministic IDs.**
 
@@ -374,19 +391,27 @@ def test_zip_reader_builds_deterministic_archive_tree() -> None:
     source = make_zip()
     first = read_zip_ir(BytesIO(source), filename="bundle.zip")
     second = read_zip_ir(BytesIO(source), filename="bundle.zip")
-    assert first == second
+    assert canonical_json_digest(first) == canonical_json_digest(second)
     assert first.source is not None and first.source.format == "zip"
     assert first.canvases[0].kind == "archive"
     assert first.nodes[first.root_node_ids[0]].semantic_role == "zip-archive"
 ```
 
-- [ ] **Step 2: Add RED for nested multi-canvas preservation.**
+- [ ] **Step 2: Add RED for nested multi-canvas preservation using the existing XLSX fixture.**
 
-Use a small XLSX fixture already available in two-way tests or construct one through the existing fixture helper. Assert each inner worksheet canvas becomes one namespaced outer canvas and its root node remains attached to that canvas; do not flatten all worksheet nodes into the archive canvas.
+Import `make_xlsx` from `packages/markitdown/tests/twoways/_xlsx_fixtures.py`. That helper produces two worksheet canvases named `Data` and `Other`, as already asserted by `test_xlsx_reader.py`.
 
 ```python
-assert [canvas.kind for canvas in document.canvases].count("worksheet") == inner_sheet_count
-assert all(canvas.metadata["zip.member_chain"] == ("book.xlsx",) for canvas in document.canvases if canvas.kind == "worksheet")
+def test_nested_xlsx_preserves_namespaced_worksheet_canvases() -> None:
+    source = make_zip(members={"book.xlsx": make_xlsx()})
+    document = read_zip_ir(BytesIO(source))
+    worksheet_canvases = [c for c in document.canvases if c.kind == "worksheet"]
+    assert [c.name for c in worksheet_canvases] == ["Data", "Other"]
+    assert all(c.metadata["zip.member_chain"] == ("book.xlsx",) for c in worksheet_canvases)
+    member = next(n for n in document.nodes.values() if n.metadata.get("zip.member_path") == "book.xlsx")
+    imported_roots = {root for c in worksheet_canvases for root in c.root_node_ids}
+    assert imported_roots.issubset(set(member.children))
+    assert all(document.nodes[root].parent_id == member.node_id for root in imported_roots)
 ```
 
 - [ ] **Step 3: Add RED for capability propagation and ZIP structural read-only behavior.**
@@ -395,7 +420,11 @@ assert all(canvas.metadata["zip.member_chain"] == ("book.xlsx",) for canvas in d
 def test_nested_json_writable_capability_survives_routing_boundary() -> None:
     source = make_zip(members={"data.json": b'{"name":"Ada"}'})
     document = read_zip_ir(BytesIO(source))
-    target = next(node for node in document.nodes.values() if node.metadata.get("json.pointer") == "/name")
+    target = next(
+        node
+        for node in document.nodes.values()
+        if node.metadata.get("json.pointer") == "/name"
+    )
     decision = capabilities_for_node(target).for_operation("replace_json_scalar")
     assert decision.state is CapabilityState.WRITABLE
     assert target.metadata["zip.member_chain"] == ("data.json",)
@@ -403,9 +432,19 @@ def test_nested_json_writable_capability_survives_routing_boundary() -> None:
 
 def test_archive_and_member_structure_are_read_only() -> None:
     document = read_zip_ir(BytesIO(make_zip()))
-    structure = [n for n in document.nodes.values() if n.semantic_role in {"zip-archive", "zip-member"}]
+    structure = [
+        node
+        for node in document.nodes.values()
+        if node.semantic_role in {"zip-archive", "zip-member"}
+    ]
     assert structure
-    assert all(not any(d.state is CapabilityState.WRITABLE for d in capabilities_for_node(n).decisions) for n in structure)
+    assert all(
+        not any(
+            decision.state is CapabilityState.WRITABLE
+            for decision in capabilities_for_node(node).decisions
+        )
+        for node in structure
+    )
 ```
 
 - [ ] **Step 4: Commit reader RED tests and observe missing `read_zip_ir` / `ZipIRReader`.**
@@ -418,7 +457,7 @@ cd packages/markitdown && hatch test -py=3.11 tests/twoways/test_zip_reader.py -
 
 - [ ] **Step 5: Implement namespaced import helpers and root reader.**
 
-Create helpers `_namespace_canvas_id(chain, adapter_key, inner_canvas_id)`, `_namespace_node_id(...)`, `_import_inner_document(...)`. Preserve all inner node references by building complete old->new maps before materializing nodes/canvases. Add immutable routing metadata keys: `zip.member_chain`, `zip.adapter_key`, `zip.inner_document_id`, `zip.inner_node_id`, `zip.inner_source_sha256`, `zip.inner_source_size`, `zip.identity_markdown=False`.
+Create helpers `_namespace_canvas_id(chain, adapter_key, inner_canvas_id)`, `_namespace_node_id(chain, adapter_key, inner_node_id)`, and `_import_inner_document(...)`. Preserve all inner references by building complete old->new maps before materializing nodes/canvases. Add immutable routing metadata keys: `zip.member_chain`, `zip.adapter_key`, `zip.inner_document_id`, `zip.inner_node_id`, `zip.inner_source_sha256`, `zip.inner_source_size`, `zip.identity_markdown=False`.
 
 - [ ] **Step 6: Implement `ZipIRReader` acceptance/probe without consuming stream position.**
 
@@ -457,25 +496,52 @@ git commit -m "feat: add recursive H8 ZIP DocumentIR reader"
 def test_forged_member_chain_fails_before_output() -> None:
     source = make_zip(members={"data.json": b'{"name":"Ada"}'})
     document = read_zip_ir(BytesIO(source))
-    target = next(node for node in document.nodes.values() if node.metadata.get("json.pointer") == "/name")
-    forged = replace_node_metadata(document, target.node_id, {**target.metadata, "zip.member_chain": ("other.json",)})
+    target = next(
+        node
+        for node in document.nodes.values()
+        if node.metadata.get("json.pointer") == "/name"
+    )
+    forged = replace_node_metadata(
+        document,
+        target.node_id,
+        {**target.metadata, "zip.member_chain": ("other.json",)},
+    )
     output = BytesIO()
     with pytest.raises(PatchPreconditionError):
-        patch_zip(forged, BytesIO(source), output, edits=(replace_json_edit(target.node_id, "Nolane"),))
+        patch_zip(
+            forged,
+            BytesIO(source),
+            output,
+            edits=(replace_json_edit(target.node_id, "Nolane"),),
+        )
     assert output.getvalue() == b""
 ```
 
-Add equivalent tests for stale root SHA/size, stale intermediate nested-member digest, adapter reclassification drift, unknown target, operation not advertised by the fresh inner node, duplicate logical target and contradictory edits.
+In the same routing file add tests named `test_stale_root_source_fails_before_output`, `test_stale_intermediate_member_digest_fails_before_output`, `test_adapter_reclassification_fails_before_output`, `test_unknown_target_fails_before_output`, `test_fresh_inner_read_only_target_fails_before_output`, `test_duplicate_logical_target_fails_before_output`, and `test_contradictory_edits_fail_before_output`.
 
 - [ ] **Step 2: Add writer RED for one-level typed mutation and zero-edit exact identity.**
 
 ```python
 def test_nested_json_edit_is_target_only_and_transactional() -> None:
-    source = make_zip(members={"data.json": b'{"name":"Ada","count":1}\n', "note.txt": b"keep\n"})
+    source = make_zip(
+        members={
+            "data.json": b'{"name":"Ada","count":1}\n',
+            "note.txt": b"keep\n",
+        }
+    )
     document = read_zip_ir(BytesIO(source))
-    target = next(node for node in document.nodes.values() if node.metadata.get("json.pointer") == "/name")
+    target = next(
+        node
+        for node in document.nodes.values()
+        if node.metadata.get("json.pointer") == "/name"
+    )
     output = BytesIO()
-    result = patch_zip(document, BytesIO(source), output, edits=(replace_json_edit(target.node_id, "Nolane"),))
+    result = patch_zip(
+        document,
+        BytesIO(source),
+        output,
+        edits=(replace_json_edit(target.node_id, "Nolane"),),
+    )
     candidate = output.getvalue()
     with ZipFile(BytesIO(candidate), "r") as archive:
         assert archive.read("data.json") == b'{"name":"Nolane","count":1}\n'
@@ -494,24 +560,30 @@ def test_zip_zero_edit_write_is_exact_source_bytes() -> None:
 
 - [ ] **Step 3: Add recursive propagation RED.**
 
-Create outer ZIP -> nested ZIP -> JSON. Edit JSON scalar and assert only the member-chain archives change while all sibling members at both levels preserve uncompressed SHA exactly. Add a second test with edits in two sibling branches to prove complete-set preflight and deterministic upward propagation.
+Create outer ZIP -> nested ZIP -> JSON using `_zip_fixtures.make_zip`. Edit the JSON scalar and assert only the member-chain archives change while all sibling members at both levels preserve uncompressed SHA exactly. Add `test_edits_across_two_nested_branches_commit_as_one_transaction` using two sibling nested ZIPs to prove complete-set preflight and deterministic upward propagation.
 
 - [ ] **Step 4: Add rollback RED.**
 
 ```python
 def test_one_inner_failure_rolls_back_all_sibling_edits() -> None:
-    source = two_editable_member_zip()
+    source, good_edit, stale_edit = make_two_member_rollback_case()
     document = read_zip_ir(BytesIO(source))
-    good, stale = build_good_and_stale_edits(document)
     output = BytesIO()
     with pytest.raises(PatchPreconditionError):
-        patch_zip(document, BytesIO(source), output, edits=(good, stale))
+        patch_zip(
+            document,
+            BytesIO(source),
+            output,
+            edits=(good_edit(document), stale_edit(document)),
+        )
     assert output.getvalue() == b""
 ```
 
+Define `make_two_member_rollback_case` in `test_zip_writer.py` as a local test helper so no undefined fixture is carried across files.
+
 - [ ] **Step 5: Add final verifier RED for unauthorized sibling drift.**
 
-Construct a candidate that contains the requested target edit but also changes an untouched sibling. `verify_zip_candidate` must reject it with `ZipParseError`/verification-specific error and never allow caller emission.
+Construct a candidate that contains the requested target edit but also changes an untouched sibling via `build_zip_candidate`. `verify_zip_candidate` must reject it and no caller-facing writer path may emit bytes after that rejection.
 
 - [ ] **Step 6: Commit Task 5 RED tests and record intended missing-module/API failures.**
 
@@ -523,11 +595,11 @@ cd packages/markitdown && hatch test -py=3.11 tests/twoways/test_zip_routing.py 
 
 - [ ] **Step 7: Implement fresh edit routing.**
 
-`resolve_zip_edit` must compare the recorded outer document with a fresh recursive parse, walk the exact chain, verify every intermediate member SHA/size, reclassify the terminal bytes, fresh-read the inner document, resolve `zip.inner_node_id`, require matching operation capability, and construct a new inner `EditOperation` targeting the fresh inner node. Preserve operation-specific payload/precondition semantics; H8-only routing preconditions are validated at H8 and not incorrectly forwarded.
+`resolve_zip_edit` must compare the recorded outer document with a fresh recursive parse, walk the exact chain, verify every intermediate member SHA/size, reclassify the terminal bytes, fresh-read the inner document, resolve `zip.inner_node_id`, require matching operation capability, and construct a new inner `EditOperation` targeting the fresh inner node. Preserve operation-specific payload/precondition semantics; H8-only routing preconditions are validated at H8 and are not forwarded as malformed inner native preconditions.
 
 - [ ] **Step 8: Implement recursive grouped transaction.**
 
-Group routed edits by terminal member chain. Invoke the selected existing inner patch function into `BytesIO`. For nested ordinary ZIP terminal members, recursion remains H8 and uses the same limit policy. Build a replacement map bottom-up: terminal bytes -> parent sparse candidate -> grandparent sparse candidate -> root candidate. Never write caller destination during this phase.
+Group routed edits by terminal member chain. Invoke the selected existing inner patch wrapper into an internal buffer. For nested ordinary ZIP members, recurse using the same H8 limits and a transaction-local shared policy. Build a replacement map bottom-up: terminal bytes -> parent sparse candidate -> grandparent sparse candidate -> root candidate. Never write caller destination during this phase.
 
 - [ ] **Step 9: Implement final recursive verifier.**
 
@@ -535,8 +607,7 @@ Fresh-parse candidate with the same limits and require exact root/nested ordered
 
 - [ ] **Step 10: Implement `WriterResult` fidelity.**
 
-Zero edits: `exact-preserve`. Mutation: `high` with evidence names at minimum:
-`zip.source_authority`, `zip.member_chain_authority`, `zip.inner_writer_verification`, `zip.ordered_inventory`, `zip.untouched_member_content`, `zip.recursive_candidate_reread`, `zip.global_budget_recheck`.
+Zero edits: `exact-preserve`. Mutation: `high` with evidence names at minimum: `zip.source_authority`, `zip.member_chain_authority`, `zip.inner_writer_verification`, `zip.ordered_inventory`, `zip.untouched_member_content`, `zip.recursive_candidate_reread`, `zip.global_budget_recheck`.
 
 - [ ] **Step 11: Run routing/writer/verifier tests GREEN and commit production.**
 
@@ -558,7 +629,7 @@ git commit -m "feat: add transactional recursive H8 ZIP writer"
 - Create: `packages/markitdown/src/markitdown/twoways/formats/zip/writer_adapter.py`
 - Create: `packages/markitdown/src/markitdown/twoways/formats/zip/__init__.py`
 - Modify only if a RED test proves required: smallest existing identity Markdown projection surface; do not create ZIP Markdown importer mutations.
-- Protected unchanged: `packages/markitdown/src/markitdown/converters/_zip_converter.py`.
+- Protected unchanged: `packages/markitdown/src/markitdown/converters/_zip_converter.py`, base blob SHA `3d388a7812aa6e62dcf24751a9d092144703a6b8`.
 
 **Interfaces:**
 - `ZipPatchWriter(DocumentWriter)` mirrors `EpubPatchWriter`: accepts source format `zip` and target `.zip`/format `zip`; `write` requires `source_stream=` and `edits=`, optionally `limits=`.
@@ -577,6 +648,7 @@ def test_zip_public_format_surface() -> None:
         patch_zip,
         read_zip_ir,
     )
+
     assert ZipIRReader and ZipPatchWriter and ZipParseError and ZipRecursiveLimits
     assert parse_zip_source and patch_zip and read_zip_ir
 ```
@@ -587,7 +659,7 @@ Project an H8 document using the existing identity projection path. Assert neste
 
 - [ ] **Step 3: Add one-way regression lock.**
 
-Lock the protected converter source blob/digest at the H8 base and add a behavior test showing one-way `ZipConverter` still delegates members through normal MarkItDown conversion and skips unsupported member conversions. Do not import H8 two-way registry into `_zip_converter.py`.
+Read `packages/markitdown/src/markitdown/converters/_zip_converter.py` and assert its blob SHA remains exactly `3d388a7812aa6e62dcf24751a9d092144703a6b8`. Add a behavior test showing one-way `ZipConverter` still iterates members, delegates each readable member through normal `MarkItDown.convert_stream`, skips `UnsupportedFormatException` / `FileConversionException`, and combines successful member Markdown with `## File: <member>` headings. Do not import H8 registry code into the protected converter.
 
 - [ ] **Step 4: Commit RED tests and observe missing facade/adapter failure.**
 
@@ -601,13 +673,26 @@ cd packages/markitdown && hatch test -py=3.11 tests/twoways/test_zip_public_impo
 
 ```python
 class ZipPatchWriter(DocumentWriter):
-    def accepts(self, document: DocumentIR, target: TargetInfo, **kwargs: Any) -> bool:
+    def accepts(
+        self,
+        document: DocumentIR,
+        target: TargetInfo,
+        **kwargs: Any,
+    ) -> bool:
         del kwargs
         source_format = document.source.format if document.source is not None else None
         extension = (target.extension or "").lower()
-        return source_format == "zip" and (target.format.lower() == "zip" or extension == ".zip")
+        return source_format == "zip" and (
+            target.format.lower() == "zip" or extension == ".zip"
+        )
 
-    def write(self, document: DocumentIR, output: BinaryIO, target: TargetInfo, **kwargs: Any) -> WriterResult:
+    def write(
+        self,
+        document: DocumentIR,
+        output: BinaryIO,
+        target: TargetInfo,
+        **kwargs: Any,
+    ) -> WriterResult:
         del target
         source_stream = kwargs.pop("source_stream", None)
         edits = kwargs.pop("edits", None)
@@ -616,7 +701,13 @@ class ZipPatchWriter(DocumentWriter):
             raise TypeError("ZipPatchWriter.write requires source_stream= and edits=")
         if kwargs:
             raise TypeError(f"unexpected ZIP writer options: {sorted(kwargs)}")
-        return patch_zip(document, source_stream, output, edits=tuple(edits), limits=limits)
+        return patch_zip(
+            document,
+            source_stream,
+            output,
+            edits=tuple(edits),
+            limits=limits,
+        )
 ```
 
 - [ ] **Step 6: Run public/Markdown/one-way tests GREEN and commit.**
@@ -659,13 +750,13 @@ hatch test -py=3.11 \
 
 - [ ] **Step 2: Audit every spec security boundary and add only missing adversarial tests.**
 
-The audit checklist is exact: nested traversal, absolute/drive/backslash paths, duplicate names, symlink, encryption, BZIP2/LZMA rejection, malformed archive, member limit, per-member bytes, per-archive bytes, global members, global expanded bytes, compression ratio, depth exhaustion, nested bomb, stale chain digest, stale classification, forged routing metadata, duplicate/conflicting edit targets, unauthorized sibling drift, inner failure rollback, final verification rollback. For any uncovered item, first add one focused RED test and observe RED before modifying production.
+The exact audit checklist is: nested traversal; absolute/drive/backslash paths; duplicate names; symlink; encryption; BZIP2/LZMA rejection; malformed archive; per-archive member limit; per-member bytes; per-archive bytes; global members; global expanded bytes; compression ratio; depth exhaustion; nested bomb; stale chain digest; stale classification; forged routing metadata; duplicate/conflicting edit targets; unauthorized sibling drift; inner failure rollback; final verification rollback. For any uncovered item, first add one focused RED test and observe RED before modifying production.
 
 - [ ] **Step 3: Add `TWOWAYS.md` H8 section before final CI.**
 
-Document: recursive composition, typed inner operations, strong-package priority, global budgets, namespaced nested canvases/nodes, ZIP structure read-only, exact zero-edit identity, high-fidelity mutated archive preservation, inspection-only Markdown, unsupported formats/structural edits, and protected unchanged one-way ZipConverter. Update current capability matrix to include H8 ZIP.
+Document recursive composition, typed inner operations, strong-package priority, global budgets, namespaced nested canvases/nodes, ZIP structure read-only, exact zero-edit identity, high-fidelity mutated archive preservation, inspection-only Markdown, unsupported formats/structural edits, and protected unchanged one-way `ZipConverter`. Update the current capability matrix to include H8 ZIP.
 
-- [ ] **Step 4: Perform exact H7→H8 scope audit.**
+- [ ] **Step 4: Perform exact H7->H8 scope audit.**
 
 ```bash
 git diff --name-status dbb016db4797c5646e863735764243d0e5c5b2a7...HEAD

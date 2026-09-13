@@ -67,8 +67,10 @@ def _structural_member_nodes(document: DocumentIR) -> dict[tuple[str, ...], Node
         if node.semantic_role != "zip-member":
             continue
         chain = node.metadata.get("zip.member_chain")
-        if not isinstance(chain, tuple) or not chain or not all(
-            isinstance(part, str) and part for part in chain
+        if (
+            not isinstance(chain, tuple)
+            or not chain
+            or not all(isinstance(part, str) and part for part in chain)
         ):
             continue
         if chain in result:
@@ -136,8 +138,10 @@ def resolve_zip_edit(
     validate_edit_preconditions(document, target, edit, format_label="zip")
 
     chain = target.metadata.get("zip.member_chain")
-    if not isinstance(chain, tuple) or not chain or not all(
-        isinstance(part, str) and part for part in chain
+    if (
+        not isinstance(chain, tuple)
+        or not chain
+        or not all(isinstance(part, str) and part for part in chain)
     ):
         _fail(
             "member_chain_metadata",

@@ -4,25 +4,30 @@ from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
 
-CONTAINER_XML = b'''<?xml version="1.0" encoding="UTF-8"?>
+CONTAINER_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
   <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
-</container>'''
+</container>"""
 
-XHTML = b'''<?xml version="1.0" encoding="UTF-8"?>
+XHTML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:svg="http://www.w3.org/2000/svg" xmlns:m="http://www.w3.org/1998/Math/MathML">
   <head><title>Chapter</title><style>.x { color: red; }</style></head>
   <body><p>Hello <span>world</span></p><script>blocked()</script><svg:svg><svg:text>vector</svg:text></svg:svg><m:math><m:mi>x</m:mi></m:math></body>
-</html>'''
+</html>"""
 
-NAV_XHTML = b'''<?xml version="1.0" encoding="UTF-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Nav</title></head><body><nav epub:type="toc"><ol><li><a href="chapter.xhtml">Chapter One</a></li></ol></nav></body></html>'''
+NAV_XHTML = b"""<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Nav</title></head><body><nav epub:type="toc"><ol><li><a href="chapter.xhtml">Chapter One</a></li></ol></nav></body></html>"""
 
 
-def _opf(*, version: str = "3.0", duplicate_manifest_id: bool = False, broken_spine: bool = False) -> bytes:
+def _opf(
+    *,
+    version: str = "3.0",
+    duplicate_manifest_id: bool = False,
+    broken_spine: bool = False,
+) -> bytes:
     second_id = "chapter" if duplicate_manifest_id else "nav"
     spine_id = "missing" if broken_spine else "chapter"
-    return f'''<?xml version="1.0" encoding="UTF-8"?>
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" version="{version}" unique-identifier="book-id">
   <metadata>
     <dc:identifier id="book-id">urn:uuid:book-1</dc:identifier>
@@ -38,7 +43,7 @@ def _opf(*, version: str = "3.0", duplicate_manifest_id: bool = False, broken_sp
     <item id="cover" href="cover.png" media-type="image/png"/>
   </manifest>
   <spine><itemref idref="{spine_id}"/></spine>
-</package>'''.encode("utf-8")
+</package>""".encode("utf-8")
 
 
 def _zip_info(name: str, *, compression: int, extra: bytes = b"") -> ZipInfo:
@@ -69,20 +74,38 @@ def make_epub(
 
     members: list[tuple[ZipInfo, bytes]] = [
         (_zip_info("META-INF/container.xml", compression=ZIP_DEFLATED), container),
-        (_zip_info("OEBPS/content.opf", compression=ZIP_DEFLATED), _opf(version=version, duplicate_manifest_id=duplicate_manifest_id, broken_spine=broken_spine)),
+        (
+            _zip_info("OEBPS/content.opf", compression=ZIP_DEFLATED),
+            _opf(
+                version=version,
+                duplicate_manifest_id=duplicate_manifest_id,
+                broken_spine=broken_spine,
+            ),
+        ),
         (_zip_info("OEBPS/chapter.xhtml", compression=ZIP_DEFLATED), XHTML),
         (_zip_info("OEBPS/nav.xhtml", compression=ZIP_DEFLATED), NAV_XHTML),
-        (_zip_info("OEBPS/style.css", compression=ZIP_DEFLATED), b"body { margin: 1em; }"),
+        (
+            _zip_info("OEBPS/style.css", compression=ZIP_DEFLATED),
+            b"body { margin: 1em; }",
+        ),
         (_zip_info("OEBPS/cover.png", compression=ZIP_STORED), b"\x89PNG\r\nfixture"),
     ]
     for name, payload in (extra_members or {}).items():
         members.append((_zip_info(name, compression=ZIP_DEFLATED), payload))
 
     mimetype = (
-        _zip_info("mimetype", compression=mimetype_compression, extra=mimetype_extra),
+        _zip_info(
+            "mimetype",
+            compression=mimetype_compression,
+            extra=mimetype_extra,
+        ),
         mimetype_payload,
     )
-    ordered = [mimetype, *members] if mimetype_first else [members[0], mimetype, *members[1:]]
+    ordered = (
+        [mimetype, *members]
+        if mimetype_first
+        else [members[0], mimetype, *members[1:]]
+    )
 
     output = BytesIO()
     with ZipFile(output, "w") as archive:

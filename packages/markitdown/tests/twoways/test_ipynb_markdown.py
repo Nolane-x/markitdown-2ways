@@ -31,7 +31,9 @@ def test_ipynb_identity_markdown_is_inspection_only() -> None:
 
     assert len(projection.manifest.blocks) == 3
     assert all(block.node_kind == "text" for block in projection.manifest.blocks)
-    assert all(block.editable_capabilities == () for block in projection.manifest.blocks)
+    assert all(
+        block.editable_capabilities == () for block in projection.manifest.blocks
+    )
     assert "# Title" in projection.markdown
     assert "print(1)" in projection.markdown
     assert "raw" in projection.markdown

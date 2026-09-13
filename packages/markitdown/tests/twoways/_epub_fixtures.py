@@ -43,7 +43,9 @@ def _opf(
     <item id="cover" href="cover.png" media-type="image/png"/>
   </manifest>
   <spine><itemref idref="{spine_id}"/></spine>
-</package>""".encode("utf-8")
+</package>""".encode(
+        "utf-8"
+    )
 
 
 def _zip_info(name: str, *, compression: int, extra: bytes = b"") -> ZipInfo:
@@ -69,7 +71,7 @@ def make_epub(
     if multiple_rootfiles:
         container = container.replace(
             b"</rootfiles>",
-            b"<rootfile full-path=\"OEBPS/alternate.opf\" media-type=\"application/oebps-package+xml\"/></rootfiles>",
+            b'<rootfile full-path="OEBPS/alternate.opf" media-type="application/oebps-package+xml"/></rootfiles>',
         )
 
     members: list[tuple[ZipInfo, bytes]] = [
@@ -102,9 +104,7 @@ def make_epub(
         mimetype_payload,
     )
     ordered = (
-        [mimetype, *members]
-        if mimetype_first
-        else [members[0], mimetype, *members[1:]]
+        [mimetype, *members] if mimetype_first else [members[0], mimetype, *members[1:]]
     )
 
     output = BytesIO()

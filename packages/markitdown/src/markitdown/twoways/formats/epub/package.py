@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from hashlib import sha256
 from io import BytesIO
 import re
 import stat
-from zipfile import BadZipFile, ZIP_STORED, ZipFile
+from zipfile import BadZipFile, ZIP_STORED, ZipFile, ZipInfo
 
 from .limits import EpubPackageLimits
 from .model import EpubPackageEntry, EpubPackageSnapshot, EpubParseError
@@ -215,3 +216,132 @@ def read_epub_member(source: bytes, member_name: str) -> bytes:
             reason="epub.package.required_member_read_failed",
             details={"member": member_name},
         ) from exc
+
+
+def _clone_zip_info(info: ZipInfo) -> ZipInfo:
+    clone = ZipInfo(filename=info.filename, date_time=info.date_time)
+    clone.compress_type = info.compress_type
+    clone.comment = info.comment
+    clone.extra = info.extra
+    clone.create_system = info.create_system
+    clone.create_version = info.create_version
+    clone.extract_version = info.extract_version
+    clone.reserved = info.reserved
+    clone.flag_bits = info.flag_bits & ~0x1
+    clone.volume = info.volume
+    clone.internal_attr = info.internal_attr
+    clone.external_attr = info.external_attr
+    if hasattr(info, "_compresslevel"):
+        clone._compresslevel = info._compresslevel  # type: ignore[attr-defined]
+    return clone
+
+
+def _validate_replacement_limits(
+    snapshot: EpubPackageSnapshot,
+    replacements: Mapping[str, bytes],
+    limits: EpubPackageLimits,
+) -> None:
+    total = 0
+    for entry in snapshot.entries:
+        replacement = replacements.get(entry.name)
+        size = len(replacement) if replacement is not None else entry.uncompressed_size
+        if size > limits.max_member_uncompressed_bytes:
+            _fail(
+                "epub.package.output_member_too_large",
+                "EPUB output member exceeds the configured size limit.",
+                member=entry.name,
+                size=size,
+                limit=limits.max_member_uncompressed_bytes,
+            )
+        if entry.name.lower().endswith(_XML_SUFFIXES) and (
+            size > limits.max_xml_member_bytes
+        ):
+            _fail(
+                "epub.package.output_xml_member_too_large",
+                "EPUB output XML member exceeds the configured XML size limit.",
+                member=entry.name,
+                size=size,
+                limit=limits.max_xml_member_bytes,
+            )
+        total += size
+        if total > limits.max_total_uncompressed_bytes:
+            _fail(
+                "epub.package.output_too_large",
+                "EPUB output package exceeds the configured total size limit.",
+                size=total,
+                limit=limits.max_total_uncompressed_bytes,
+            )
+
+
+def build_epub_candidate(
+    snapshot: EpubPackageSnapshot,
+    source: bytes,
+    *,
+    replacements: Mapping[str, bytes],
+    limits: EpubPackageLimits | None = None,
+) -> bytes:
+    if sha256(source).hexdigest() != snapshot.source_sha256 or len(source) != snapshot.source_size:
+        _fail(
+            "epub.package.snapshot_source_mismatch",
+            "EPUB package snapshot does not match source bytes.",
+        )
+    replacements = dict(replacements)
+    if not replacements:
+        return source
+
+    known = {entry.name for entry in snapshot.entries}
+    unknown = sorted(set(replacements) - known)
+    if unknown:
+        _fail(
+            "epub.package.unknown_replacement_member",
+            "Sparse EPUB writer cannot add new members.",
+            members=unknown,
+        )
+    protected = sorted(set(replacements) & {"mimetype", "META-INF/container.xml"})
+    if protected:
+        _fail(
+            "epub.package.protected_replacement_member",
+            "Sparse EPUB writer cannot replace protected OCF members.",
+            members=protected,
+        )
+    directories = sorted(name for name in replacements if name.endswith("/"))
+    if directories:
+        _fail(
+            "epub.package.directory_replacement",
+            "Sparse EPUB writer cannot replace directory members.",
+            members=directories,
+        )
+    for name, payload in replacements.items():
+        if not isinstance(payload, bytes):
+            raise TypeError(f"EPUB replacement member must be bytes: {name}")
+
+    limits = limits or EpubPackageLimits()
+    _validate_replacement_limits(snapshot, replacements, limits)
+
+    output = BytesIO()
+    try:
+        source_archive = ZipFile(BytesIO(source), "r")
+    except (BadZipFile, ValueError) as exc:
+        raise EpubParseError(
+            "Unable to reopen EPUB source for sparse writing.",
+            reason="epub.package.source_reopen_failed",
+        ) from exc
+
+    with source_archive, ZipFile(output, "w") as target:
+        target.comment = snapshot.archive_comment
+        for info in source_archive.infolist():
+            payload = replacements.get(info.filename)
+            if payload is None:
+                payload = source_archive.read(info)
+            target.writestr(_clone_zip_info(info), payload)
+
+    candidate = output.getvalue()
+    candidate_snapshot = snapshot_epub_package(candidate, limits=limits)
+    if tuple(entry.name for entry in candidate_snapshot.entries) != tuple(
+        entry.name for entry in snapshot.entries
+    ):
+        _fail(
+            "epub.package.output_inventory_drift",
+            "Sparse EPUB writer changed the ordered member inventory.",
+        )
+    return candidate

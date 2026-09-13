@@ -69,7 +69,7 @@ def make_epub(
     if multiple_rootfiles:
         container = container.replace(
             b"</rootfiles>",
-            b'<rootfile full-path="OEBPS/alternate.opf" media-type="application/oebps-package+xml"/></rootfiles>',
+            b"<rootfile full-path=\"OEBPS/alternate.opf\" media-type=\"application/oebps-package+xml\"/></rootfiles>",
         )
 
     members: list[tuple[ZipInfo, bytes]] = [

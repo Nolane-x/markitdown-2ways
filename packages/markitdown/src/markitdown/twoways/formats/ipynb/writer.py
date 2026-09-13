@@ -156,7 +156,10 @@ def _preflight_edits(
         if edit.type != "replace_ipynb_cell_source":
             raise UnsupportedEditError(
                 "H6 IPYNB supports replace_ipynb_cell_source edits only.",
-                details={"reason": "ipynb.edit_type", "operation_id": edit.operation_id},
+                details={
+                    "reason": "ipynb.edit_type",
+                    "operation_id": edit.operation_id,
+                },
             )
         node = _source_node(document, edit)
         validate_edit_preconditions(document, node, edit, format_label="ipynb")

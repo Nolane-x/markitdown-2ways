@@ -59,8 +59,13 @@ def test_reader_advertises_only_selected_epub_text_mutations() -> None:
     assert "blocked()" not in xhtml_values
     assert "vector" not in xhtml_values
     assert "x" not in xhtml_values
-    assert all(node.metadata.get("epub.identity_markdown") is False for node in metadata_nodes)
-    assert all(node.metadata.get("epub.identity_markdown") is False for node in xhtml_nodes)
+    assert all(
+        node.metadata.get("epub.identity_markdown") is False
+        for node in metadata_nodes
+    )
+    assert all(
+        node.metadata.get("epub.identity_markdown") is False for node in xhtml_nodes
+    )
 
 
 def test_epub2_and_multiple_rootfiles_have_no_writable_epub_text_nodes() -> None:

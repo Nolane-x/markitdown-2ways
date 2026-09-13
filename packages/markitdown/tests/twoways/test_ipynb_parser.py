@@ -37,7 +37,10 @@ def test_parses_nbformat4_source_evidence_without_normalizing_json() -> None:
     )
     assert len(cell.source_segment_raw_digests) == 2
     assert cell.logical_source == "print(1)\nprint(2)"
-    assert source.decode("utf-8")[cell.source_start : cell.source_end] == '["print(1)\\n","print(2)"]'
+    assert (
+        source.decode("utf-8")[cell.source_start : cell.source_end]
+        == '["print(1)\\n","print(2)"]'
+    )
 
 
 def test_parses_string_source_and_raw_cell() -> None:
@@ -59,7 +62,9 @@ def test_parses_string_source_and_raw_cell() -> None:
     assert raw.logical_source == "literal\n"
 
 
-def test_parser_records_non_source_evidence_for_outputs_metadata_and_attachments() -> None:
+def test_parser_records_non_source_evidence_for_outputs_metadata_and_attachments() -> (
+    None
+):
     source = (
         b'{"cells":['
         b'{"cell_type":"markdown","attachments":{"a.txt":{"text/plain":"YQ=="}},'
@@ -98,9 +103,7 @@ def test_malformed_nbformat4_shapes_fail_closed(source: bytes) -> None:
 
 
 def test_duplicate_json_keys_fail_through_strict_json_ownership() -> None:
-    source = (
-        b'{"cells":[],"metadata":{},"nbformat":4,"nbformat":4,"nbformat_minor":5}'
-    )
+    source = b'{"cells":[],"metadata":{},"nbformat":4,"nbformat":4,"nbformat_minor":5}'
 
     with pytest.raises((IpynbParseError, ValueError)):
         parse_ipynb_source(source)

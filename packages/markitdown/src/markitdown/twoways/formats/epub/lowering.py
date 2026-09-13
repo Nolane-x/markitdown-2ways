@@ -61,7 +61,9 @@ def lower_epub_member_edits(
     seen_paths: set[str] = set()
     for item in replacements:
         if not isinstance(item, EpubXmlTextReplacement):
-            raise TypeError("EPUB lowering requests must be EpubXmlTextReplacement values")
+            raise TypeError(
+                "EPUB lowering requests must be EpubXmlTextReplacement values"
+            )
         if item.member_sha256 != actual_digest:
             raise ValueError(
                 "EPUB member digest does not match lowering source authority"

@@ -53,10 +53,11 @@ def _source_capability(
 ) -> CapabilityDecision:
     if cell.cell_type not in _SUPPORTED_CELL_TYPES:
         return _read_only_capability("ipynb.cell.unsupported_type")
-    if cell.source_representation == "string-array" and not cell.source_segment_pointers:
-        return _read_only_capability(
-            "ipynb.cell.source.empty_array_requires_structure"
-        )
+    if (
+        cell.source_representation == "string-array"
+        and not cell.source_segment_pointers
+    ):
+        return _read_only_capability("ipynb.cell.source.empty_array_requires_structure")
     if not byte_roundtrip:
         return _read_only_capability("ipynb.encoding.not_roundtrippable")
     return CapabilityDecision(

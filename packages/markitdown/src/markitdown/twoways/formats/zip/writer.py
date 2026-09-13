@@ -59,9 +59,7 @@ def _validate_source_authority(document: DocumentIR, source: bytes) -> None:
 def _validate_edit_set(edits: Sequence[EditOperation]) -> None:
     operation_counts = Counter(edit.operation_id for edit in edits)
     duplicate_operation_ids = sorted(
-        operation_id
-        for operation_id, count in operation_counts.items()
-        if count > 1
+        operation_id for operation_id, count in operation_counts.items() if count > 1
     )
     if duplicate_operation_ids:
         raise UnsupportedEditError(

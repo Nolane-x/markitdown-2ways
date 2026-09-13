@@ -265,14 +265,38 @@ def _zero_edit_result(bytes_written: int) -> WriterResult:
 def _mutation_result(bytes_written: int) -> WriterResult:
     evidence = (
         ("epub.source_authority", "Source SHA-256 and size matched EPUB authority."),
-        ("epub.package_authority", "The original OCF/package graph was authoritative."),
-        ("epub.native_evidence", "Fresh EPUB IR matched the recorded native evidence."),
-        ("epub.xml_member_lowering", "Authorized owners lowered only to fresh H4 XML text targets."),
-        ("epub.member_target_only", "H4 verified target-only XML mutation inside touched members."),
-        ("epub.untouched_member_content", "Untouched EPUB member content remained byte-identical."),
-        ("epub.ocf_invariants", "The candidate preserved required OCF container invariants."),
-        ("epub.package_graph_reread", "The candidate preserved manifest and spine semantics."),
-        ("epub.candidate_reread", "The complete candidate passed strict H7 verification."),
+        (
+            "epub.package_authority",
+            "The original OCF/package graph was authoritative.",
+        ),
+        (
+            "epub.native_evidence",
+            "Fresh EPUB IR matched the recorded native evidence.",
+        ),
+        (
+            "epub.xml_member_lowering",
+            "Authorized owners lowered only to fresh H4 XML text targets.",
+        ),
+        (
+            "epub.member_target_only",
+            "H4 verified target-only XML mutation inside touched members.",
+        ),
+        (
+            "epub.untouched_member_content",
+            "Untouched EPUB member content remained byte-identical.",
+        ),
+        (
+            "epub.ocf_invariants",
+            "The candidate preserved required OCF container invariants.",
+        ),
+        (
+            "epub.package_graph_reread",
+            "The candidate preserved manifest and spine semantics.",
+        ),
+        (
+            "epub.candidate_reread",
+            "The complete candidate passed strict H7 verification.",
+        ),
     )
     return WriterResult(
         format="epub",

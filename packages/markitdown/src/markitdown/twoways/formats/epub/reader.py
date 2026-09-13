@@ -97,7 +97,9 @@ def _root_metadata(parsed: ParsedEpubSource) -> dict[str, Any]:
         "epub.package_version": parsed.package_version,
         "epub.writable_version": parsed.writable_version,
         "epub.read_only_reason": parsed.read_only_reason,
-        "epub.rootfiles": tuple((item.path, item.media_type) for item in parsed.rootfiles),
+        "epub.rootfiles": tuple(
+            (item.path, item.media_type) for item in parsed.rootfiles
+        ),
         "epub.unique_identifier_id": parsed.unique_identifier_id,
         "epub.unique_identifier_value": parsed.unique_identifier_value,
         "epub.native_source": True,
@@ -130,7 +132,9 @@ def read_epub_ir(
         for item in parsed.manifest
     }
     metadata_node_ids = tuple(
-        _node_id(source_digest, f"metadata:{index}:{owner.member_path}:{owner.xml_path}")
+        _node_id(
+            source_digest, f"metadata:{index}:{owner.member_path}:{owner.xml_path}"
+        )
         for index, owner in enumerate(parsed.metadata_owners)
     )
     spine_node_ids = tuple(

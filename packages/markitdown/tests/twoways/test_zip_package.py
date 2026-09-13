@@ -65,9 +65,7 @@ def test_symlink_member_fails_closed() -> None:
 
 
 def test_encrypted_member_fails_closed() -> None:
-    source = mark_single_member_encrypted(
-        make_zip(members={"secret.txt": b"secret"})
-    )
+    source = mark_single_member_encrypted(make_zip(members={"secret.txt": b"secret"}))
     with pytest.raises(ZipParseError) as exc:
         snapshot_zip_package(source)
     _assert_reason(exc, "zip.package.encrypted_member")

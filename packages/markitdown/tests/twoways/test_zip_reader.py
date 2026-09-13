@@ -35,12 +35,9 @@ def test_nested_xlsx_preserves_each_inner_worksheet_canvas() -> None:
     assert len(worksheets) == 2
     assert [canvas.name for canvas in worksheets] == ["Data", "Other"]
     assert all(
-        canvas.metadata["zip.member_chain"] == ("book.xlsx",)
-        for canvas in worksheets
+        canvas.metadata["zip.member_chain"] == ("book.xlsx",) for canvas in worksheets
     )
-    assert all(
-        canvas.metadata["zip.adapter_key"] == "xlsx" for canvas in worksheets
-    )
+    assert all(canvas.metadata["zip.adapter_key"] == "xlsx" for canvas in worksheets)
     for canvas in worksheets:
         assert canvas.root_node_ids
         assert all(

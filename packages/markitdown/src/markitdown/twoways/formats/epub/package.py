@@ -280,7 +280,10 @@ def build_epub_candidate(
     replacements: Mapping[str, bytes],
     limits: EpubPackageLimits | None = None,
 ) -> bytes:
-    if sha256(source).hexdigest() != snapshot.source_sha256 or len(source) != snapshot.source_size:
+    if (
+        sha256(source).hexdigest() != snapshot.source_sha256
+        or len(source) != snapshot.source_size
+    ):
         _fail(
             "epub.package.snapshot_source_mismatch",
             "EPUB package snapshot does not match source bytes.",

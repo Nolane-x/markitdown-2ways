@@ -41,7 +41,8 @@ def _is_touched_prefix(
     touched: frozenset[tuple[str, ...]],
 ) -> bool:
     return any(
-        len(chain) <= len(target) and target[: len(chain)] == chain for target in touched
+        len(chain) <= len(target) and target[: len(chain)] == chain
+        for target in touched
     )
 
 

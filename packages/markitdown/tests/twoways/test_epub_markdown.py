@@ -46,7 +46,9 @@ def test_epub_navigation_and_blocked_xhtml_content_remain_noneditable() -> None:
         options=MarkdownProjectionOptions(mode=MarkdownProjectionMode.IDENTITY),
     )
 
-    assert all(block.editable_capabilities == () for block in projection.manifest.blocks)
+    assert all(
+        block.editable_capabilities == () for block in projection.manifest.blocks
+    )
     assert "Chapter One" not in projection.markdown
     assert "blocked()" not in projection.markdown
     assert "vector" not in projection.markdown

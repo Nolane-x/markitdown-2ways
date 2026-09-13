@@ -43,7 +43,9 @@ def _shadow_path(shadow, edit) -> str:
 
 
 def test_h7_registers_exactly_two_epub_edit_types() -> None:
-    epub_types = {item for item in INITIAL_EDIT_TYPES if item.startswith("replace_epub_")}
+    epub_types = {
+        item for item in INITIAL_EDIT_TYPES if item.startswith("replace_epub_")
+    }
     assert epub_types == {
         "replace_epub_metadata_text",
         "replace_epub_xhtml_text",

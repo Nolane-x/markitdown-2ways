@@ -126,7 +126,8 @@ def test_source_authority_mismatch_fails_before_output() -> None:
     assert output.getvalue() == b""
 
 
-def test_duplicate_noop_invalid_type_and_stale_precondition_fail_before_output() -> None:
+def test_duplicate_noop_invalid_type_and_stale_precondition_fail_before_output(
+) -> None:
     source = make_epub()
     document = read_epub_ir(BytesIO(source), filename="book.epub")
 

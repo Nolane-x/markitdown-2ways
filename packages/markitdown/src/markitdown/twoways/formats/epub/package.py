@@ -5,7 +5,7 @@ from hashlib import sha256
 from io import BytesIO
 import re
 import stat
-from zipfile import BadZipFile, ZIP_STORED, ZipFile, ZipInfo
+from zipfile import BadZipFile, ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
 from .limits import EpubPackageLimits
 from .model import EpubPackageEntry, EpubPackageSnapshot, EpubParseError
@@ -14,6 +14,7 @@ from .model import EpubPackageEntry, EpubPackageSnapshot, EpubParseError
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 _XML_SUFFIXES = (".xml", ".opf", ".xhtml", ".html", ".htm")
 _EPUB_MIMETYPE = b"application/epub+zip"
+_ALLOWED_COMPRESSION_METHODS = frozenset({ZIP_STORED, ZIP_DEFLATED})
 
 
 def _fail(reason: str, message: str, **details: object) -> None:
@@ -102,6 +103,13 @@ def snapshot_epub_package(
                     member=name,
                 )
             seen.add(name)
+            if info.compress_type not in _ALLOWED_COMPRESSION_METHODS:
+                _fail(
+                    "epub.package.unsupported_compression",
+                    "EPUB package member uses an unsupported compression method.",
+                    member=name,
+                    compression_method=info.compress_type,
+                )
             if info.flag_bits & 0x1:
                 _fail(
                     "epub.package.encrypted_member",

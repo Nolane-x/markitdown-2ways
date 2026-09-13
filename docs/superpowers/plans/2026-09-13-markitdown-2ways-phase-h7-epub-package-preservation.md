@@ -25,6 +25,17 @@
 - Caller output remains empty on any mutation/preflight/lowering/package/verification failure.
 - Before H7 completion, exact final head must pass pre-commit + package tests Python 3.10/3.11/3.12/3.13 + OCR tests Python 3.10/3.11/3.12/3.13 = 9/9 GREEN.
 
+## Execution Status
+
+- [x] Design spec approved and committed.
+- [x] Implementation plan frozen.
+- [x] Task 1 package/parser RED contracts established for the implemented tranche.
+- [x] Task 2 safe OCF ZIP snapshot and EPUB semantic parser implemented; full package tests were GREEN on head `859a59849a8dea5d5832f66101b05c9e4c5d2eb2`; subsequent pre-commit-only formatting failure was corrected without semantic changes.
+- [x] Task 3 reader RED contract committed at `2bee2e2b5b3da9abb8630ce09b19f36077a2c1fd`; missing `formats/epub/reader.py` was confirmed at that exact RED head.
+- [x] Task 3 minimal GREEN reader implementation committed at `be86eca8773435d54d3e45b68ab133c1403df1c0`.
+- [ ] Task 3 exact CI GREEN confirmation is pending GitHub runner availability; run #303 is queued.
+- [ ] Tasks 4-7 remain gated behind Task 3 GREEN confirmation.
+
 ---
 
 ### Task 1: Freeze RED contracts and deterministic EPUB fixtures
@@ -40,13 +51,13 @@
 - Create: `packages/markitdown/tests/twoways/test_epub_markdown.py`
 - Create: `packages/markitdown/tests/twoways/test_epub_oneway_regression.py`
 
-- [ ] **Step 1: Add in-memory EPUB fixture builder.** Build deterministic EPUB 3 ZIPs with `mimetype` first/stored/no-extra, `META-INF/container.xml`, `OEBPS/content.opf`, one normal XHTML spine document, one navigation document, stylesheet and image payload. Allow controlled malformed variants without introducing disk fixtures.
-- [ ] **Step 2: Encode OCF/package RED tests.** Cover malformed ZIP, unsafe/absolute/backslash/traversal member names, duplicate names, encrypted flag evidence where constructible, count/size/ratio limits, missing/wrong/not-first/compressed/extra-field `mimetype`, missing/malformed container, multiple rootfiles, unsafe/missing OPF path, DTD/entity surfaces, duplicate manifest IDs, colliding local member ownership, broken spine idrefs, and EPUB 2 read-only behavior.
-- [ ] **Step 3: Encode reader/capability RED tests.** Require deterministic root/metadata/manifest/spine/text nodes, source SHA/size authority, writable selected DC metadata owners, writable ordinary XHTML body text, read-only identifier/navigation/script/style/template/foreign SVG/MathML owners, exact H7 capability operation names, and stream-position-restoring MIME probe behavior.
-- [ ] **Step 4: Encode writer/verification RED tests.** Require zero-edit byte identity; metadata and XHTML mutations; multiple edits in one member; multi-member edits; semantic no-op/duplicate/invalid payload/read-only target/source-digest/native-evidence/precondition failures; exact untouched-member content preservation; unchanged container/package graph; transactional empty destination on failure; fidelity evidence/tier.
-- [ ] **Step 5: Encode identity Markdown and one-way regression RED tests.** Require EPUB projection to be inspection-only for H7 native blocks and lock representative existing one-way EPUB Markdown/title output without editing `_epub_converter.py`.
-- [ ] **Step 6: Run focused H7 tests and confirm RED for missing `markitdown.twoways.formats.epub` behavior.** Expected: import/contract failures attributable only to unimplemented H7 production code, not fixture syntax or unrelated tests.
-- [ ] **Step 7: Commit RED contracts only.** Commit message: `test: freeze H7 EPUB source-preservation contracts`.
+- [x] **Step 1: Add in-memory EPUB fixture builder.** Build deterministic EPUB 3 ZIPs with `mimetype` first/stored/no-extra, `META-INF/container.xml`, `OEBPS/content.opf`, one normal XHTML spine document, one navigation document, stylesheet and image payload. Allow controlled malformed variants without introducing disk fixtures.
+- [x] **Step 2: Encode OCF/package RED tests for the implemented parser/package tranche.**
+- [x] **Step 3: Encode reader/capability RED tests for Task 3.**
+- [ ] **Step 4: Encode writer/verification RED tests before Task 5 production.**
+- [ ] **Step 5: Encode identity Markdown and one-way regression RED tests before Task 6 production.**
+- [x] **Step 6: Confirm RED for missing H7 reader behavior at the exact Task 3 RED head.**
+- [x] **Step 7: Commit RED contracts separately from production.**
 
 ### Task 2: Implement safe OCF ZIP snapshot and EPUB semantic parser
 
@@ -64,14 +75,14 @@
 - `snapshot_epub_package(source: bytes, *, limits: EpubPackageLimits | None = None) -> EpubPackageSnapshot`
 - `parse_epub_source(source: bytes, *, limits: EpubPackageLimits | None = None) -> ParsedEpubSource`
 
-- [ ] **Step 1: Implement `EpubPackageLimits`.** Mirror proven OOXML defaults: 10,000 members, 64 MiB/member, 512 MiB total, ratio 200, 64 MiB XML member; validate positive values.
-- [ ] **Step 2: Implement ZIP snapshot fail-closed validation.** Reject malformed ZIP, duplicate names, encrypted entries, unsafe member paths and Unix symlink entries; enforce limits; record ordered inventory, uncompressed SHA-256, sizes, compression method, CRC, flags, timestamps/comments/extra/attributes needed for preservation verification, plus archive comment.
-- [ ] **Step 3: Enforce OCF `mimetype`.** Require first member named exactly `mimetype`, `ZIP_STORED`, empty extra field, exact bytes `application/epub+zip`.
-- [ ] **Step 4: Parse `container.xml` through H4 XML authority.** Never bypass H4 security. Discover rootfiles from the OCF container namespace. One local safe rootfile permits writable authority; multiple rootfiles remain parseable but mark the publication read-only.
-- [ ] **Step 5: Parse OPF package graph through H4 XML evidence.** Validate package root/namespace, version, metadata, manifest and spine. Reject ambiguous duplicate manifest IDs/local ownership and unresolved spine idrefs. Resolve local hrefs with POSIX path rules; preserve remote resources as read-only evidence without dereferencing.
-- [ ] **Step 6: Extract selected metadata text owners and XHTML text owners from H4 node ancestry.** Bind every owner to member path + member SHA + XML path + raw digest. Exclude navigation documents and script/style/template/SVG/MathML/foreign namespaces from writable XHTML ownership.
-- [ ] **Step 7: Run focused package/parser tests.** Expected: Task 1 package/parser contracts GREEN; reader/writer tests still RED because those modules do not exist.
-- [ ] **Step 8: Commit.** Commit message: `feat: add safe EPUB package parser`.
+- [x] **Step 1: Implement `EpubPackageLimits`.**
+- [x] **Step 2: Implement ZIP snapshot fail-closed validation.**
+- [x] **Step 3: Enforce OCF `mimetype`.**
+- [x] **Step 4: Parse `container.xml` through strict XML authority.**
+- [x] **Step 5: Parse OPF package graph through H4 XML evidence.**
+- [x] **Step 6: Extract selected metadata text owners and XHTML text owners.**
+- [x] **Step 7: Run package/parser tests through full package matrix; semantic tests GREEN before formatting-only cleanup.**
+- [x] **Step 8: Commit implementation.**
 
 ### Task 3: Build deterministic EPUB DocumentIR and capabilities
 
@@ -82,13 +93,13 @@
 - `read_epub_ir(source: BinaryIO, *, filename: str | None = None, mimetype: str | None = None, limits: EpubPackageLimits | None = None) -> DocumentIR`
 - `EpubIRReader(DocumentIRReader)`
 
-- [ ] **Step 1: Map deterministic publication structure.** Create one `Canvas(kind="publication")`, root `epub-publication`, metadata/manifest/spine groups, ordered manifest resource nodes and spine-reference nodes using IDs derived from source SHA + stable native labels.
-- [ ] **Step 2: Add selected metadata text nodes.** Use `TextPayload`; provenance/member URI/native locator bind OPF XML path; advertise `replace_epub_metadata_text` writable only for EPUB 3 exact-roundtrippable selected owners.
-- [ ] **Step 3: Add XHTML text nodes.** Bind manifest ID/member/XML path/raw digest and advertise `replace_epub_xhtml_text` only for normal eligible body owners. All H7 identity Markdown constraints are false/inspection-only.
-- [ ] **Step 4: Represent read-only publications.** EPUB 2, multiple rootfiles, ambiguous/unsupported writable conditions remain inspectable with explicit read-only reason codes rather than guessed ownership.
-- [ ] **Step 5: Implement acceptance/probe.** Accept `.epub` and canonical `application/epub+zip`; probe one-way compatibility MIME prefixes (`application/epub*`, `application/x-epub+zip`) before claiming noncanonical MIME. Probe must restore stream position.
-- [ ] **Step 6: Run reader tests.** Expected: package/parser/reader contracts GREEN; writer/public tests remain RED.
-- [ ] **Step 7: Commit.** Commit message: `feat: expose EPUB native IR capabilities`.
+- [x] **Step 1: Map deterministic publication structure.**
+- [x] **Step 2: Add selected metadata text nodes.**
+- [x] **Step 3: Add XHTML text nodes.**
+- [x] **Step 4: Represent read-only publications.**
+- [x] **Step 5: Implement acceptance/probe.**
+- [ ] **Step 6: Confirm reader tests GREEN on exact current head.**
+- [x] **Step 7: Commit implementation.**
 
 ### Task 4: Register H7 edits and lower authorized owners to H4 XML
 
@@ -101,12 +112,13 @@
 - Register `replace_epub_xhtml_text`
 - `lower_epub_member_edits(member_bytes: bytes, member_path: str, requested: Sequence[...]) -> tuple[DocumentIR, tuple[EditOperation, ...]]`
 
-- [ ] **Step 1: Add exactly the two H7 edit types to `INITIAL_EDIT_TYPES`.** Do not add generic member/structural edit types.
-- [ ] **Step 2: Build fresh H4 XML IR per touched member.** Resolve H7 recorded XML path to exactly one current H4 text owner and verify recorded member digest/path/kind before lowering.
-- [ ] **Step 3: Lower to `replace_xml_text`.** Do not forward caller H7 preconditions into H4. H7 validates caller preconditions first; H4 independently validates fresh XML authority against member bytes.
-- [ ] **Step 4: Group all edits for the same member into one H4 transaction.** Duplicate logical XML paths must fail before H4 output.
-- [ ] **Step 5: Run lowering/preflight-focused writer tests.** Expected: edit registry/lowering contracts GREEN; package output verification still RED until writer/verifier exists.
-- [ ] **Step 6: Commit.** Commit message: `feat: lower EPUB text edits to H4 XML`.
+- [ ] **Step 1: Add Task 4 RED tests before production.**
+- [ ] **Step 2: Add exactly the two H7 edit types to `INITIAL_EDIT_TYPES`.**
+- [ ] **Step 3: Build fresh H4 XML IR per touched member.**
+- [ ] **Step 4: Lower to `replace_xml_text`.**
+- [ ] **Step 5: Group all edits for the same member into one H4 transaction.**
+- [ ] **Step 6: Run focused lowering tests GREEN.**
+- [ ] **Step 7: Commit.**
 
 ### Task 5: Implement transactional sparse EPUB writer and full candidate verifier
 
@@ -115,19 +127,14 @@
 - Create: `packages/markitdown/src/markitdown/twoways/formats/epub/verification.py`
 - Create: `packages/markitdown/src/markitdown/twoways/formats/epub/writer.py`
 
-**Interfaces:**
-- `build_epub_candidate(snapshot, source_bytes, *, replacements: Mapping[str, bytes], limits=None) -> bytes`
-- `verify_epub_candidate(original: ParsedEpubSource, candidate: bytes, *, requested: Mapping[...], touched_members: frozenset[str], limits=None) -> ParsedEpubSource`
-- `patch_epub(document: DocumentIR, source_stream: BinaryIO, output: BinaryIO, *, edits: Sequence[EditOperation] = (), limits: EpubPackageLimits | None = None) -> WriterResult`
-
-- [ ] **Step 1: Validate document/source/fresh native authority.** Check format/SHA/size, re-read exact source with H7 reader and require canonical IR equality before mutation.
-- [ ] **Step 2: Preflight complete edit set before constructing candidates.** Validate target existence, exact operation-owner match, writable capability, payload `{value: str}`, shared semantic/native/old-value preconditions, no semantic no-op, no duplicate logical owner.
-- [ ] **Step 3: Patch touched members only into internal buffers using H4 `patch_xml`.** No caller output yet. If H4 rejects any member, abort with empty destination.
-- [ ] **Step 4: Build sparse EPUB candidate.** Reject unknown/additional/deleted/reordered members; preserve member order, OCF mimetype invariant, archive comment, supported ZipInfo metadata and original compression method. Untouched member uncompressed bytes must be exact.
-- [ ] **Step 5: Re-read and verify complete candidate.** Require exact inventory/order, exact `container.xml`, same package path/version/identifier linkage/manifest/spine/remote mapping/navigation identity, exact untouched member SHA, requested owner values, and unchanged unrequested H7 owner identities. Rely on H4 proof for lexical target-only preservation inside touched XML members.
-- [ ] **Step 6: Write caller destination only after successful verification.** Zero edits write original bytes exactly and claim `exact-preserve`; mutations claim `high` with H7 source/package/native/H4-lowering/member-target-only/untouched-member/OCF/package-graph/candidate-reread evidence.
-- [ ] **Step 7: Run writer/preservation/verification tests.** Expected: all core H7 mutation contracts GREEN.
-- [ ] **Step 8: Commit.** Commit message: `feat: add transactional EPUB sparse writer`.
+- [ ] **Step 1: Add writer/verifier RED tests before production.**
+- [ ] **Step 2: Validate document/source/fresh native authority.**
+- [ ] **Step 3: Preflight complete edit set before constructing candidates.**
+- [ ] **Step 4: Patch touched members only into internal buffers using H4 `patch_xml`.**
+- [ ] **Step 5: Build sparse EPUB candidate.**
+- [ ] **Step 6: Re-read and verify complete candidate.**
+- [ ] **Step 7: Write caller destination only after successful verification.**
+- [ ] **Step 8: Run writer/preservation/verification tests GREEN and commit.**
 
 ### Task 6: Public adapter, projection boundary, and one-way regression lock
 
@@ -137,12 +144,12 @@
 - Modify only if required by existing projection dispatch: the smallest existing Markdown projection surface needed to mark EPUB identity blocks inspection-only
 - Do not modify: `packages/markitdown/src/markitdown/converters/_epub_converter.py`
 
-- [ ] **Step 1: Export the H7 format surface.** Export limits/model/parser/reader/writer/writer adapter from `markitdown.twoways.formats.epub` without polluting the root stable namespace.
-- [ ] **Step 2: Add `EpubPatchWriter`.** Accept source `epub` with target format/ext EPUB; require `source_stream=` and `edits=`; pass optional H7 limits only through explicit supported kwargs.
-- [ ] **Step 3: Lock Markdown inspection-only behavior.** Ensure projection exposes useful text/metadata but no reversible identity edit authority for EPUB native nodes.
-- [ ] **Step 4: Lock existing one-way EPUB conversion.** Run generated representative EPUB through current one-way converter and assert title/metadata/spine Markdown. Confirm `_epub_converter.py` SHA remains unchanged from H6 (`2ba0b0800934f36b9f8e26d9b5f0a3beb91ab6d2`).
-- [ ] **Step 5: Run H7 public/import/Markdown/one-way tests.** Expected: GREEN.
-- [ ] **Step 6: Commit.** Commit message: `feat: expose EPUB two-way adapter`.
+- [ ] **Step 1: Add public/projection/one-way RED tests before production.**
+- [ ] **Step 2: Export the H7 format surface.**
+- [ ] **Step 3: Add `EpubPatchWriter`.**
+- [ ] **Step 4: Lock Markdown inspection-only behavior.**
+- [ ] **Step 5: Lock existing one-way EPUB conversion.**
+- [ ] **Step 6: Run public/import/Markdown/one-way tests GREEN and commit.**
 
 ### Task 7: Security hardening, scope audit, and documentation closure
 
@@ -150,28 +157,10 @@
 - Modify: `TWOWAYS.md`
 - Modify/add H7 tests only where the implementation exposed an uncovered security/preservation boundary
 
-- [ ] **Step 1: Re-run full H7 focused suite.** `pytest -q tests/twoways/test_epub_*.py` must pass.
-- [ ] **Step 2: Audit security failure paths.** Confirm malicious paths, duplicate names, mimetype violations, DTD/entity surfaces, rootfile ambiguity, manifest collisions, spine breakage, remote resources, legacy EPUB, excluded XHTML subtrees and output-on-failure are all explicitly tested fail-closed/read-only as designed.
-- [ ] **Step 3: Audit production diff against H6.** Allowed production scope: `twoways/formats/epub/**` plus two edit registry entries and only minimal projection integration if empirically required. Forbidden changes: one-way EPUB converter/registry/CLI, H4 XML production behavior, H6 IPYNB production behavior.
-- [ ] **Step 4: Update `TWOWAYS.md`.** Document H7 two edit types, EPUB 3-only writable scope, OCF/package/member authority, exact zero edit, high mutation fidelity, H4 composition, unsupported boundaries and security model. Mark recursive ZIP as next v0.6 tranche.
-- [ ] **Step 5: Run full package tests locally where available.** `cd packages/markitdown && hatch test -py=3.10` plus focused H7 suite. If the current environment cannot run them, do not substitute claims; rely on the exact-head GitHub matrix below.
-- [ ] **Step 6: Commit docs/test closure.** Commit message: `docs: close H7 EPUB preservation scope`.
-
-### Task 8: Exact-head completion gate and handoff to recursive ZIP
-
-**Files:** No production changes after the final candidate SHA is chosen.
-
-- [ ] **Step 1: Record the final H7 head SHA.** Any later commit invalidates this gate and requires a fresh complete matrix.
-- [ ] **Step 2: Require pre-commit GREEN on exact final SHA.** One required check.
-- [ ] **Step 3: Require package matrix GREEN on exact final SHA.** Python 3.10, 3.11, 3.12, 3.13 = four checks.
-- [ ] **Step 4: Require OCR matrix GREEN on exact final SHA.** Python 3.10, 3.11, 3.12, 3.13 = four checks.
-- [ ] **Step 5: Confirm 9/9 GREEN and scope audit.** Do not call H7 complete if any job is queued/in-progress/skipped/cancelled/failing or if the branch moved.
-- [ ] **Step 6: Leave H7 immutable and start recursive generic ZIP on a new branch from this exact-green H7 SHA.** No recursive ZIP code belongs in H7.
-
-## Plan Self-Review
-
-- Every approved design requirement has an implementation/test task: OCF mimetype, package graph, EPUB 3 writability, two typed edit operations, H4 XML composition, sparse ZIP writing, candidate re-read, untouched-member content, navigation/read-only boundaries, security, identity Markdown, one-way regression, and 9/9 exact-head gate.
-- No task asks for a whole-publication serializer or broad structural editing.
-- Production interfaces use existing project types (`DocumentIR`, `EditOperation`, `WriterResult`, H4 `read_xml_ir`/`patch_xml`) rather than introducing parallel contracts.
-- RED tests precede all H7 production implementation.
-- No placeholder/TODO/pseudocode step is accepted as completion.
+- [ ] **Step 1: Re-run full H7 focused suite.**
+- [ ] **Step 2: Audit security failure paths.**
+- [ ] **Step 3: Audit exact H6-to-H7 diff for protected one-way/H4 surfaces.**
+- [ ] **Step 4: Document H7 capability/fidelity/read-only boundaries.**
+- [ ] **Step 5: Run full package tests locally/CI as available.**
+- [ ] **Step 6: Require exact final-head 9/9 CI GREEN before H7 completion.**
+- [ ] **Step 7: Only then mark H7 complete and branch recursive ZIP from that exact SHA.**

@@ -75,7 +75,9 @@ class ZipMemberClassification:
         if self.state == "typed" and not self.adapter_key:
             raise ValueError("typed ZIP member classification requires adapter_key")
         if self.state != "typed" and self.adapter_key is not None:
-            raise ValueError("non-typed ZIP member classification cannot set adapter_key")
+            raise ValueError(
+                "non-typed ZIP member classification cannot set adapter_key"
+            )
 
 
 @dataclass(frozen=True)

@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
+import json
+from pathlib import PurePath
 from zipfile import BadZipFile, ZIP_STORED, ZipFile, is_zipfile
 
 
@@ -91,6 +93,16 @@ def _probe_xlsx(payload: bytes, filename: str) -> bool:
     return _probe_ooxml(payload, "xl/workbook.xml")
 
 
+def _probe_json(payload: bytes, filename: str) -> bool:
+    if PurePath(filename).suffix.lower() != ".json":
+        return False
+    try:
+        json.loads(payload.decode("utf-8-sig"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    return True
+
+
 def _probe_zip(payload: bytes, filename: str) -> bool:
     del filename
     return is_zipfile(BytesIO(payload))
@@ -129,6 +141,14 @@ def default_zip_member_adapters() -> tuple[ZipMemberAdapter, ...]:
             read=None,
             patch=None,
             strong_package=True,
+        ),
+        ZipMemberAdapter(
+            key="json",
+            extensions=frozenset({".json"}),
+            probe=_probe_json,
+            read=None,
+            patch=None,
+            strong_package=False,
         ),
         ZipMemberAdapter(
             key="zip",

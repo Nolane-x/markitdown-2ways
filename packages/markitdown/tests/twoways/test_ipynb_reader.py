@@ -136,9 +136,7 @@ def test_ipynb_capabilities_are_narrow_and_source_specific() -> None:
 
     root = document.nodes[document.root_node_ids[0]]
     assert (
-        capabilities_for_node(root)
-        .for_operation("replace_ipynb_cell_source")
-        .state
+        capabilities_for_node(root).for_operation("replace_ipynb_cell_source").state
         is CapabilityState.READ_ONLY
     )
     for cell_id in root.children:
@@ -176,7 +174,9 @@ def test_unsupported_nbformat_collapses_to_one_read_only_root() -> None:
     assert root.kind == "unknown_native"
     assert root.semantic_role == "ipynb-notebook"
     assert root.metadata["ipynb.writable_version"] is False
-    assert root.metadata["ipynb.read_only_reason"] == "ipynb.nbformat.unsupported_version"
+    assert (
+        root.metadata["ipynb.read_only_reason"] == "ipynb.nbformat.unsupported_version"
+    )
     assert root.native_locator is not None
     assert root.native_locator.object_id == "notebook"
     assert (

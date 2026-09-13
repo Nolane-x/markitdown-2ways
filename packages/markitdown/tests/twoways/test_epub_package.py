@@ -36,7 +36,10 @@ def test_ocf_mimetype_contract_fails_closed(kwargs: dict[str, object]) -> None:
         snapshot_epub_package(make_epub(**kwargs))
 
 
-@pytest.mark.parametrize("name", ["../escape", "/absolute", "C:/drive", "dir\\evil", "a/../evil"])
+@pytest.mark.parametrize(
+    "name",
+    ["../escape", "/absolute", "C:/drive", "dir\\evil", "a/../evil"],
+)
 def test_unsafe_archive_member_names_fail_closed(name: str) -> None:
     with pytest.raises(EpubParseError):
         snapshot_epub_package(make_epub(extra_members={name: b"x"}))

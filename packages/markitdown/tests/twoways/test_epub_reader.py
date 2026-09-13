@@ -60,8 +60,7 @@ def test_reader_advertises_only_selected_epub_text_mutations() -> None:
     assert "vector" not in xhtml_values
     assert "x" not in xhtml_values
     assert all(
-        node.metadata.get("epub.identity_markdown") is False
-        for node in metadata_nodes
+        node.metadata.get("epub.identity_markdown") is False for node in metadata_nodes
     )
     assert all(
         node.metadata.get("epub.identity_markdown") is False for node in xhtml_nodes

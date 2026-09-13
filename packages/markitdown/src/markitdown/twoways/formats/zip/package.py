@@ -254,9 +254,7 @@ def build_zip_candidate(
             "Sparse ZIP writer cannot add new members.",
             members=unknown,
         )
-    directories = sorted(
-        name for name in replacements if known[name].is_directory
-    )
+    directories = sorted(name for name in replacements if known[name].is_directory)
     if directories:
         _fail(
             "zip.package.directory_replacement",

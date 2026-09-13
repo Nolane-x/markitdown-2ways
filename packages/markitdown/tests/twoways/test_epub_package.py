@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from zipfile import ZIP_DEFLATED
+from io import BytesIO
+from zipfile import ZIP_BZIP2, ZIP_DEFLATED, ZipFile
 
 import pytest
 
@@ -49,3 +50,18 @@ def test_duplicate_archive_member_names_fail_closed() -> None:
     source = make_epub(extra_members={"OEBPS/style.css": b"duplicate"})
     with pytest.raises(EpubParseError):
         snapshot_epub_package(source)
+
+
+def test_unsupported_archive_compression_method_fails_closed() -> None:
+    source = make_epub()
+    output = BytesIO()
+    with ZipFile(BytesIO(source), "r") as before, ZipFile(output, "w") as after:
+        after.comment = before.comment
+        for info in before.infolist():
+            payload = before.read(info)
+            if info.filename == "OEBPS/style.css":
+                info.compress_type = ZIP_BZIP2
+            after.writestr(info, payload)
+
+    with pytest.raises(EpubParseError, match="compression"):
+        snapshot_epub_package(output.getvalue())

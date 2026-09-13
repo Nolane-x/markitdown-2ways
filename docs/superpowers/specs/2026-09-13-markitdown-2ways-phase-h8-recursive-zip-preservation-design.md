@@ -223,7 +223,7 @@ If recursion depth is exhausted, the member remains represented as an opaque/rea
 
 Add immutable evidence types under `markitdown.twoways.formats.zip`:
 
-- `ZipPackageLimits` or `ZipRecursiveLimits`;
+- `ZipRecursiveLimits`;
 - `ZipPackageEntry`;
 - `ZipPackageSnapshot`;
 - `ZipMemberChain`;
@@ -239,12 +239,13 @@ A parsed root archive records the complete recursive inventory tree required to 
 ### Root document
 
 - `SourceDescriptor(format="zip")` binds root source SHA-256 and size.
-- One `Canvas(kind="archive")` represents the root ZIP.
+- The first canvas is `Canvas(kind="archive")` and represents the root ZIP inventory.
 - Root semantic role is `zip-archive`.
+- The document may contain additional namespaced canvases imported from typed members; H8 therefore does not flatten XLSX/PPTX or other multi-canvas inner documents into one archive canvas.
 
 ### Archive/member nodes
 
-Create deterministic structural nodes for:
+Create deterministic structural nodes on the archive canvas for:
 
 - root archive;
 - each member in archive order;
@@ -265,11 +266,19 @@ Each regular member node records at minimum:
 - `zip.adapter_key` when typed;
 - `zip.identity_markdown = false`.
 
-### Namespaced nested nodes
+### Namespaced nested canvases and nodes
 
-When a member is classified to a supported two-way adapter, H8 reads a fresh inner `DocumentIR` and imports its user-visible semantic nodes into the outer archive document using deterministic namespaced node IDs.
+When a member is classified to a supported two-way adapter, H8 reads a fresh inner `DocumentIR` and imports its canvases and user-visible semantic nodes into the outer archive document.
 
-Namespacing must be collision-safe and depend on:
+For every inner canvas, H8 creates a deterministic namespaced canvas that preserves the inner canvas `kind`, `name`, dimensions/unit when present, root ordering, and format-relevant metadata while adding immutable ZIP routing metadata. Global canvas indexes are assigned deterministically after the root archive canvas according to recursive archive order, member order, then inner canvas index.
+
+Canvas identity depends on:
+
+- canonical full member-chain;
+- inner adapter key;
+- original inner canvas ID.
+
+Nested node namespacing must be collision-safe and depend on:
 
 - canonical full member-chain;
 - inner adapter key;
@@ -278,12 +287,16 @@ Namespacing must be collision-safe and depend on:
 Conceptually:
 
 ```text
-zip-node-id = H("zip", member_chain, adapter_key, inner_node_id)
+zip-canvas-id = H("zip-canvas", member_chain, adapter_key, inner_canvas_id)
+zip-node-id   = H("zip-node", member_chain, adapter_key, inner_node_id)
 ```
+
+All root-node references inside imported canvases and all child-node references inside imported nodes are rewritten to the corresponding namespaced outer IDs. H8 must not create cross-document dangling references.
 
 The imported node records immutable routing evidence including:
 
 - original `inner_node_id`;
+- original inner canvas membership when applicable;
 - adapter key;
 - full member-chain;
 - inner source SHA-256/size;
@@ -486,7 +499,7 @@ A later tranche may add reversible archive-aware Markdown only with its own rout
 
 `packages/markitdown/src/markitdown/converters/_zip_converter.py` is protected and remains unchanged in H8.
 
-The existing one-way behavior—extracting members in memory/temporary conversion flow, delegating through `MarkItDown.convert_stream`, skipping unsupported member conversions, and combining Markdown—is regression-locked by H8 tests.
+The existing one-way behavior—reading ZIP members, delegating each member through `MarkItDown.convert_stream`, skipping unsupported/file-conversion failures, and combining Markdown—is regression-locked by H8 tests.
 
 The two-way H8 adapter must not be registered in a way that changes the one-way converter dispatch order or output.
 
@@ -621,6 +634,7 @@ Required test families:
 - one-level typed members;
 - two-plus nested ZIP levels;
 - deterministic namespaced node IDs;
+- deterministic namespaced canvas IDs and preserved inner canvas/root ordering;
 - global depth/member/byte budget enforcement;
 - nested capability propagation;
 - no writable ZIP structural nodes.
@@ -692,7 +706,7 @@ PDF native-safe editing remains a separate tranche. H8 must not absorb PDF mutat
 - typed inner operations remain authoritative;
 - specific package adapters outrank generic ZIP recursion;
 - shared global recursion budgets prevent nested bomb evasion;
-- imported nested nodes use deterministic member-chain namespacing;
+- imported nested canvases and nodes use deterministic member-chain namespacing;
 - ZIP structure remains read-only in tranche one;
 - identity Markdown remains inspection-only;
 - one-way `ZipConverter` remains unchanged;

@@ -420,8 +420,9 @@ class EpubIRReader(DocumentIRReader):
 
         try:
             position = file_stream.tell()
+            file_stream.seek(0)
         except (AttributeError, OSError):
-            position = None
+            return False
         try:
             source_bytes = _read_source_bytes(file_stream)
             parse_epub_source(source_bytes)
@@ -429,11 +430,10 @@ class EpubIRReader(DocumentIRReader):
         except (EpubParseError, TypeError, ValueError):
             return False
         finally:
-            if position is not None:
-                try:
-                    file_stream.seek(position)
-                except (AttributeError, OSError):
-                    pass
+            try:
+                file_stream.seek(position)
+            except (AttributeError, OSError):
+                pass
 
     def read(
         self,

@@ -135,10 +135,7 @@ def _owner_node(document: DocumentIR, edit: EditOperation) -> Node:
 def _preflight_edits(
     document: DocumentIR,
     edits: Sequence[EditOperation],
-) -> tuple[
-    dict[OwnerKey, str],
-    dict[str, tuple[EpubXmlTextReplacement, ...]],
-]:
+) -> tuple[dict[OwnerKey, str], dict[str, tuple[EpubXmlTextReplacement, ...]],]:
     requested: dict[OwnerKey, str] = {}
     grouped: dict[str, list[EpubXmlTextReplacement]] = {}
 

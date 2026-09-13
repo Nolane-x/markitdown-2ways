@@ -66,6 +66,8 @@ def test_multiple_rootfiles_are_parseable_but_read_only() -> None:
         {"broken_spine": True},
     ],
 )
-def test_ambiguous_or_broken_package_graph_fails_closed(kwargs: dict[str, object]) -> None:
+def test_ambiguous_or_broken_package_graph_fails_closed(
+    kwargs: dict[str, object],
+) -> None:
     with pytest.raises(EpubParseError):
         parse_epub_source(make_epub(**kwargs))

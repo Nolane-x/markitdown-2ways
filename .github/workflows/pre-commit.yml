@@ -16,5 +16,10 @@ jobs:
           pip install pre-commit
           pre-commit install --install-hooks
 
-      - name: Run pre-commit
-        run: pre-commit run --all-files
+      - name: Run pre-commit with Task 5 diff
+        run: |
+          set +e
+          pre-commit run --all-files
+          status=$?
+          git diff -- packages/markitdown/src/markitdown/twoways/formats/zip/routing.py packages/markitdown/src/markitdown/twoways/formats/zip/verification.py packages/markitdown/src/markitdown/twoways/formats/zip/writer.py
+          exit $status

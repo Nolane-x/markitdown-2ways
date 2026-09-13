@@ -96,7 +96,10 @@ def test_multiple_cell_edits_are_atomic() -> None:
     assert b'"source":"print(2)"' in candidate
     assert b'"source":["RAW\\n"]' in candidate
     assert b'"execution_count":7' in candidate
-    assert b'"outputs":[{"output_type":"stream","name":"stdout","text":["ok\\n"]}]' in candidate
+    assert (
+        b'"outputs":[{"output_type":"stream","name":"stdout","text":["ok\\n"]}]'
+        in candidate
+    )
     assert b'"attachments":{"a.txt":{"text/plain":"YQ=="}}' in candidate
 
 

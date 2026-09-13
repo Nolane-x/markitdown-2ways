@@ -1,8 +1,8 @@
-name: H6 finalization capture
+name: pre-commit
 on: [pull_request]
 
 jobs:
-  capture:
+  pre-commit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -10,25 +10,11 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.x"
+
       - name: Install pre-commit
         run: |
           pip install pre-commit
           pre-commit install --install-hooks
-      - name: Apply exact Black formatting
-        continue-on-error: true
+
+      - name: Run pre-commit
         run: pre-commit run --all-files
-      - name: Build H6 documentation candidate
-        run: python .github/h6-finalize-docs.py
-      - name: Capture H6 finalization candidate
-        run: |
-          tar -czf h6-finalization.tar.gz \
-            TWOWAYS.md \
-            packages/markitdown/src/markitdown/twoways/formats/ipynb \
-            packages/markitdown/tests/twoways/test_ipynb_*.py
-      - name: Upload H6 finalization candidate
-        uses: actions/upload-artifact@v4
-        with:
-          name: h6-finalization
-          path: h6-finalization.tar.gz
-          if-no-files-found: error
-          retention-days: 1

@@ -26,24 +26,36 @@ def test_zip_reader_builds_deterministic_archive_tree() -> None:
 
 
 def test_nested_xlsx_preserves_each_inner_worksheet_canvas() -> None:
-    source = make_zip(members={"book.xlsx": make_xlsx(), "keep.txt": b"keep\n"})
+    source = make_zip(
+        members={"book.xlsx": make_xlsx(), "keep.txt": b"keep\n"},
+    )
     document = read_zip_ir(BytesIO(source), filename="bundle.zip")
 
     worksheets = [canvas for canvas in document.canvases if canvas.kind == "worksheet"]
     assert len(worksheets) == 2
     assert [canvas.name for canvas in worksheets] == ["Data", "Other"]
-    assert all(canvas.metadata["zip.member_chain"] == ("book.xlsx",) for canvas in worksheets)
-    assert all(canvas.metadata["zip.adapter_key"] == "xlsx" for canvas in worksheets)
+    assert all(
+        canvas.metadata["zip.member_chain"] == ("book.xlsx",)
+        for canvas in worksheets
+    )
+    assert all(
+        canvas.metadata["zip.adapter_key"] == "xlsx" for canvas in worksheets
+    )
     for canvas in worksheets:
         assert canvas.root_node_ids
-        assert all(document.nodes[node_id].canvas_id == canvas.canvas_id for node_id in canvas.root_node_ids)
+        assert all(
+            document.nodes[node_id].canvas_id == canvas.canvas_id
+            for node_id in canvas.root_node_ids
+        )
 
 
 def test_nested_json_writable_capability_survives_routing_boundary() -> None:
     source = make_zip(members={"data.json": b'{"name":"Ada"}'})
     document = read_zip_ir(BytesIO(source), filename="bundle.zip")
     target = next(
-        node for node in document.nodes.values() if node.metadata.get("json.pointer") == "/name"
+        node
+        for node in document.nodes.values()
+        if node.metadata.get("json.pointer") == "/name"
     )
 
     decision = capabilities_for_node(target).for_operation("replace_json_scalar")
@@ -55,7 +67,9 @@ def test_nested_json_writable_capability_survives_routing_boundary() -> None:
 
 
 def test_archive_and_member_structure_are_read_only() -> None:
-    source = make_zip(members={"data.json": b'{"name":"Ada"}', "keep.txt": b"keep\n"})
+    source = make_zip(
+        members={"data.json": b'{"name":"Ada"}', "keep.txt": b"keep\n"},
+    )
     document = read_zip_ir(BytesIO(source), filename="bundle.zip")
     structure = [
         node

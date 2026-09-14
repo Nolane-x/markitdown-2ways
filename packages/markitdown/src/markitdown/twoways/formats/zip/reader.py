@@ -80,10 +80,30 @@ def _read_inner_document(
     payload: bytes,
     filename: str,
 ) -> DocumentIR | None:
+    if adapter_key == "text":
+        from ..text import read_text_ir
+
+        return read_text_ir(BytesIO(payload), filename=filename)
+    if adapter_key == "csv":
+        from ..csv import read_csv_ir
+
+        return read_csv_ir(BytesIO(payload), filename=filename)
     if adapter_key == "json":
         from ..json import read_json_ir
 
         return read_json_ir(BytesIO(payload), filename=filename)
+    if adapter_key == "xml":
+        from ..xml import read_xml_ir
+
+        return read_xml_ir(BytesIO(payload), filename=filename)
+    if adapter_key == "html":
+        from ..html import read_html_ir
+
+        return read_html_ir(BytesIO(payload), filename=filename)
+    if adapter_key == "ipynb":
+        from ..ipynb import read_ipynb_ir
+
+        return read_ipynb_ir(BytesIO(payload), filename=filename)
     if adapter_key == "xlsx":
         from ..xlsx.reader import read_xlsx_ir
 

@@ -81,6 +81,7 @@ def _text_field_dictionary(
     parent_ref: int | None = None,
     kids_ref: int | None = None,
     left: int = 72,
+    uri_action_owner: bool = False,
 ) -> bytes:
     value_token = b"42" if non_text_value else _pdf_literal(value)
     pieces = [
@@ -107,6 +108,8 @@ def _text_field_dictionary(
         pieces.extend((b" /Parent ", f"{parent_ref} 0 R".encode("ascii")))
     if kids_ref is not None:
         pieces.extend((b" /Kids [", f"{kids_ref} 0 R".encode("ascii"), b"]"))
+    if uri_action_owner:
+        pieces.append(b" /S /URI /URI (https://example.test/old)")
     pieces.append(b" >>")
     return b"".join(pieces)
 
@@ -130,6 +133,8 @@ def make_text_form_pdf(
     duplicate_page_binding: bool = False,
     non_text_value: bool = False,
     second_field: bool = False,
+    with_uri_link: bool = False,
+    shared_link_owner: bool = False,
 ) -> bytes:
     """Build a deterministic classic-xref AcroForm fixture with explicit ownership."""
 
@@ -144,6 +149,7 @@ def make_text_form_pdf(
         with_action=with_action,
         parent_ref=10 if with_parent else None,
         kids_ref=10 if with_kids else None,
+        uri_action_owner=shared_link_owner,
     )
     field7_name = field_name if duplicate_field_name else "customer.email"
     field7 = _text_field_dictionary(
@@ -164,6 +170,8 @@ def make_text_form_pdf(
         annots.append(b"7 0 R")
     if duplicate_page_binding:
         annots.append(b"6 0 R")
+    if with_uri_link or shared_link_owner:
+        annots.append(b"11 0 R")
 
     if direct_field:
         fields_token = b"[" + field6 + b"]"
@@ -211,5 +219,12 @@ def make_text_form_pdf(
         objects[10] = b"<< /FT /Tx /T (parent) /Kids [6 0 R] >>"
     elif with_kids:
         objects[10] = b"<< /Subtype /Widget /Parent 6 0 R /Rect [72 700 240 724] >>"
+    if with_uri_link or shared_link_owner:
+        action = b"6 0 R" if shared_link_owner else b"<< /S /URI /URI (https://example.test/old) >>"
+        objects[11] = (
+            b"<< /Type /Annot /Subtype /Link /Rect [72 650 240 674] /A "
+            + action
+            + b" >>"
+        )
 
     return _build_pdf(objects)

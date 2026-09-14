@@ -203,8 +203,10 @@ def parse_pdf_source(
         "pdf.structure.linearized",
         "pdf.structure.authority_ambiguous",
     }
-    writable = bool(fields) and not unsupported_value_type and not any(
-        reason in blocking for reason in diagnostics
+    writable = (
+        bool(fields)
+        and not unsupported_value_type
+        and not any(reason in blocking for reason in diagnostics)
     )
 
     header_line = source.splitlines()[0].decode("ascii", errors="replace")

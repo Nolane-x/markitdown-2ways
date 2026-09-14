@@ -113,6 +113,11 @@ def project_markdown(
         diagnostics.extend(rendered.diagnostics)
         pid = _projection_id(document.document_id, node.node_id, ordinal)
         semantic_digest = source_semantic_digest(node)
+        editable_capabilities = (
+            ()
+            if node.metadata.get("zip.identity_markdown") is False
+            else rendered.editable_capabilities
+        )
         block = ProjectionBlock(
             projection_id=pid,
             node_id=node.node_id,
@@ -122,7 +127,7 @@ def project_markdown(
             ordinal=ordinal,
             source_semantic_digest=semantic_digest,
             native_locator_digest=native_locator_digest(node),
-            editable_capabilities=rendered.editable_capabilities,
+            editable_capabilities=editable_capabilities,
             rendered_digest=_rendered_digest(rendered.markdown),
         )
         blocks.append(block)

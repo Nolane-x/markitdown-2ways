@@ -13,9 +13,10 @@ identity/clean Markdown projection, PPTX, DOCX, conservative XLSX mutation, nati
 text/Markdown source preservation, target-only CSV cell mutation, target-only JSON
 scalar mutation, target-only XML text/attribute mutation, recovery-aware target-only
 HTML text/quoted-attribute mutation, target-only Jupyter Notebook cell-source mutation,
-and package-preserving EPUB 3 metadata/XHTML text mutation. It is not an Office
-automation platform, workflow engine, document-management service, browser automation
-layer, EPUB authoring suite, or general application framework.
+package-preserving EPUB 3 metadata/XHTML text mutation, and bounded recursive ordinary
+ZIP composition over supported typed inner formats. It is not an Office automation
+platform, workflow engine, document-management service, browser automation layer,
+archive authoring suite, or general application framework.
 
 ## Install this fork
 
@@ -421,6 +422,74 @@ Identity Markdown is inspection-only for EPUB: it exposes selected metadata and 
 spine text but advertises no reversible Markdown edit capability. Direct typed EPUB
 operations are authoritative. The existing one-way `EpubConverter` remains unchanged.
 
+## Recursive ZIP package-preserving composition
+
+Phase H8 adds bounded recursive ordinary ZIP support as a **preservation and routing
+layer**, not as a generic binary archive editor. A ZIP-backed `DocumentIR` contains an
+archive canvas, read-only archive/member structural nodes, and deterministic namespaced
+copies of supported inner documents. Namespacing uses the complete member chain so nested
+canvases and nodes preserve their original semantics without colliding across siblings.
+
+Strong package formats are classified before generic ZIP recursion. EPUB and OOXML
+DOCX/PPTX/XLSX therefore retain their package-specific authorities instead of being
+mistaken for ordinary ZIPs. Ordinary typed members currently compose the existing H1-H7
+writers for native text/Markdown, CSV, JSON, XML, HTML, IPYNB, EPUB, DOCX, PPTX and XLSX;
+nested ordinary ZIPs recurse through the same H8 policy. Unsupported or ambiguous member
+formats remain opaque/read-only and do not prevent unrelated safe typed siblings from
+being used.
+
+```python
+from io import BytesIO
+
+from markitdown.twoways import EditOperation
+from markitdown.twoways.formats.zip import patch_zip, read_zip_ir
+
+with open("bundle.zip", "rb") as source_file:
+    source = source_file.read()
+
+document = read_zip_ir(BytesIO(source), filename="bundle.zip")
+name_node = next(
+    node
+    for node in document.nodes.values()
+    if node.metadata.get("zip.member_chain") == ("data/config.json",)
+    and node.metadata.get("json.pointer") == "/name"
+)
+edit = EditOperation(
+    operation_id="rename-nested-json",
+    type="replace_json_scalar",
+    target_node_id=name_node.node_id,
+    payload={"value": "Nolane"},
+)
+
+with open("bundle-edited.zip", "wb") as output_file:
+    patch_zip(document, BytesIO(source), output_file, edits=(edit,))
+```
+
+Before any mutation H8 re-parses the root archive, validates SHA/size authority, proves
+every intermediate member digest/size in the requested chain, reclassifies the terminal
+member and reconstructs a fresh inner `DocumentIR`. The requested typed operation is then
+delegated unchanged to the existing inner writer in an internal buffer. Complete edit
+sets are preflighted before mutation; edits across multiple nested branches are prepared
+as one transaction and propagated upward through sparse ZIP candidates. Caller output is
+written only after the complete root candidate passes a fresh recursive verification.
+One failing inner edit therefore rolls back all sibling edits.
+
+H8 enforces global recursion limits for depth, per-archive and global member counts,
+per-member/per-archive/global expanded bytes and compression ratio. Unsafe traversal or
+absolute paths, drive/backslash forms, duplicate names, symlinks, encrypted entries,
+malformed archives and compression methods outside Stored/Deflate fail closed. Nested ZIP
+bombs are bounded by the same shared budgets. Archive/member add, delete, rename, reorder,
+comment mutation, compression conversion, encryption, split archives and arbitrary opaque
+member replacement are unsupported.
+
+Zero-edit ZIP writes are exact source bytes. Mutated archives preserve ordered inventory,
+archive comments, directory entries, required member metadata and byte-identical
+uncompressed content for every untouched member. H8 claims high preservation rather than
+exact compressed-bitstream identity for rebuilt touched archive chains. Identity Markdown
+is inspection-only for every ZIP-backed imported node even when its inner typed capability
+is directly writable; direct typed operations remain the only H8 mutation path. The
+existing one-way `ZipConverter` remains unchanged and independent of the H8 registry.
+
 ## PPTX and DOCX round trips
 
 PPTX and DOCX use identity Markdown where the projection/importer can prove a semantic
@@ -478,17 +547,18 @@ a serializer; `openpyxl` is an independent regression oracle.
 
 ## Current capability boundary
 
-| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | PPTX | DOCX | XLSX tranche one |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
-| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
-| Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
-| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
-| Structural edits | unsupported | unsupported | unsupported | unsupported | unsupported | unsupported; notebook/cell structure and non-source state are read-only | unsupported; package graph/inventory/nav/media are read-only | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
+| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PPTX | DOCX | XLSX tranche one |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
+| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | routes the existing typed inner operation through the exact member chain; ZIP structure itself is read-only | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
+| Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only for every ZIP-backed imported node | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
+| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | root/member SHA+size, ordered nested inventory, member metadata, full chain + shared global budgets | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
+| Structural edits | unsupported | unsupported | unsupported | unsupported | unsupported | unsupported; notebook/cell structure and non-source state are read-only | unsupported; package graph/inventory/nav/media are read-only | unsupported; add/delete/rename/reorder/comment/compression/encryption/raw member replacement are read-only | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
 
-H1-H5 together form the v0.5 text/structured-text parity tranche. H6 and H7 extend v0.6
-with bounded Jupyter Notebook source preservation and EPUB 3 package-preserving text
-mutation, each isolated on its own exact-head branch.
+H1-H5 together form the v0.5 text/structured-text parity tranche. H6-H8 extend v0.6
+with bounded Jupyter Notebook source preservation, EPUB 3 package-preserving text
+mutation and recursive ordinary ZIP composition, each isolated behind exact source and
+native ownership authority.
 
 ## Fidelity details
 
@@ -505,17 +575,26 @@ Format-specific proof strengthens the common safety model:
   cardinality and raw source-token evidence while reusing H3 scalar lexical authority;
 - EPUB binds OCF inventory/order/member metadata, package/rootfile/manifest/spine graph,
   selected text-owner evidence and untouched member SHA-256 while reusing H4 XML authority;
+- ZIP binds root source authority, full recursive member-chain SHA/size evidence, ordered
+  inventories, archive comments, supported member metadata, strong-package classification
+  priority and transaction-wide recursion budgets;
 - CSV, JSON, XML, HTML and IPYNB prove every encoded byte segment outside requested
   targets remains exact through their native or composed preservation contracts;
 - EPUB proves byte-identical content for every untouched archive member and strict graph
   equivalence around requested text-owner changes;
-- text, CSV, JSON, XML, HTML, IPYNB and EPUB candidates are re-read before destination
-  emission;
+- ZIP proves byte-identical uncompressed content for untouched members, delegates touched
+  terminal semantics to existing typed inner writers and re-reads the complete recursive
+  candidate before output;
+- text, CSV, JSON, XML, HTML, IPYNB, EPUB and ZIP candidates are re-read before destination
+  emission according to their native or composed verifier contract;
 - XML additionally rejects DTD/entity/external-resolution surfaces before mutation;
 - HTML additionally rejects recovery-sensitive/foreign/template/table/rawtext/RCDATA
   mutation surfaces before mutation;
 - EPUB additionally rejects unsafe/duplicate/encrypted/symlink archive members,
   unsupported ZIP compression, resource-limit violations and ambiguous package graphs;
+- ZIP additionally rejects unsafe/duplicate/encrypted/symlink members, unsupported ZIP
+  compression, recursion-depth/member/expanded-byte/ratio violations and ambiguous member
+  classification before typed routing;
 - OOXML writers start from the original package and restrict mutation to authorized
   parts/subtrees, with unrelated package members verified after writes.
 
@@ -528,8 +607,10 @@ identity, semantic digests and native locator evidence before emitting typed edi
 
 Native lexical text/Markdown, CSV, JSON, XML and HTML are explicit v0.5 inspection-only
 identity projections. IPYNB H6 and EPUB H7 keep the same inspection-only identity
-boundary. Direct typed native paths remain writable only where source evidence is
-sufficient.
+boundary. H8 preserves visible projection of supported nested content but forces
+`editable_capabilities=()` for every ZIP-backed imported block, so identity Markdown
+cannot become an alternate archive mutation path. Direct typed native paths remain
+writable only where source evidence is sufficient.
 
 ## Scope discipline and roadmap
 
@@ -558,12 +639,15 @@ Current v0.6 execution documents include:
 - `docs/superpowers/plans/2026-09-13-phase-h6-ipynb-source-preservation-implementation.md`
 - `docs/superpowers/specs/2026-09-13-markitdown-2ways-phase-h7-epub-package-preservation-design.md`
 - `docs/superpowers/plans/2026-09-13-markitdown-2ways-phase-h7-epub-package-preservation.md`
+- `docs/superpowers/specs/2026-09-13-markitdown-2ways-phase-h8-recursive-zip-preservation-design.md`
+- `docs/superpowers/plans/2026-09-13-markitdown-2ways-phase-h8-recursive-zip-preservation.md`
 
 Each tranche is complete only after its exact final branch head passes pre-commit plus
 the package and OCR matrices on Python 3.10-3.13. H5 uses a separate recovery-aware
 contract and leaves the one-way HTML path unchanged. H6 composes notebook-specific
 authority with H3 lexical scalar patching and leaves the existing one-way IPYNB path
-unchanged. H7 composes EPUB package authority with H4 XML text mutation, leaves the
-existing one-way EPUB path unchanged, and keeps recursive generic ZIP support outside
-this tranche. Recursive ZIP starts on a new branch only after the exact H7 completion
-head is frozen.
+unchanged. H7 composes EPUB package authority with H4 XML text mutation and leaves the
+existing one-way EPUB path unchanged. H8 composes ordinary ZIP preservation/routing with
+the existing typed H1-H7/native package writers, leaves the one-way `ZipConverter`
+unchanged, and keeps PDF native-safe mutation, media-native mutation, other archive
+families, remote writeback and archive structural editing outside this tranche.

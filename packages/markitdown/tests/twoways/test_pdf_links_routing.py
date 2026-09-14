@@ -5,9 +5,20 @@ from io import BytesIO
 
 import pytest
 from pypdf import PdfWriter
-from pypdf.generic import ArrayObject, DictionaryObject, NameObject, NumberObject, RectangleObject, TextStringObject
+from pypdf.generic import (
+    ArrayObject,
+    DictionaryObject,
+    NameObject,
+    NumberObject,
+    RectangleObject,
+    TextStringObject,
+)
 
-from markitdown.twoways._errors import PatchPreconditionError, SourcePackageMismatchError, UnsupportedEditError
+from markitdown.twoways._errors import (
+    PatchPreconditionError,
+    SourcePackageMismatchError,
+    UnsupportedEditError,
+)
 from markitdown.twoways.formats.pdf.reader import read_pdf_ir
 from markitdown.twoways.formats.pdf.routing import resolve_pdf_link_uri_edit
 from markitdown.twoways.ir.edits import EditOperation, EditPrecondition
@@ -18,13 +29,27 @@ def _link_pdf(uri: str = "https://example.com/old") -> bytes:
     writer = PdfWriter()
     page = writer.add_blank_page(width=300, height=200)
     writer.add_metadata({"/Title": "H10 routing"})
-    action = DictionaryObject({NameObject("/S"): NameObject("/URI"), NameObject("/URI"): TextStringObject(uri)})
-    annotation = DictionaryObject({
-        NameObject("/Type"): NameObject("/Annot"),
-        NameObject("/Subtype"): NameObject("/Link"),
-        NameObject("/Rect"): RectangleObject([NumberObject(10), NumberObject(10), NumberObject(120), NumberObject(30)]),
-        NameObject("/A"): action,
-    })
+    action = DictionaryObject(
+        {
+            NameObject("/S"): NameObject("/URI"),
+            NameObject("/URI"): TextStringObject(uri),
+        }
+    )
+    annotation = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Annot"),
+            NameObject("/Subtype"): NameObject("/Link"),
+            NameObject("/Rect"): RectangleObject(
+                [
+                    NumberObject(10),
+                    NumberObject(10),
+                    NumberObject(120),
+                    NumberObject(30),
+                ]
+            ),
+            NameObject("/A"): action,
+        }
+    )
     page[NameObject("/Annots")] = ArrayObject([writer._add_object(annotation)])
     stream = BytesIO()
     writer.write(stream)
@@ -32,7 +57,9 @@ def _link_pdf(uri: str = "https://example.com/old") -> bytes:
 
 
 def _link(document):
-    return next(node for node in document.nodes.values() if node.semantic_role == "pdf-link-uri")
+    return next(
+        node for node in document.nodes.values() if node.semantic_role == "pdf-link-uri"
+    )
 
 
 def _edit(document, uri: str = "https://example.com/new") -> EditOperation:
@@ -75,14 +102,18 @@ def test_pdf_link_routing_rejects_stale_source() -> None:
     source = _link_pdf()
     document = read_pdf_ir(BytesIO(source), filename="links.pdf")
     with pytest.raises(SourcePackageMismatchError):
-        resolve_pdf_link_uri_edit(document, _link_pdf("https://example.com/stale"), _edit(document))
+        resolve_pdf_link_uri_edit(
+            document, _link_pdf("https://example.com/stale"), _edit(document)
+        )
 
 
 def test_pdf_link_routing_rejects_stale_old_uri() -> None:
     source = _link_pdf()
     document = read_pdf_ir(BytesIO(source), filename="links.pdf")
     edit = _edit(document)
-    edit = replace(edit, payload={**edit.payload, "old_uri": "https://example.com/stale"})
+    edit = replace(
+        edit, payload={**edit.payload, "old_uri": "https://example.com/stale"}
+    )
     with pytest.raises(PatchPreconditionError) as exc:
         resolve_pdf_link_uri_edit(document, source, edit)
     assert exc.value.details["reason"] == "pdf.link.old_uri"
@@ -120,14 +151,19 @@ def test_pdf_link_routing_rejects_forged_native_evidence() -> None:
     forged_document = _replace_node(document, forged)
     with pytest.raises(PatchPreconditionError) as exc:
         resolve_pdf_link_uri_edit(forged_document, source, _edit(forged_document))
-    assert exc.value.details["reason"] in {"pdf.link.native_binding", "pdf.link.native_locator"}
+    assert exc.value.details["reason"] in {
+        "pdf.link.native_binding",
+        "pdf.link.native_locator",
+    }
 
 
 def test_pdf_link_routing_rejects_semantic_noop() -> None:
     source = _link_pdf()
     document = read_pdf_ir(BytesIO(source), filename="links.pdf")
     with pytest.raises(UnsupportedEditError) as exc:
-        resolve_pdf_link_uri_edit(document, source, _edit(document, uri="https://example.com/old"))
+        resolve_pdf_link_uri_edit(
+            document, source, _edit(document, uri="https://example.com/old")
+        )
     assert exc.value.details["reason"] == "pdf.link.semantic_noop"
 
 

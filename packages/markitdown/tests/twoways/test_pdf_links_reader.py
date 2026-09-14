@@ -52,9 +52,7 @@ def _link_pdf(*, competing_dest: bool = False) -> bytes:
 
 def _link_node(document):
     return next(
-        node
-        for node in document.nodes.values()
-        if node.semantic_role == "pdf-link-uri"
+        node for node in document.nodes.values() if node.semantic_role == "pdf-link-uri"
     )
 
 

@@ -472,8 +472,7 @@ def resolve_pdf_link_uri_edit(
         len(item.uri)
         for item in parsed.links
         if not (
-            item.page_index == page_index
-            and item.annotation_index == annotation_index
+            item.page_index == page_index and item.annotation_index == annotation_index
         )
     ) + len(uri)
     if total_uri_chars > limits.max_total_uri_chars:

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from markitdown.twoways.formats.pdf.model import PdfParseError
+from markitdown.twoways.formats.pdf.lexer import (
+    decode_pdf_text_string,
+    encode_pdf_text_string,
+    parse_pdf_dictionary,
+)
+from markitdown.twoways.formats.pdf.limits import PdfNativeLimits
+from markitdown.twoways.formats.pdf.model import PdfIndirectRef, PdfParseError
 from markitdown.twoways.formats.pdf.parser import parse_pdf_source
 
 from ._pdf_fixtures import (
@@ -10,6 +16,34 @@ from ._pdf_fixtures import (
     append_free_info_revision,
     make_classic_pdf,
 )
+
+
+def test_parse_pdf_dictionary_preserves_raw_values_and_indirect_refs() -> None:
+    raw = b"<< /Title (A\\(B\\)) /Ref 7 2 R /Flag true /List [1 null /Name] >>"
+
+    parsed = parse_pdf_dictionary(raw, 0, limits=PdfNativeLimits())
+
+    assert parsed.start == 0
+    assert parsed.end == len(raw)
+    assert parsed.entries["Title"].raw == b"(A\\(B\\))"
+    assert parsed.entries["Ref"].value == PdfIndirectRef(7, 2)
+    assert parsed.entries["Flag"].value is True
+    assert parsed.entries["List"].raw == b"[1 null /Name]"
+
+
+def test_pdf_text_string_utf16be_hex_round_trip() -> None:
+    encoded = encode_pdf_text_string("Nolane Việt")
+
+    assert encoded.startswith(b"<FEFF")
+    assert encoded.endswith(b">")
+    assert decode_pdf_text_string(encoded, limits=PdfNativeLimits()) == "Nolane Việt"
+
+
+def test_unterminated_dictionary_fails_closed() -> None:
+    with pytest.raises(PdfParseError) as exc:
+        parse_pdf_dictionary(b"<< /Title (Alpha)", 0, limits=PdfNativeLimits())
+
+    assert exc.value.reason == "pdf.syntax.unterminated_dictionary"
 
 
 def test_parse_classic_pdf_resolves_effective_info() -> None:

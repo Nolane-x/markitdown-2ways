@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from hashlib import sha256
 from io import BytesIO
 import re
 
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
-from pypdf.generic import IndirectObject, TextStringObject
+from pypdf.generic import ArrayObject, DictionaryObject, IndirectObject, TextStringObject
 
 from .limits import PdfNativeLimits
 from .model import (
     ParsedPdfSource,
     PdfInfoFieldEvidence,
+    PdfLinkEvidence,
     PdfParseError,
     PdfSourceSnapshot,
 )
@@ -22,6 +24,17 @@ _SUPPORTED_FIELDS = {
     "Subject": "/Subject",
     "Keywords": "/Keywords",
 }
+
+_LINK_SOURCE_BLOCKERS = frozenset(
+    {
+        "pdf.metadata.xmp_conflict",
+        "pdf.security.encrypted",
+        "pdf.security.signature_present",
+        "pdf.security.certification_present",
+        "pdf.structure.linearized",
+        "pdf.structure.authority_ambiguous",
+    }
+)
 
 
 def _raw_get(mapping: object, key: str) -> object | None:
@@ -78,6 +91,239 @@ def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
     except Exception:
         has_signature = True
     return (has_signature, has_certification)
+
+
+def _rect_tuple(value: object) -> tuple[float, float, float, float] | None:
+    if isinstance(value, IndirectObject):
+        try:
+            value = value.get_object()
+        except Exception:
+            return None
+    if not isinstance(value, (ArrayObject, list, tuple)) or len(value) != 4:
+        return None
+    try:
+        return tuple(float(item) for item in value)  # type: ignore[return-value]
+    except (TypeError, ValueError):
+        return None
+
+
+def _link_locator_digest(
+    *,
+    page_index: int,
+    annotation_index: int,
+    annotation_objgen: tuple[int, int],
+    action_objgen: tuple[int, int] | None,
+    owner_kind: str,
+    mutation_owner_objgen: tuple[int, int],
+    uri: str,
+) -> str:
+    evidence = repr(
+        (
+            "pdf-link-uri",
+            page_index,
+            annotation_index,
+            annotation_objgen,
+            action_objgen,
+            owner_kind,
+            mutation_owner_objgen,
+            "/Link",
+            "/URI",
+            uri,
+        )
+    ).encode("utf-8")
+    return sha256(evidence).hexdigest()
+
+
+def _collect_links(
+    reader: PdfReader,
+    *,
+    limits: PdfNativeLimits,
+    source_policy_blocked: bool,
+) -> tuple[PdfLinkEvidence, ...]:
+    links: list[PdfLinkEvidence] = []
+    total_annotations = 0
+    total_uri_chars = 0
+
+    for page_index, page in enumerate(reader.pages):
+        annots_ref = _raw_get(page, "/Annots")
+        if annots_ref is None:
+            continue
+        try:
+            annots = (
+                annots_ref.get_object()
+                if isinstance(annots_ref, IndirectObject)
+                else annots_ref
+            )
+        except Exception as exc:
+            raise PdfParseError(
+                "Unable to establish PDF annotation-array authority.",
+                reason="pdf.annotations.malformed",
+                details={"page_index": page_index},
+            ) from exc
+        if not isinstance(annots, (ArrayObject, list, tuple)):
+            raise PdfParseError(
+                "PDF page annotations are not represented by an array.",
+                reason="pdf.annotations.malformed",
+                details={"page_index": page_index},
+            )
+        if len(annots) > limits.max_annotations_per_page:
+            raise PdfParseError(
+                "PDF page annotation count exceeds the configured limit.",
+                reason="pdf.annotations.too_many",
+                details={
+                    "page_index": page_index,
+                    "annotation_count": len(annots),
+                    "limit": limits.max_annotations_per_page,
+                },
+            )
+        total_annotations += len(annots)
+        if total_annotations > limits.max_total_annotations:
+            raise PdfParseError(
+                "PDF annotation count exceeds the configured limit.",
+                reason="pdf.annotations.too_many",
+                details={
+                    "annotation_count": total_annotations,
+                    "limit": limits.max_total_annotations,
+                },
+            )
+
+        for annotation_index, annotation_ref in enumerate(annots):
+            annotation_objgen = _objgen(annotation_ref)
+            if annotation_objgen is None:
+                # H10 never invents stable authority for direct annotation entries.
+                continue
+            try:
+                annotation = annotation_ref.get_object()
+            except Exception as exc:
+                raise PdfParseError(
+                    "Unable to resolve an indirect PDF annotation.",
+                    reason="pdf.annotations.malformed",
+                    details={
+                        "page_index": page_index,
+                        "annotation_index": annotation_index,
+                    },
+                ) from exc
+            if not isinstance(annotation, DictionaryObject):
+                raise PdfParseError(
+                    "PDF annotation entry does not resolve to a dictionary.",
+                    reason="pdf.annotations.malformed",
+                    details={
+                        "page_index": page_index,
+                        "annotation_index": annotation_index,
+                    },
+                )
+            if str(annotation.get("/Subtype", "")) != "/Link":
+                continue
+
+            action_ref = _raw_get(annotation, "/A")
+            if action_ref is None:
+                continue
+            action_objgen = _objgen(action_ref)
+            if action_objgen is not None:
+                owner_kind = "action"
+                mutation_owner_objgen = action_objgen
+                try:
+                    action = action_ref.get_object()
+                except Exception as exc:
+                    raise PdfParseError(
+                        "Unable to resolve an indirect PDF link action.",
+                        reason="pdf.link.action_malformed",
+                        details={
+                            "page_index": page_index,
+                            "annotation_index": annotation_index,
+                        },
+                    ) from exc
+            else:
+                owner_kind = "annotation"
+                mutation_owner_objgen = annotation_objgen
+                action = action_ref
+            if not isinstance(action, DictionaryObject):
+                continue
+            action_type = str(action.get("/S", ""))
+            if action_type != "/URI":
+                continue
+
+            uri_raw = _raw_get(action, "/URI")
+            if uri_raw is None:
+                continue
+            uri_is_text = isinstance(uri_raw, TextStringObject)
+            uri = str(uri_raw) if uri_is_text else ""
+            if uri_is_text and len(uri) > limits.max_uri_chars:
+                raise PdfParseError(
+                    "PDF URI exceeds the configured character limit.",
+                    reason="pdf.link.uri_too_large",
+                    details={
+                        "page_index": page_index,
+                        "annotation_index": annotation_index,
+                        "uri_chars": len(uri),
+                        "limit": limits.max_uri_chars,
+                    },
+                )
+            total_uri_chars += len(uri)
+            if total_uri_chars > limits.max_total_uri_chars:
+                raise PdfParseError(
+                    "PDF URI text exceeds the configured total character limit.",
+                    reason="pdf.link.total_uri_too_large",
+                    details={
+                        "uri_chars": total_uri_chars,
+                        "limit": limits.max_total_uri_chars,
+                    },
+                )
+
+            reason_code: str | None = None
+            if source_policy_blocked:
+                reason_code = "pdf.link.source_policy"
+            elif not uri_is_text:
+                reason_code = "pdf.link.unsupported_uri"
+            elif "/Dest" in annotation:
+                reason_code = "pdf.link.competing_destination"
+            elif "/AA" in annotation or "/AA" in action:
+                reason_code = "pdf.link.additional_actions"
+
+            links.append(
+                PdfLinkEvidence(
+                    page_index=page_index,
+                    annotation_index=annotation_index,
+                    annotation_objgen=annotation_objgen,
+                    action_objgen=action_objgen,
+                    owner_kind=owner_kind,
+                    mutation_owner_objgen=mutation_owner_objgen,
+                    uri=uri,
+                    rect=_rect_tuple(_raw_get(annotation, "/Rect")),
+                    subtype="/Link",
+                    action_type="/URI",
+                    locator_digest=_link_locator_digest(
+                        page_index=page_index,
+                        annotation_index=annotation_index,
+                        annotation_objgen=annotation_objgen,
+                        action_objgen=action_objgen,
+                        owner_kind=owner_kind,
+                        mutation_owner_objgen=mutation_owner_objgen,
+                        uri=uri,
+                    ),
+                    writable=reason_code is None,
+                    reason_code=reason_code,
+                )
+            )
+
+    owner_counts: dict[tuple[int, int], int] = {}
+    for link in links:
+        owner_counts[link.mutation_owner_objgen] = (
+            owner_counts.get(link.mutation_owner_objgen, 0) + 1
+        )
+    if any(count > 1 for count in owner_counts.values()):
+        links = [
+            replace(
+                link,
+                writable=False,
+                reason_code="pdf.link.shared_owner",
+            )
+            if owner_counts[link.mutation_owner_objgen] > 1
+            else link
+            for link in links
+        ]
+
+    return tuple(links)
 
 
 def parse_pdf_source(
@@ -214,6 +460,16 @@ def parse_pdf_source(
         and not any(reason in blocking for reason in diagnostics)
     )
 
+    links: tuple[PdfLinkEvidence, ...] = ()
+    if not encrypted:
+        links = _collect_links(
+            reader,
+            limits=limits,
+            source_policy_blocked=any(
+                reason in _LINK_SOURCE_BLOCKERS for reason in diagnostics
+            ),
+        )
+
     header_line = source.splitlines()[0].decode("ascii", errors="replace")
     snapshot = PdfSourceSnapshot(
         source_sha256=sha256(source).hexdigest(),
@@ -234,4 +490,5 @@ def parse_pdf_source(
         fields=tuple(fields),
         writable=writable,
         diagnostics=tuple(dict.fromkeys(diagnostics)),
+        links=links,
     )

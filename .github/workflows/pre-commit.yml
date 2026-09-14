@@ -20,3 +20,12 @@ jobs:
         run: |
           pre-commit run --all-files || true
           git diff -- packages/markitdown/src/markitdown/twoways/formats/pdf/reader.py packages/markitdown/src/markitdown/twoways/formats/pdf/routing.py packages/markitdown/tests/twoways/test_pdf_links_reader.py packages/markitdown/tests/twoways/test_pdf_links_routing.py
+      - name: Upload canonical H10 files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: h10-canonical-black
+          path: |
+            packages/markitdown/src/markitdown/twoways/formats/pdf/reader.py
+            packages/markitdown/src/markitdown/twoways/formats/pdf/routing.py
+            packages/markitdown/tests/twoways/test_pdf_links_reader.py
+            packages/markitdown/tests/twoways/test_pdf_links_routing.py

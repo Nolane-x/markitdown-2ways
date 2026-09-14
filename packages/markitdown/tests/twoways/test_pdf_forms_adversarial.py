@@ -11,9 +11,7 @@ def _form_pdf(*, fields: bytes, field: bytes) -> bytes:
         2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         3: b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [6 0 R] >>",
         4: b"<< /Title (H11 adversarial) >>",
-        5: b"<< /Fields "
-        + fields
-        + b" /NeedAppearances true /DA (/Helv 0 Tf 0 g) >>",
+        5: b"<< /Fields " + fields + b" /NeedAppearances true /DA (/Helv 0 Tf 0 g) >>",
         6: field,
     }
     return _build_pdf(objects)
@@ -22,9 +20,7 @@ def _form_pdf(*, fields: bytes, field: bytes) -> bytes:
 def _plain_field(extra: bytes = b"") -> bytes:
     return (
         b"<< /FT /Tx /Subtype /Widget /T (customer.name) /V (Alice) "
-        b"/Rect [72 700 240 724] /Ff 0"
-        + extra
-        + b" >>"
+        b"/Rect [72 700 240 724] /Ff 0" + extra + b" >>"
     )
 
 

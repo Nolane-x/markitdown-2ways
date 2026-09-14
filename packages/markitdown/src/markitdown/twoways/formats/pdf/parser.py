@@ -154,8 +154,14 @@ def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
         else:
             fields = ()
         stack = list(fields or ())
+        seen: set[tuple[int, int]] = set()
         while stack:
             field_ref = stack.pop()
+            field_objgen = _objgen(field_ref)
+            if field_objgen is not None:
+                if field_objgen in seen:
+                    continue
+                seen.add(field_objgen)
             if isinstance(field_ref, IndirectObject):
                 field = field_ref.get_object()
             else:

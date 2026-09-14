@@ -305,7 +305,9 @@ def read_pdf_ir(
             "pdf.acroform_objgen": snapshot.acroform_objgen,
             "pdf.need_appearances": snapshot.need_appearances,
             "pdf.form_h11_count": len(parsed.form_fields),
-            "pdf.form_h11_supported": any(field.writable for field in parsed.form_fields),
+            "pdf.form_h11_supported": any(
+                field.writable for field in parsed.form_fields
+            ),
             "pdf.identity_markdown": False,
             CAPABILITY_METADATA_KEY: encode_capabilities((_root_capability(parsed),)),
         },

@@ -53,25 +53,24 @@ def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
     has_signature = False
     acroform_ref = _raw_get(root, "/AcroForm")
     try:
-        acroform = (
-            acroform_ref.get_object()
-            if isinstance(acroform_ref, IndirectObject)
-            else acroform_ref
-        )
-        fields = acroform.get("/Fields", ()) if hasattr(acroform, "get") else ()
+        if isinstance(acroform_ref, IndirectObject):
+            acroform = acroform_ref.get_object()
+        else:
+            acroform = acroform_ref
+        if hasattr(acroform, "get"):
+            fields = acroform.get("/Fields", ())
+        else:
+            fields = ()
         stack = list(fields or ())
         while stack:
             field_ref = stack.pop()
-            field = (
-                field_ref.get_object()
-                if isinstance(field_ref, IndirectObject)
-                else field_ref
-            )
+            if isinstance(field_ref, IndirectObject):
+                field = field_ref.get_object()
+            else:
+                field = field_ref
             if not hasattr(field, "get"):
                 continue
-            if field.get("/FT") == "/Sig" or (
-                "/V" in field and field.get("/FT") == "/Sig"
-            ):
+            if field.get("/FT") == "/Sig":
                 has_signature = True
                 break
             kids = field.get("/Kids", ())

@@ -15,7 +15,6 @@ authors = [
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
-  "Programming Language :: Python",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -42,6 +41,7 @@ all = [
   "lxml",
   "pdfminer.six>=20251230",
   "pdfplumber>=0.11.9",
+  "pypdf>=6.18.1,<7",
   "olefile",
   "pydub",
   "SpeechRecognition",
@@ -54,7 +54,7 @@ pptx = ["python-pptx", "lxml"]
 docx = ["mammoth~=1.11.0", "lxml"]
 xlsx = ["pandas", "openpyxl"]
 xls = ["pandas", "xlrd"]
-pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9"]
+pdf = ["pdfminer.six>=20251230", "pdfplumber>=0.11.9", "pypdf>=6.18.1,<7"]
 outlook = ["olefile"]
 audio-transcription = ["pydub", "SpeechRecognition"]
 youtube-transcription = ["youtube-transcript-api"]
@@ -67,16 +67,16 @@ Documentation = "https://github.com/microsoft/markitdown#readme"
 Issues = "https://github.com/microsoft/markitdown/issues"
 Source = "https://github.com/microsoft/markitdown"
 
-[tool.hatch.version]
-path = "src/markitdown/__about__.py"
-
 [project.scripts]
 markitdown = "markitdown.__main__:main"
+
+[tool.hatch.version]
+path = "src/markitdown/__about__.py"
 
 [tool.hatch.envs.default]
 features = ["all"]
 
-[tool.hatch.envs.hatch-test]
+ [tool.hatch.envs.hatch-test]
 features = ["all"]
 extra-dependencies = [
   "openai",

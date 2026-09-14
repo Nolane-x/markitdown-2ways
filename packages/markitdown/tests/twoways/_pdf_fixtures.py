@@ -12,6 +12,7 @@ def make_metadata_pdf(
     author: str = "Ada",
     subject: str = "Spec",
     keywords: str = "one,two",
+    include_info: bool = True,
 ) -> bytes:
     objects = {
         1: b"<< /Type /Catalog /Pages 2 0 R >>",
@@ -41,6 +42,7 @@ def make_metadata_pdf(
     output.extend(b"0000000000 65535 f \n")
     for number in range(1, 5):
         output.extend(f"{offsets[number]:010d} 00000 n \n".encode("ascii"))
-    output.extend(b"trailer\n<< /Size 5 /Root 1 0 R /Info 4 0 R >>\n")
+    info_entry = b" /Info 4 0 R" if include_info else b""
+    output.extend(b"trailer\n<< /Size 5 /Root 1 0 R" + info_entry + b" >>\n")
     output.extend(f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii"))
     return bytes(output)

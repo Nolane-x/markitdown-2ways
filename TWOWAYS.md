@@ -15,7 +15,7 @@ scalar mutation, target-only XML text/attribute mutation, recovery-aware target-
 HTML text/quoted-attribute mutation, target-only Jupyter Notebook cell-source mutation,
 package-preserving EPUB 3 metadata/XHTML text mutation, bounded recursive ordinary ZIP
 composition over supported typed inner formats, and conservative PDF Document Information
-incremental metadata mutation. It is not an Office automation
+plus existing URI-link target incremental mutation. It is not an Office automation
 platform, workflow engine, document-management service, browser automation layer,
 archive authoring suite, or general application framework.
 
@@ -541,6 +541,61 @@ outlines, page text, images, page content streams or arbitrary PDF objects. Iden
 Markdown is inspection-only; direct typed `update_pdf_metadata` is authoritative. The
 existing one-way `PdfConverter` remains byte-for-byte unchanged and independent of H9.
 
+## PDF existing URI-link incremental edits
+
+Phase H10 extends v0.7 without turning PDF into a general annotation editor. The reader
+materializes deterministic `pdf-link-uri` nodes only for existing indirect `/Subtype
+/Link` annotations with an existing `/A` action, `/S /URI`, and existing `/URI` value.
+Writable capability `update_pdf_link_uri` is advertised only when the URI is text and the
+annotation/action ownership is unique and fully authoritative.
+
+```python
+from io import BytesIO
+
+from markitdown.twoways import EditOperation, EditPrecondition
+from markitdown.twoways.formats.pdf import patch_pdf, read_pdf_ir
+
+with open("report.pdf", "rb") as source_file:
+    source = source_file.read()
+
+document = read_pdf_ir(BytesIO(source), filename="report.pdf")
+link_node = next(
+    node for node in document.nodes.values() if node.semantic_role == "pdf-link-uri"
+)
+edit = EditOperation(
+    operation_id="update-link",
+    type="update_pdf_link_uri",
+    target_node_id=link_node.node_id,
+    precondition=EditPrecondition(expected_old_value=link_node.payload.text),
+    payload={
+        "page_index": link_node.metadata["pdf.page_index"],
+        "annotation_index": link_node.metadata["pdf.annotation_index"],
+        "old_uri": link_node.payload.text,
+        "uri": "https://example.com/new",
+    },
+)
+
+with open("report-edited.pdf", "wb") as output_file:
+    patch_pdf(document, BytesIO(source), output_file, edits=(edit,))
+```
+
+H10 preserves H9's append-only source-prefix contract and permits mixed metadata/link
+transactions. The pypdf incremental changed-object set must equal the exact union of the
+H9 `/Info` owner and requested H10 link mutation owners. A fresh strict re-read must keep
+page object identities, annotation count/order/ownership topology, every sibling
+annotation fingerprint, and immutable target semantics outside `/URI` unchanged. Direct
+action targets may change their containing annotation fingerprint only because `/URI`
+changed. pdfplumber independently confirms requested hyperlink URI semantics.
+
+H10 fails closed for direct annotation-array entries without indirect write authority,
+shared mutation owners, `/Dest`, `/AA`, unsupported actions, non-text URI values,
+ambiguous/malformed annotation authority, source-policy blockers such as XMP,
+encryption/signatures/certification/linearization, and annotation/URI resource-limit
+violations. It does not create, delete, reorder, resize or restyle annotations; edit
+forms, non-URI actions, page text/images/content streams, outlines or appearances; or
+regenerate the PDF. PDF identity Markdown remains inspection-only. The existing one-way
+`PdfConverter` remains byte-for-byte unchanged.
+
 ## PPTX and DOCX round trips
 
 PPTX and DOCX use identity Markdown where the projection/importer can prove a semantic
@@ -598,19 +653,19 @@ a serializer; `openpyxl` is an independent regression oracle.
 
 ## Current capability boundary
 
-| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9 | PPTX | DOCX | XLSX tranche one |
+| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9-H10 | PPTX | DOCX | XLSX tranche one |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
-| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | routes the existing typed inner operation through the exact member chain; ZIP structure itself is read-only | `update_pdf_metadata` for existing Title/Author/Subject/Keywords | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
+| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners + deterministic existing URI-link evidence/topology | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
+| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | routes the existing typed inner operation through the exact member chain; ZIP structure itself is read-only | `update_pdf_metadata` for existing Title/Author/Subject/Keywords + `update_pdf_link_uri` for existing safe URI links | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
 | Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only for every ZIP-backed imported node | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
-| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | root/member SHA+size, ordered nested inventory, member metadata, full chain + shared global budgets | exact source prefix + root/Info objgen + changed-object audit + strict pypdf/pdfminer agreement | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
-| Structural edits | unsupported | unsupported | unsupported | unsupported | unsupported | unsupported; notebook/cell structure and non-source state are read-only | unsupported; package graph/inventory/nav/media are read-only | unsupported; add/delete/rename/reorder/comment/compression/encryption/raw member replacement are read-only | unsupported; no new keys or page/object-graph edits | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
+| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | root/member SHA+size, ordered nested inventory, member metadata, full chain + shared global budgets | exact source prefix + root/Info/page/annotation identities + annotation topology/fingerprints + changed-object audit + strict pypdf/pdfminer/pdfplumber agreement | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
+| Structural edits | unsupported | unsupported | unsupported | unsupported | unsupported | unsupported; notebook/cell structure and non-source state are read-only | unsupported; package graph/inventory/nav/media are read-only | unsupported; add/delete/rename/reorder/comment/compression/encryption/raw member replacement are read-only | unsupported; no new keys, annotation creation/deletion/reordering, forms, or page/object-graph edits | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
 
 H1-H5 together form the v0.5 text/structured-text parity tranche. H6-H8 extend v0.6
 with bounded Jupyter Notebook source preservation, EPUB 3 package-preserving text
-mutation and recursive ordinary ZIP composition. H9 starts v0.7 with conservative PDF
-Document Information mutation. Every tranche remains isolated behind exact source and
-native ownership authority.
+mutation and recursive ordinary ZIP composition. H9-H10 extend v0.7 with conservative
+PDF Document Information mutation followed by existing URI-link target preservation.
+Every tranche remains isolated behind exact source and native ownership authority.
 
 ## Fidelity details
 
@@ -631,7 +686,9 @@ Format-specific proof strengthens the common safety model:
   inventories, archive comments, supported member metadata, strong-package classification
   priority and transaction-wide recursion budgets;
 - PDF binds strict source/catalog/Info ownership, exact source-prefix preservation, the
-  incremental changed-object set, page count and dual pypdf/pdfminer metadata semantics;
+  incremental changed-object set, page count/object identities, complete annotation
+  topology/fingerprints, immutable URI-link semantics outside `/URI`, dual pypdf/pdfminer
+  metadata semantics and an independent pdfplumber URI oracle;
 - CSV, JSON, XML, HTML and IPYNB prove every encoded byte segment outside requested
   targets remains exact through their native or composed preservation contracts;
 - EPUB proves byte-identical content for every untouched archive member and strict graph
@@ -650,8 +707,9 @@ Format-specific proof strengthens the common safety model:
   compression, recursion-depth/member/expanded-byte/ratio violations and ambiguous member
   classification before typed routing;
 - PDF additionally rejects XMP authority, encryption, signatures/certification,
-  linearization, ambiguous/missing Info ownership, non-text supported values and configured
-  source/page/metadata/increment limits before caller output;
+  linearization, ambiguous/missing Info ownership, non-text supported metadata values,
+  `/Dest`, `/AA`, unsupported/non-text URI actions, shared or ambiguous link ownership,
+  and configured source/page/metadata/annotation/URI/increment limits before caller output;
 - OOXML writers start from the original package and restrict mutation to authorized
   parts/subtrees, with unrelated package members verified after writes.
 
@@ -666,9 +724,9 @@ Native lexical text/Markdown, CSV, JSON, XML and HTML are explicit v0.5 inspecti
 identity projections. IPYNB H6 and EPUB H7 keep the same inspection-only identity
 boundary. H8 preserves visible projection of supported nested content but forces
 `editable_capabilities=()` for every ZIP-backed imported block, so identity Markdown
-cannot become an alternate archive mutation path. H9 applies the same inspection-only
-boundary to PDF metadata blocks. Direct typed native paths remain writable only where
-source evidence is sufficient.
+cannot become an alternate archive mutation path. H9-H10 apply the same inspection-only
+boundary to PDF metadata and URI-link blocks. Direct typed native paths remain writable
+only where source evidence is sufficient.
 
 ## Scope discipline and roadmap
 
@@ -704,6 +762,8 @@ Current v0.7 execution documents include:
 
 - `docs/superpowers/specs/2026-09-14-markitdown-2ways-phase-h9-pdf-metadata-preservation-design.md`
 - `docs/superpowers/plans/2026-09-14-markitdown-2ways-phase-h9-pdf-metadata-preservation.md`
+- `docs/superpowers/specs/2026-09-14-markitdown-2ways-phase-h10-pdf-uri-link-preservation-design.md`
+- `docs/superpowers/plans/2026-09-14-markitdown-2ways-phase-h10-pdf-uri-link-preservation.md`
 
 Each tranche is complete only after its exact final branch head passes pre-commit plus
 the package and OCR matrices on Python 3.10-3.13. H5 uses a separate recovery-aware
@@ -712,8 +772,9 @@ authority with H3 lexical scalar patching and leaves the existing one-way IPYNB 
 unchanged. H7 composes EPUB package authority with H4 XML text mutation and leaves the
 existing one-way EPUB path unchanged. H8 composes ordinary ZIP preservation/routing with
 the existing typed H1-H7/native package writers, leaves the one-way `ZipConverter`
-unchanged. H9 adds only conservative PDF Document Information incremental mutation and
-leaves the existing one-way `PdfConverter` unchanged. PDF annotations/forms/links, page
-text/image/content mutation, outlines, new metadata keys, media-native mutation, other
-archive families, remote writeback and archive structural editing remain outside the
-current completed boundary.
+unchanged. H9 adds conservative PDF Document Information incremental mutation; H10 adds
+only existing safe URI-link target mutation and leaves the existing one-way `PdfConverter`
+unchanged. Annotation structural editing, forms, non-URI actions, page text/image/content
+mutation, outlines, new metadata keys, media-native mutation, other archive families,
+remote writeback and archive structural editing remain outside the current completed
+boundary.

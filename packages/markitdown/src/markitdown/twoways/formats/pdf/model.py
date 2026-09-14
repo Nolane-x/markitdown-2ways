@@ -27,6 +27,24 @@ class PdfInfoFieldEvidence:
 
 
 @dataclass(frozen=True)
+class PdfLinkEvidence:
+    page_index: int
+    annotation_index: int
+    annotation_objgen: tuple[int, int]
+    action_objgen: tuple[int, int] | None
+    owner_kind: str
+    mutation_owner_objgen: tuple[int, int]
+    uri: str
+    rect: tuple[float, float, float, float] | None
+    subtype: str
+    action_type: str
+    locator_digest: str
+    writable: bool
+    reason_code: str | None = None
+    immutable_digest: str = ""
+
+
+@dataclass(frozen=True)
 class PdfSourceSnapshot:
     source_sha256: str
     source_size: int
@@ -40,6 +58,9 @@ class PdfSourceSnapshot:
     has_signature: bool
     has_certification: bool
     linearized: bool
+    page_objgens: tuple[tuple[int, int] | None, ...] = ()
+    annotation_topology: tuple[tuple[tuple[int, int] | None, ...], ...] = ()
+    annotation_fingerprints: tuple[tuple[str, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -48,3 +69,4 @@ class ParsedPdfSource:
     fields: tuple[PdfInfoFieldEvidence, ...]
     writable: bool
     diagnostics: tuple[str, ...] = ()
+    links: tuple[PdfLinkEvidence, ...] = ()

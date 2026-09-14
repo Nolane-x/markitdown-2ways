@@ -19,9 +19,7 @@ def _form_node(document):
 
 def _root_node(document):
     return next(
-        node
-        for node in document.nodes.values()
-        if node.semantic_role == "pdf-document"
+        node for node in document.nodes.values() if node.semantic_role == "pdf-document"
     )
 
 
@@ -49,9 +47,7 @@ def test_pdf_reader_materializes_deterministic_writable_text_field() -> None:
     assert field.native_locator.backend == "pdf"
     assert field.native_locator.path == "/V"
 
-    decision = capabilities_for_node(field).for_operation(
-        "update_pdf_text_field_value"
-    )
+    decision = capabilities_for_node(field).for_operation("update_pdf_text_field_value")
     assert decision.state is CapabilityState.WRITABLE
     assert decision.reason_code is None
     assert decision.constraints["identity_markdown"] is False
@@ -73,9 +69,7 @@ def test_pdf_reader_materializes_policy_read_only_text_field() -> None:
     )
     field = _form_node(document)
 
-    decision = capabilities_for_node(field).for_operation(
-        "update_pdf_text_field_value"
-    )
+    decision = capabilities_for_node(field).for_operation("update_pdf_text_field_value")
     assert decision.state is CapabilityState.READ_ONLY
     assert decision.reason_code == "pdf.form.appearance_present"
 

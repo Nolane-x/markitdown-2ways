@@ -16,7 +16,5 @@ jobs:
           pip install pre-commit
           pre-commit install --install-hooks
 
-      - name: Run pre-commit diagnostic
-        run: |
-          pre-commit run --all-files || true
-          git diff -- packages/markitdown/src/markitdown/twoways/formats/pdf/reader.py packages/markitdown/tests/twoways/test_pdf_links_reader.py
+      - name: Run pre-commit
+        run: pre-commit run --all-files

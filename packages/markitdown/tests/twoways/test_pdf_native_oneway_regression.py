@@ -41,6 +41,7 @@ def test_oneway_pdf_converter_behavior_remains_independent_of_h9_writer() -> Non
         BytesIO(b""),
         StreamInfo(filename="sample.txt", extension=".txt", mimetype="text/plain"),
     )
-    assert _merge_partial_numbering_lines(
-        ".1\nFirst item\n\n.2\nSecond item"
-    ) == ".1 First item\n\n.2 Second item"
+    assert (
+        _merge_partial_numbering_lines(".1\nFirst item\n\n.2\nSecond item")
+        == ".1 First item\n\n.2 Second item"
+    )

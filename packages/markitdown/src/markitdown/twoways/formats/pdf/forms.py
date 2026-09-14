@@ -15,7 +15,9 @@ from pypdf.generic import (
 from .limits import PdfNativeLimits
 from .model import PdfParseError, PdfTextFieldEvidence
 
-_UNSUPPORTED_TEXT_FLAGS = (1 << 12) | (1 << 13) | (1 << 20) | (1 << 24) | (1 << 25)
+_UNSUPPORTED_TEXT_FLAGS = (
+    (1 << 12) | (1 << 13) | (1 << 20) | (1 << 24) | (1 << 25)
+)
 _READ_ONLY_FLAG = 1
 
 
@@ -408,7 +410,10 @@ def collect_text_fields(
     fingerprints: list[tuple[tuple[int, int], str]] = []
     for evidence, field in collected:
         reason = evidence.reason_code
-        if evidence.field_objgen in ambiguous_owners or name_counts[evidence.field_name] > 1:
+        if (
+            evidence.field_objgen in ambiguous_owners
+            or name_counts[evidence.field_name] > 1
+        ):
             reason = "pdf.form.tree_ambiguous"
         final = replace(
             evidence,

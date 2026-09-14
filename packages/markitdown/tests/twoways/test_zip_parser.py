@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from zipfile import ZIP_STORED
+
 from markitdown.twoways.formats.zip.limits import ZipRecursiveLimits
 from markitdown.twoways.formats.zip.parser import parse_zip_source
 from markitdown.twoways.formats.zip.registry import ZipMemberAdapter
@@ -83,6 +85,58 @@ def test_global_member_budget_is_shared_across_nested_archives() -> None:
     assert parsed.member_by_chain[("b.zip",)].classification.adapter_key == "zip"
     descendants = [chain for chain in parsed.member_by_chain if len(chain) > 1]
     assert len(descendants) <= 2
+
+
+def test_global_expanded_byte_budget_is_shared_across_nested_archives() -> None:
+    nested_a = make_zip(members={"a.txt": b"1234"}, compression=ZIP_STORED)
+    nested_b = make_zip(members={"b.txt": b"5678"}, compression=ZIP_STORED)
+    source = make_zip(
+        members={"a.zip": nested_a, "b.zip": nested_b, "safe.txt": b"ok"},
+        compression=ZIP_STORED,
+    )
+    root_expanded = len(nested_a) + len(nested_b) + len(b"ok")
+    parsed = parse_zip_source(
+        source,
+        limits=ZipRecursiveLimits(
+            max_archive_uncompressed_bytes=root_expanded + 16,
+            max_global_expanded_bytes=root_expanded + 5,
+        ),
+    )
+
+    assert any(
+        diagnostic.code == "zip.recursion.expanded_byte_budget_exceeded"
+        for diagnostic in parsed.diagnostics
+    )
+    assert parsed.member_by_chain[("safe.txt",)].entry.name == "safe.txt"
+    descendants = [chain for chain in parsed.member_by_chain if len(chain) > 1]
+    assert len(descendants) <= 1
+
+
+def test_nested_zip_bomb_is_rejected_without_losing_safe_sibling() -> None:
+    nested_bomb = make_zip(members={"bomb.txt": b"A" * 16_384})
+    source = make_zip(
+        members={"nested.zip": nested_bomb, "safe.txt": b"safe\n"},
+        compression=ZIP_STORED,
+    )
+    parsed = parse_zip_source(
+        source,
+        limits=ZipRecursiveLimits(max_compression_ratio=2.0),
+    )
+
+    nested = parsed.member_by_chain[("nested.zip",)]
+    sibling = parsed.member_by_chain[("safe.txt",)]
+    rejected = [
+        diagnostic
+        for diagnostic in parsed.diagnostics
+        if diagnostic.code == "zip.recursion.nested_archive_rejected"
+    ]
+
+    assert nested.classification.state == "typed"
+    assert nested.classification.adapter_key == "zip"
+    assert nested.nested_archive is None
+    assert sibling.entry.name == "safe.txt"
+    assert rejected
+    assert rejected[0].details["reason"] == "zip.package.compression_ratio_too_high"
 
 
 def test_depth_exhaustion_keeps_unrelated_sibling_represented() -> None:

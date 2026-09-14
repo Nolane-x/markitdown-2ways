@@ -89,7 +89,9 @@ def test_pdf_reader_appends_form_nodes_after_existing_pdf_nodes() -> None:
     root = _root_node(document)
     children = [document.nodes[node_id] for node_id in root.children]
 
-    metadata_orders = [node.order for node in children if node.semantic_role == "pdf-metadata"]
+    metadata_orders = [
+        node.order for node in children if node.semantic_role == "pdf-metadata"
+    ]
     form = _form_node(document)
     assert metadata_orders
     assert form.order > max(metadata_orders)

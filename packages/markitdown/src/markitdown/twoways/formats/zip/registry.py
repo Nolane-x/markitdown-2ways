@@ -13,6 +13,7 @@ ZipRead = Callable[..., object]
 ZipPatch = Callable[..., object]
 
 _EPUB_MIMETYPE = b"application/epub+zip"
+_TEXT_EXTENSIONS = frozenset({".txt", ".text", ".md", ".markdown"})
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,10 @@ class ZipMemberAdapter:
             "extensions",
             frozenset(extension.lower() for extension in self.extensions),
         )
+
+
+def _suffix(filename: str) -> str:
+    return PurePath(filename).suffix.lower()
 
 
 def _member_names(payload: bytes) -> set[str] | None:
@@ -93,13 +98,58 @@ def _probe_xlsx(payload: bytes, filename: str) -> bool:
     return _probe_ooxml(payload, "xl/workbook.xml")
 
 
+def _probe_text(payload: bytes, filename: str) -> bool:
+    if _suffix(filename) not in _TEXT_EXTENSIONS:
+        return False
+    from ..text import read_text_ir
+
+    read_text_ir(BytesIO(payload), filename=filename)
+    return True
+
+
+def _probe_csv(payload: bytes, filename: str) -> bool:
+    if _suffix(filename) != ".csv":
+        return False
+    from ..csv import read_csv_ir
+
+    read_csv_ir(BytesIO(payload), filename=filename)
+    return True
+
+
 def _probe_json(payload: bytes, filename: str) -> bool:
-    if PurePath(filename).suffix.lower() != ".json":
+    if _suffix(filename) != ".json":
         return False
     try:
         json.loads(payload.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError):
         return False
+    return True
+
+
+def _probe_xml(payload: bytes, filename: str) -> bool:
+    if _suffix(filename) != ".xml":
+        return False
+    from ..xml import read_xml_ir
+
+    read_xml_ir(BytesIO(payload), filename=filename)
+    return True
+
+
+def _probe_html(payload: bytes, filename: str) -> bool:
+    if _suffix(filename) not in {".html", ".htm"}:
+        return False
+    from ..html import read_html_ir
+
+    read_html_ir(BytesIO(payload), filename=filename)
+    return True
+
+
+def _probe_ipynb(payload: bytes, filename: str) -> bool:
+    if _suffix(filename) != ".ipynb":
+        return False
+    from ..ipynb import read_ipynb_ir
+
+    read_ipynb_ir(BytesIO(payload), filename=filename)
     return True
 
 
@@ -143,9 +193,49 @@ def default_zip_member_adapters() -> tuple[ZipMemberAdapter, ...]:
             strong_package=True,
         ),
         ZipMemberAdapter(
+            key="ipynb",
+            extensions=frozenset({".ipynb"}),
+            probe=_probe_ipynb,
+            read=None,
+            patch=None,
+            strong_package=False,
+        ),
+        ZipMemberAdapter(
+            key="csv",
+            extensions=frozenset({".csv"}),
+            probe=_probe_csv,
+            read=None,
+            patch=None,
+            strong_package=False,
+        ),
+        ZipMemberAdapter(
             key="json",
             extensions=frozenset({".json"}),
             probe=_probe_json,
+            read=None,
+            patch=None,
+            strong_package=False,
+        ),
+        ZipMemberAdapter(
+            key="xml",
+            extensions=frozenset({".xml"}),
+            probe=_probe_xml,
+            read=None,
+            patch=None,
+            strong_package=False,
+        ),
+        ZipMemberAdapter(
+            key="html",
+            extensions=frozenset({".html", ".htm"}),
+            probe=_probe_html,
+            read=None,
+            patch=None,
+            strong_package=False,
+        ),
+        ZipMemberAdapter(
+            key="text",
+            extensions=_TEXT_EXTENSIONS,
+            probe=_probe_text,
             read=None,
             patch=None,
             strong_package=False,

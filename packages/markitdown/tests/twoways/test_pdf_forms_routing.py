@@ -155,22 +155,23 @@ def test_pdf_form_routing_rejects_forged_field_name_payload() -> None:
 
 
 @pytest.mark.parametrize(
-    "metadata_key,forged",
+    "metadata_key,forged,reason",
     [
-        ("pdf.form_field_name", "forged.name"),
-        ("pdf.form_field_objgen", (999, 0)),
-        ("pdf.page_index", 9),
-        ("pdf.annotation_index", 9),
-        ("pdf.acroform_objgen", (999, 0)),
-        ("pdf.form_locator_digest", "0" * 64),
-        ("pdf.form_immutable_digest", "1" * 64),
+        ("pdf.form_field_name", "forged.name", "pdf.form.field_name"),
+        ("pdf.form_field_objgen", (999, 0), "pdf.form.native_binding"),
+        ("pdf.page_index", 9, "pdf.form.native_binding"),
+        ("pdf.annotation_index", 9, "pdf.form.native_binding"),
+        ("pdf.acroform_objgen", (999, 0), "pdf.form.native_binding"),
+        ("pdf.form_locator_digest", "0" * 64, "pdf.form.native_binding"),
+        ("pdf.form_immutable_digest", "1" * 64, "pdf.form.native_binding"),
     ],
 )
 def test_pdf_form_routing_rejects_forged_native_binding(
-    metadata_key: str, forged: object
+    metadata_key: str, forged: object, reason: str
 ) -> None:
     source = make_text_form_pdf()
     document = read_pdf_ir(BytesIO(source), filename="form.pdf")
+    edit = _edit(document)
     node = _field(document)
     metadata = dict(node.metadata)
     metadata[metadata_key] = forged
@@ -178,10 +179,8 @@ def test_pdf_form_routing_rejects_forged_native_binding(
     forged_document = _replace_node(document, forged_node)
 
     with pytest.raises(PatchPreconditionError) as exc:
-        resolve_pdf_text_field_value_edit(
-            forged_document, source, _edit(forged_document)
-        )
-    assert exc.value.details["reason"] == "pdf.form.native_binding"
+        resolve_pdf_text_field_value_edit(forged_document, source, edit)
+    assert exc.value.details["reason"] == reason
 
 
 def test_pdf_form_routing_rejects_forged_native_locator() -> None:
@@ -208,7 +207,7 @@ def test_pdf_form_routing_rejects_forged_native_locator() -> None:
 
 
 def test_pdf_form_routing_rejects_per_value_limit() -> None:
-    source = make_text_form_pdf()
+    source = make_text_form_pdf(value="Al")
     document = read_pdf_ir(BytesIO(source), filename="form.pdf")
     limits = PdfNativeLimits(max_form_value_chars=3)
 

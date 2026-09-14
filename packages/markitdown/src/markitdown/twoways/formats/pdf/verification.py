@@ -67,7 +67,10 @@ def _info_inventory(data: bytes) -> dict[str, object]:
         reader = PdfReader(BytesIO(data), strict=True)
         info_ref = _raw_get(reader.trailer, "/Info")
         if not isinstance(info_ref, IndirectObject):
-            _fail("pdf.candidate.info_missing", "PDF candidate lacks indirect Info authority.")
+            _fail(
+                "pdf.candidate.info_missing",
+                "PDF candidate lacks indirect Info authority.",
+            )
         info = info_ref.get_object()
         if not isinstance(info, Mapping):
             _fail(
@@ -154,7 +157,9 @@ def _pdfplumber_hyperlinks(
         ) from exc
 
 
-def _verify_metadata(source, candidate, source_parsed, candidate_parsed, routed) -> None:
+def _verify_metadata(
+    source, candidate, source_parsed, candidate_parsed, routed
+) -> None:
     source_snapshot = source_parsed.snapshot
     candidate_snapshot = candidate_parsed.snapshot
     requested = {item.field: item.value for item in routed}
@@ -245,7 +250,10 @@ def _verify_annotation_authority(
             zip(source_page, candidate_page)
         ):
             target = (page_index, annotation_index)
-            if source_digest != candidate_digest and target not in direct_action_targets:
+            if (
+                source_digest != candidate_digest
+                and target not in direct_action_targets
+            ):
                 _fail(
                     "pdf.candidate.annotation_sibling",
                     "PDF candidate changed an annotation outside an authorized direct URI target.",
@@ -271,9 +279,7 @@ def _link_binding(link) -> tuple[object, ...]:
 
 
 def _verify_links(source_parsed, candidate_parsed, routed) -> None:
-    source_links = {
-        (x.page_index, x.annotation_index): x for x in source_parsed.links
-    }
+    source_links = {(x.page_index, x.annotation_index): x for x in source_parsed.links}
     candidate_links = {
         (x.page_index, x.annotation_index): x for x in candidate_parsed.links
     }
@@ -320,9 +326,7 @@ def _verify_pdfplumber_links(
         return
     source_oracle = _pdfplumber_hyperlinks(source)
     candidate_oracle = _pdfplumber_hyperlinks(candidate)
-    source_links = {
-        (x.page_index, x.annotation_index): x for x in source_parsed.links
-    }
+    source_links = {(x.page_index, x.annotation_index): x for x in source_parsed.links}
     candidate_links = {
         (x.page_index, x.annotation_index): x for x in candidate_parsed.links
     }
@@ -383,9 +387,7 @@ def verify_pdf_candidate(
     limits = limits or PdfNativeLimits()
     routed = tuple(routed)
     changed_objects = tuple(changed_objects)
-    metadata_edits = tuple(
-        x for x in routed if isinstance(x, PdfRoutedMetadataEdit)
-    )
+    metadata_edits = tuple(x for x in routed if isinstance(x, PdfRoutedMetadataEdit))
     link_edits = tuple(x for x in routed if isinstance(x, PdfRoutedLinkEdit))
     if not candidate.startswith(source) or len(candidate) <= len(source):
         _fail(

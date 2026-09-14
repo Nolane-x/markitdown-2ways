@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 from io import BytesIO
-from zipfile import ZIP_BZIP2, ZipFile
+from zipfile import ZIP_BZIP2, ZIP_LZMA, ZipFile
 
 import pytest
 
@@ -75,6 +75,16 @@ def test_bzip2_member_fails_closed() -> None:
     source = make_zip(
         members={"docs/readme.txt": b"hello"},
         per_member_compression={"docs/readme.txt": ZIP_BZIP2},
+    )
+    with pytest.raises(ZipParseError, match="compression") as exc:
+        snapshot_zip_package(source)
+    _assert_reason(exc, "zip.package.unsupported_compression")
+
+
+def test_lzma_member_fails_closed() -> None:
+    source = make_zip(
+        members={"docs/readme.txt": b"hello"},
+        per_member_compression={"docs/readme.txt": ZIP_LZMA},
     )
     with pytest.raises(ZipParseError, match="compression") as exc:
         snapshot_zip_package(source)

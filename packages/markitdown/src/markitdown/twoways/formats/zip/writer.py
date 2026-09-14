@@ -101,10 +101,30 @@ def _read_chain_member(source: bytes, chain: tuple[str, ...]) -> bytes:
 
 def _read_inner(adapter_key: str, source: bytes, filename: str) -> DocumentIR:
     stream = BytesIO(source)
+    if adapter_key == "text":
+        from ..text import read_text_ir
+
+        return read_text_ir(stream, filename=filename)
+    if adapter_key == "csv":
+        from ..csv import read_csv_ir
+
+        return read_csv_ir(stream, filename=filename)
     if adapter_key == "json":
         from ..json import read_json_ir
 
         return read_json_ir(stream, filename=filename)
+    if adapter_key == "xml":
+        from ..xml import read_xml_ir
+
+        return read_xml_ir(stream, filename=filename)
+    if adapter_key == "html":
+        from ..html import read_html_ir
+
+        return read_html_ir(stream, filename=filename)
+    if adapter_key == "ipynb":
+        from ..ipynb import read_ipynb_ir
+
+        return read_ipynb_ir(stream, filename=filename)
     if adapter_key == "epub":
         from ..epub import read_epub_ir
 
@@ -135,10 +155,30 @@ def _patch_inner(
 ) -> bytes:
     output = BytesIO()
     source_stream = BytesIO(source)
-    if adapter_key == "json":
+    if adapter_key == "text":
+        from ..text import patch_text
+
+        patch_text(document, source_stream, output, edits=edits)
+    elif adapter_key == "csv":
+        from ..csv import patch_csv
+
+        patch_csv(document, source_stream, output, edits=edits)
+    elif adapter_key == "json":
         from ..json import patch_json
 
         patch_json(document, source_stream, output, edits=edits)
+    elif adapter_key == "xml":
+        from ..xml import patch_xml
+
+        patch_xml(document, source_stream, output, edits=edits)
+    elif adapter_key == "html":
+        from ..html import patch_html
+
+        patch_html(document, source_stream, output, edits=edits)
+    elif adapter_key == "ipynb":
+        from ..ipynb import patch_ipynb
+
+        patch_ipynb(document, source_stream, output, edits=edits)
     elif adapter_key == "epub":
         from ..epub import patch_epub
 

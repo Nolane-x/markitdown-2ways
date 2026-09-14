@@ -32,7 +32,12 @@ def _link_pdf(*, competing_dest: bool = False) -> bytes:
             NameObject("/Type"): NameObject("/Annot"),
             NameObject("/Subtype"): NameObject("/Link"),
             NameObject("/Rect"): RectangleObject(
-                [NumberObject(10), NumberObject(10), NumberObject(120), NumberObject(30)]
+                [
+                    NumberObject(10),
+                    NumberObject(10),
+                    NumberObject(120),
+                    NumberObject(30),
+                ]
             ),
             NameObject("/A"): action,
         }
@@ -82,7 +87,9 @@ def test_pdf_reader_materializes_deterministic_writable_uri_link() -> None:
 
 
 def test_pdf_reader_materializes_policy_read_only_uri_link() -> None:
-    document = read_pdf_ir(BytesIO(_link_pdf(competing_dest=True)), filename="links.pdf")
+    document = read_pdf_ir(
+        BytesIO(_link_pdf(competing_dest=True)), filename="links.pdf"
+    )
     link = _link_node(document)
 
     decision = capabilities_for_node(link).for_operation("update_pdf_link_uri")

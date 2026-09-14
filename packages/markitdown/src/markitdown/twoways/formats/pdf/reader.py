@@ -154,13 +154,9 @@ def read_pdf_ir(
 
     link_order_base = len(child_ids)
     for offset, link in enumerate(parsed.links, start=1):
-        link_id = (
-            f"pdf-link-{digest[:16]}-{link.page_index}-{link.annotation_index}"
-        )
+        link_id = f"pdf-link-{digest[:16]}-{link.page_index}-{link.annotation_index}"
         child_ids.append(link_id)
-        annotation_object_id = (
-            f"{link.annotation_objgen[0]}:{link.annotation_objgen[1]}"
-        )
+        annotation_object_id = f"{link.annotation_objgen[0]}:{link.annotation_objgen[1]}"
         part_uri = f"/Pages/{link.page_index}/Annots"
         locator = NativeLocator(
             backend="pdf",

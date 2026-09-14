@@ -4,7 +4,13 @@ from io import BytesIO
 
 import pytest
 from pypdf import PdfWriter
-from pypdf.generic import ArrayObject, DictionaryObject, NameObject, NumberObject, TextStringObject
+from pypdf.generic import (
+    ArrayObject,
+    DictionaryObject,
+    NameObject,
+    NumberObject,
+    TextStringObject,
+)
 
 from markitdown.twoways._errors import RoundTripVerificationError
 from markitdown.twoways.formats.pdf import writer as pdf_writer
@@ -40,7 +46,9 @@ def _routed_form_edit(source: bytes):
     "drift",
     ("action", "additional_action", "flags", "max_len", "rect"),
 )
-def test_pdf_form_native_apply_rechecks_complete_immutable_owner_shape(drift: str) -> None:
+def test_pdf_form_native_apply_rechecks_complete_immutable_owner_shape(
+    drift: str,
+) -> None:
     source = make_text_form_pdf(max_len=40)
     routed = _routed_form_edit(source)
     writer = PdfWriter(BytesIO(source), incremental=True, strict=True)

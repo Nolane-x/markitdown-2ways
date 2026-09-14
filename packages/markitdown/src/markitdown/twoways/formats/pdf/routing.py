@@ -553,7 +553,9 @@ def resolve_pdf_text_field_value_edit(
         )
 
     node = document.nodes[edit.target_node_id]
-    capability = capabilities_for_node(node).for_operation("update_pdf_text_field_value")
+    capability = capabilities_for_node(node).for_operation(
+        "update_pdf_text_field_value"
+    )
     if capability.state is not CapabilityState.WRITABLE:
         raise UnsupportedEditError(
             "PDF form text-field target is read-only.",

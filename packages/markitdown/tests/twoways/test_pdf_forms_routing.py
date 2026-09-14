@@ -128,7 +128,9 @@ def test_pdf_form_routing_rejects_semantic_noop() -> None:
     document = read_pdf_ir(BytesIO(source), filename="form.pdf")
 
     with pytest.raises(UnsupportedEditError) as exc:
-        resolve_pdf_text_field_value_edit(document, source, _edit(document, value="Alice"))
+        resolve_pdf_text_field_value_edit(
+            document, source, _edit(document, value="Alice")
+        )
     assert exc.value.details["reason"] == "pdf.form.semantic_noop"
 
 

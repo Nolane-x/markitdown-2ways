@@ -5,7 +5,7 @@ from hashlib import sha256
 from io import BytesIO
 from typing import BinaryIO
 
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfWriter
 
 from ..._errors import (
     RoundTripVerificationError,
@@ -19,6 +19,7 @@ from ...ir.serialization import validate_document
 from .limits import PdfNativeLimits
 from .parser import parse_pdf_source
 from .routing import PdfRoutedMetadataEdit, resolve_pdf_metadata_edit
+from .verification import verify_pdf_candidate
 
 
 def _read_source_bytes(source_stream: BinaryIO) -> bytes:
@@ -103,76 +104,6 @@ def _route_all(
     return tuple(routed)
 
 
-def _audit_increment(
-    writer: PdfWriter,
-    *,
-    info_objgen: tuple[int, int],
-) -> tuple[tuple[int, int], ...]:
-    changed = tuple(
-        (reference.idnum, reference.generation)
-        for reference in writer.list_objects_in_increment()
-    )
-    if set(changed) != {info_objgen}:
-        raise RoundTripVerificationError(
-            "PDF incremental writer changed objects outside the authorized /Info owner.",
-            details={
-                "reason": "pdf.writer.unexpected_increment_object",
-                "expected": (info_objgen,),
-                "actual": changed,
-            },
-        )
-    return changed
-
-
-def _verify_basic_candidate(
-    source: bytes,
-    candidate: bytes,
-    routed: tuple[PdfRoutedMetadataEdit, ...],
-    *,
-    limits: PdfNativeLimits,
-) -> None:
-    if not candidate.startswith(source) or len(candidate) <= len(source):
-        raise RoundTripVerificationError(
-            "PDF incremental candidate does not preserve the exact source prefix.",
-            details={"reason": "pdf.candidate.source_prefix"},
-        )
-    suffix_size = len(candidate) - len(source)
-    if suffix_size > limits.max_increment_bytes:
-        raise RoundTripVerificationError(
-            "PDF incremental suffix exceeds the configured safety limit.",
-            details={
-                "reason": "pdf.writer.increment_too_large",
-                "suffix_size": suffix_size,
-                "limit": limits.max_increment_bytes,
-            },
-        )
-
-    try:
-        metadata = PdfReader(BytesIO(candidate), strict=True).metadata
-    except Exception as exc:
-        raise RoundTripVerificationError(
-            "PDF incremental candidate could not be re-read strictly.",
-            details={"reason": "pdf.candidate.reread_failed"},
-        ) from exc
-    if metadata is None:
-        raise RoundTripVerificationError(
-            "PDF incremental candidate lost its Document Information dictionary.",
-            details={"reason": "pdf.candidate.info_missing"},
-        )
-    for item in routed:
-        actual = metadata.get(item.key)
-        if actual != item.value:
-            raise RoundTripVerificationError(
-                "PDF requested metadata value did not survive strict re-read.",
-                details={
-                    "reason": "pdf.candidate.requested_semantic",
-                    "field": item.field,
-                    "expected": item.value,
-                    "actual": actual,
-                },
-            )
-
-
 def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
     evidence = [
         FidelityEvidence(
@@ -203,9 +134,9 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
                     description="Only the authorized Document Information object changed.",
                 ),
                 FidelityEvidence(
-                    check_code="pdf.candidate_reread",
+                    check_code="pdf.final_verification",
                     status=FidelityStatus.PASSED,
-                    description="Requested metadata survived strict candidate re-read.",
+                    description="Strict pypdf and independent pdfminer metadata verification agreed.",
                 ),
             )
         )
@@ -246,12 +177,14 @@ def patch_pdf(
             "PDF metadata transaction resolved to ambiguous native owners.",
             details={"reason": "pdf.structure.authority_ambiguous"},
         )
-    info_objgen = next(iter(info_objgens))
 
     try:
         writer = PdfWriter(BytesIO(source), incremental=True, strict=True)
         writer.add_metadata({item.key: item.value for item in routed})
-        _audit_increment(writer, info_objgen=info_objgen)
+        changed_objects = tuple(
+            (reference.idnum, reference.generation)
+            for reference in writer.list_objects_in_increment()
+        )
         candidate_stream = BytesIO()
         writer.write(candidate_stream)
         candidate = candidate_stream.getvalue()
@@ -263,6 +196,12 @@ def patch_pdf(
             details={"reason": "pdf.writer.incremental_write_failed"},
         ) from exc
 
-    _verify_basic_candidate(source, candidate, routed, limits=limits)
+    verify_pdf_candidate(
+        source,
+        candidate,
+        routed,
+        changed_objects=changed_objects,
+        limits=limits,
+    )
     output.write(candidate)
     return _result(len(candidate), zero_edit=False)

@@ -82,10 +82,15 @@ def read_pdf_ir(
     document_id = f"pdf-document-{digest[:24]}"
     canvas_id = f"pdf-canvas-{digest[:24]}"
     root_id = f"pdf-root-{digest[:24]}"
+    root_object_id = (
+        f"{snapshot.root_objgen[0]}:{snapshot.root_objgen[1]}"
+        if snapshot.root_objgen is not None
+        else "catalog"
+    )
     root_locator = NativeLocator(
         backend="pdf",
-        part_uri="/",
-        object_id="catalog",
+        part_uri="/Root",
+        object_id=root_object_id,
     )
 
     nodes: dict[str, Node] = {}
@@ -138,7 +143,7 @@ def read_pdf_ir(
             Provenance(
                 source_format="pdf",
                 canvas_index=0,
-                part_uri="/",
+                part_uri="/Root",
                 extraction_method="pypdf-strict",
             ),
         ),
@@ -148,6 +153,7 @@ def read_pdf_ir(
             "page_count": snapshot.page_count,
         },
         metadata={
+            "pdf.root_objgen": snapshot.root_objgen,
             "pdf.info_objgen": snapshot.info_objgen,
             "pdf.has_xmp": snapshot.has_xmp,
             "pdf.encrypted": snapshot.encrypted,

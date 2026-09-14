@@ -32,6 +32,7 @@ class PdfSourceSnapshot:
     source_size: int
     pdf_header: str
     page_count: int
+    root_objgen: tuple[int, int] | None
     info_objgen: tuple[int, int] | None
     supported_metadata: Mapping[str, str]
     has_xmp: bool

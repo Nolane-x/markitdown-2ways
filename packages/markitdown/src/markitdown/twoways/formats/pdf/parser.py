@@ -121,11 +121,16 @@ def parse_pdf_source(
         )
 
     trailer = reader.trailer
+    root_ref = _raw_get(trailer, "/Root")
+    root_objgen = _objgen(root_ref)
     info_ref = _raw_get(trailer, "/Info")
     info_objgen = _objgen(info_ref)
     diagnostics: list[str] = []
     fields: list[PdfInfoFieldEvidence] = []
     supported_metadata: dict[str, str] = {}
+
+    if root_objgen is None:
+        diagnostics.append("pdf.structure.authority_ambiguous")
 
     if info_ref is None or info_objgen is None:
         diagnostics.append("pdf.metadata.info_missing")
@@ -215,6 +220,7 @@ def parse_pdf_source(
         source_size=len(source),
         pdf_header=header_line,
         page_count=page_count,
+        root_objgen=root_objgen,
         info_objgen=info_objgen,
         supported_metadata=supported_metadata,
         has_xmp=has_xmp,

@@ -88,11 +88,15 @@ def _metadata_edit(document, value: str) -> EditOperation:
 
 
 def _form_values(data: bytes) -> dict[str, str]:
-    return {field.field_name: field.value for field in parse_pdf_source(data).form_fields}
+    return {
+        field.field_name: field.value for field in parse_pdf_source(data).form_fields
+    }
 
 
 def _disable_verifier(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(pdf_writer, "verify_pdf_candidate", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        pdf_writer, "verify_pdf_candidate", lambda *args, **kwargs: None
+    )
 
 
 def test_pdf_writer_updates_one_text_field_incrementally(

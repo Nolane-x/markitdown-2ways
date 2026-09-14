@@ -220,7 +220,11 @@ def make_text_form_pdf(
     elif with_kids:
         objects[10] = b"<< /Subtype /Widget /Parent 6 0 R /Rect [72 700 240 724] >>"
     if with_uri_link or shared_link_owner:
-        action = b"6 0 R" if shared_link_owner else b"<< /S /URI /URI (https://example.test/old) >>"
+        action = (
+            b"6 0 R"
+            if shared_link_owner
+            else b"<< /S /URI /URI (https://example.test/old) >>"
+        )
         objects[11] = (
             b"<< /Type /Annot /Subtype /Link /Rect [72 650 240 674] /A "
             + action

@@ -187,9 +187,7 @@ def _route_all(
                         "owner_objgen": form.field_objgen,
                     },
                 )
-            if _cross_kind_owner_collision(
-                owner_kinds, form.field_objgen, "form"
-            ):
+            if _cross_kind_owner_collision(owner_kinds, form.field_objgen, "form"):
                 raise UnsupportedEditError(
                     "PDF transaction resolved different edit kinds to one native owner.",
                     details={

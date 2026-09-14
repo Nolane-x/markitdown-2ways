@@ -5,7 +5,10 @@ from io import BytesIO
 from pathlib import Path
 
 from markitdown._stream_info import StreamInfo
-from markitdown.converters._pdf_converter import PdfConverter, _merge_partial_numbering_lines
+from markitdown.converters._pdf_converter import (
+    PdfConverter,
+    _merge_partial_numbering_lines,
+)
 
 
 _PROTECTED_PDF_CONVERTER_BLOB = "ffbcbd990cfc40a577404c453ebe47bf477c4929"

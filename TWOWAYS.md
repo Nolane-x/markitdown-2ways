@@ -754,9 +754,9 @@ Current v0.6 execution documents include:
 - `docs/superpowers/specs/2026-09-13-markitdown-2ways-phase-h6-ipynb-source-preservation-design.md`
 - `docs/superpowers/plans/2026-09-13-phase-h6-ipynb-source-preservation-implementation.md`
 - `docs/superpowers/specs/2026-09-13-markitdown-2ways-phase-h7-epub-package-preservation-design.md`
-- `docs/superpowers/plans/2026-09-13-phase-h7-epub-package-preservation.md`
+- `docs/superpowers/plans/2026-09-13-markitdown-2ways-phase-h7-epub-package-preservation.md`
 - `docs/superpowers/specs/2026-09-13-markitdown-2ways-phase-h8-recursive-zip-preservation-design.md`
-- `docs/superpowers/plans/2026-09-13-phase-h8-recursive-zip-preservation.md`
+- `docs/superpowers/plans/2026-09-13-markitdown-2ways-phase-h8-recursive-zip-preservation.md`
 
 Current v0.7 execution documents include:
 

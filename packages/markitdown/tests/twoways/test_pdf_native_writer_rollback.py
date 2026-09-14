@@ -4,7 +4,8 @@ from io import BytesIO
 
 import pytest
 
-from markitdown.twoways._errors import UnsupportedEditError
+from markitdown.twoways._errors import RoundTripVerificationError, UnsupportedEditError
+from markitdown.twoways.formats.pdf.limits import PdfNativeLimits
 from markitdown.twoways.formats.pdf.reader import read_pdf_ir
 from markitdown.twoways.formats.pdf.writer import patch_pdf
 from markitdown.twoways.ir.edits import EditOperation
@@ -61,4 +62,22 @@ def test_pdf_failed_transaction_leaves_output_empty() -> None:
                 _edit(document, "/Author", "Changed", "bad", "Producer"),
             ),
         )
+    assert output.getvalue() == b""
+
+
+def test_pdf_oversized_increment_is_rejected_before_output() -> None:
+    source = make_metadata_pdf()
+    document = read_pdf_ir(BytesIO(source), filename="sample.pdf")
+    output = BytesIO()
+
+    with pytest.raises(RoundTripVerificationError) as exc:
+        patch_pdf(
+            document,
+            BytesIO(source),
+            output,
+            edits=(_edit(document, "/Title", "Updated", "bounded"),),
+            limits=PdfNativeLimits(max_increment_bytes=1),
+        )
+
+    assert exc.value.details["reason"] == "pdf.writer.increment_too_large"
     assert output.getvalue() == b""

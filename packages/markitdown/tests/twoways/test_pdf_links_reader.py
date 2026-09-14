@@ -52,9 +52,7 @@ def _link_pdf(*, competing_dest: bool = False) -> bytes:
 
 def _link_node(document):
     return next(
-        node
-        for node in document.nodes.values()
-        if node.semantic_role == "pdf-link-uri"
+        node for node in document.nodes.values() if node.semantic_role == "pdf-link-uri"
     )
 
 
@@ -71,9 +69,10 @@ def test_pdf_reader_materializes_deterministic_writable_uri_link() -> None:
     assert link.metadata["pdf.page_index"] == 0
     assert link.metadata["pdf.annotation_index"] == 0
     assert link.metadata["pdf.action_owner_kind"] == "annotation"
-    assert link.metadata["pdf.annotation_objgen"] == link.metadata[
-        "pdf.mutation_owner_objgen"
-    ]
+    assert (
+        link.metadata["pdf.annotation_objgen"]
+        == link.metadata["pdf.mutation_owner_objgen"]
+    )
     assert link.metadata["pdf.identity_markdown"] is False
     assert link.native_locator is not None
     assert link.native_locator.backend == "pdf"

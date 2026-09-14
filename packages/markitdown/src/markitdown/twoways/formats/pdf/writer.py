@@ -82,7 +82,10 @@ def _route_all(
         if item.field in fields:
             raise UnsupportedEditError(
                 "PDF metadata transaction contains a duplicate logical target.",
-                details={"reason": "pdf.metadata.duplicate_target", "field": item.field},
+                details={
+                    "reason": "pdf.metadata.duplicate_target",
+                    "field": item.field,
+                },
             )
         fields.add(item.field)
         routed.append(item)

@@ -149,7 +149,9 @@ def _pdfplumber_rect(
 
 def _pdfplumber_hyperlinks(
     data: bytes,
-) -> tuple[tuple[tuple[tuple[float, float, float, float] | None, str | None], ...], ...]:
+) -> tuple[
+    tuple[tuple[tuple[float, float, float, float] | None, str | None], ...], ...
+]:
     try:
         with pdfplumber.open(BytesIO(data)) as pdf:
             pages: list[

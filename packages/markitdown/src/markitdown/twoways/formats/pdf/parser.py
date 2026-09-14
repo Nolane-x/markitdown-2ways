@@ -61,6 +61,79 @@ def _objgen(value: object) -> tuple[int, int] | None:
     return None
 
 
+def _canonical_pdf_value(value: object) -> object:
+    if isinstance(value, IndirectObject):
+        return ("ref", value.idnum, value.generation)
+    if isinstance(value, DictionaryObject):
+        return (
+            "dict",
+            tuple(
+                sorted(
+                    (str(key), _canonical_pdf_value(item))
+                    for key, item in value.items()
+                )
+            ),
+        )
+    if isinstance(value, (ArrayObject, list, tuple)):
+        return ("array", tuple(_canonical_pdf_value(item) for item in value))
+    if isinstance(value, bytes):
+        return ("bytes", value.hex())
+    if isinstance(value, str):
+        return ("text", str(value))
+    if isinstance(value, bool):
+        return ("bool", value)
+    if isinstance(value, int):
+        return ("int", value)
+    if isinstance(value, float):
+        return ("float", value)
+    if value is None:
+        return ("null", None)
+    return (type(value).__name__, repr(value))
+
+
+def _semantic_digest(value: object) -> str:
+    return sha256(repr(_canonical_pdf_value(value)).encode("utf-8")).hexdigest()
+
+
+def _masked_action_semantic(action: DictionaryObject) -> object:
+    return (
+        "dict",
+        tuple(
+            sorted(
+                (
+                    str(key),
+                    ("editable-uri",)
+                    if str(key) == "/URI"
+                    else _canonical_pdf_value(value),
+                )
+                for key, value in action.items()
+            )
+        ),
+    )
+
+
+def _link_immutable_digest(
+    annotation: DictionaryObject,
+    action: DictionaryObject,
+    *,
+    action_objgen: tuple[int, int] | None,
+) -> str:
+    annotation_items: list[tuple[str, object]] = []
+    for key, value in annotation.items():
+        key_text = str(key)
+        if key_text == "/A" and action_objgen is None:
+            encoded = _masked_action_semantic(action)
+        else:
+            encoded = _canonical_pdf_value(value)
+        annotation_items.append((key_text, encoded))
+    evidence = (
+        "pdf-link-immutable",
+        tuple(sorted(annotation_items)),
+        _masked_action_semantic(action),
+    )
+    return sha256(repr(evidence).encode("utf-8")).hexdigest()
+
+
 def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
     try:
         root = reader.root_object
@@ -144,14 +217,26 @@ def _collect_links(
     *,
     limits: PdfNativeLimits,
     source_policy_blocked: bool,
-) -> tuple[PdfLinkEvidence, ...]:
+) -> tuple[
+    tuple[PdfLinkEvidence, ...],
+    tuple[tuple[int, int] | None, ...],
+    tuple[tuple[tuple[int, int] | None, ...], ...],
+    tuple[tuple[str, ...], ...],
+]:
     links: list[PdfLinkEvidence] = []
+    page_objgens: list[tuple[int, int] | None] = []
+    annotation_topology: list[tuple[tuple[int, int] | None, ...]] = []
+    annotation_fingerprints: list[tuple[str, ...]] = []
     total_annotations = 0
     total_uri_chars = 0
 
     for page_index, page in enumerate(reader.pages):
+        page_objgen = _objgen(getattr(page, "indirect_reference", None))
+        page_objgens.append(page_objgen)
         annots_ref = _raw_get(page, "/Annots")
         if annots_ref is None:
+            annotation_topology.append(())
+            annotation_fingerprints.append(())
             continue
         try:
             annots = (
@@ -192,16 +277,20 @@ def _collect_links(
                 },
             )
 
+        page_topology: list[tuple[int, int] | None] = []
+        page_fingerprints: list[str] = []
         for annotation_index, annotation_ref in enumerate(annots):
             annotation_objgen = _objgen(annotation_ref)
-            if annotation_objgen is None:
-                # H10 never invents stable authority for direct annotation entries.
-                continue
+            page_topology.append(annotation_objgen)
             try:
-                annotation = annotation_ref.get_object()
+                annotation = (
+                    annotation_ref.get_object()
+                    if isinstance(annotation_ref, IndirectObject)
+                    else annotation_ref
+                )
             except Exception as exc:
                 raise PdfParseError(
-                    "Unable to resolve an indirect PDF annotation.",
+                    "Unable to resolve a PDF annotation.",
                     reason="pdf.annotations.malformed",
                     details={
                         "page_index": page_index,
@@ -217,6 +306,10 @@ def _collect_links(
                         "annotation_index": annotation_index,
                     },
                 )
+            page_fingerprints.append(_semantic_digest(annotation))
+            if annotation_objgen is None:
+                # H10 records direct entries for topology, but never invents write authority.
+                continue
             if str(annotation.get("/Subtype", "")) != "/Link":
                 continue
 
@@ -276,7 +369,9 @@ def _collect_links(
                 )
 
             reason_code: str | None = None
-            if source_policy_blocked:
+            if page_objgen is None:
+                reason_code = "pdf.link.page_authority"
+            elif source_policy_blocked:
                 reason_code = "pdf.link.source_policy"
             elif not uri_is_text:
                 reason_code = "pdf.link.unsupported_uri"
@@ -308,8 +403,16 @@ def _collect_links(
                     ),
                     writable=reason_code is None,
                     reason_code=reason_code,
+                    immutable_digest=_link_immutable_digest(
+                        annotation,
+                        action,
+                        action_objgen=action_objgen,
+                    ),
                 )
             )
+
+        annotation_topology.append(tuple(page_topology))
+        annotation_fingerprints.append(tuple(page_fingerprints))
 
     owner_counts: dict[tuple[int, int], int] = {}
     for link in links:
@@ -328,7 +431,12 @@ def _collect_links(
             for link in links
         ]
 
-    return tuple(links)
+    return (
+        tuple(links),
+        tuple(page_objgens),
+        tuple(annotation_topology),
+        tuple(annotation_fingerprints),
+    )
 
 
 def parse_pdf_source(
@@ -466,8 +574,16 @@ def parse_pdf_source(
     )
 
     links: tuple[PdfLinkEvidence, ...] = ()
+    page_objgens: tuple[tuple[int, int] | None, ...] = ()
+    annotation_topology: tuple[tuple[tuple[int, int] | None, ...], ...] = ()
+    annotation_fingerprints: tuple[tuple[str, ...], ...] = ()
     if not encrypted:
-        links = _collect_links(
+        (
+            links,
+            page_objgens,
+            annotation_topology,
+            annotation_fingerprints,
+        ) = _collect_links(
             reader,
             limits=limits,
             source_policy_blocked=any(
@@ -489,6 +605,9 @@ def parse_pdf_source(
         has_signature=has_signature,
         has_certification=has_certification,
         linearized=linearized,
+        page_objgens=page_objgens,
+        annotation_topology=annotation_topology,
+        annotation_fingerprints=annotation_fingerprints,
     )
     return ParsedPdfSource(
         snapshot=snapshot,

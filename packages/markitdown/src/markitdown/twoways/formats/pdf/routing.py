@@ -54,10 +54,14 @@ def _validate_source_authority(document: DocumentIR, source: bytes) -> None:
     if digest != descriptor.sha256:
         _source_mismatch("source_sha256", expected=descriptor.sha256, actual=digest)
     if len(source) != descriptor.size_bytes:
-        _source_mismatch("source_size", expected=descriptor.size_bytes, actual=len(source))
+        _source_mismatch(
+            "source_size", expected=descriptor.size_bytes, actual=len(source)
+        )
 
 
-def _precondition(reason: str, *, node_id: str, expected: object, actual: object) -> None:
+def _precondition(
+    reason: str, *, node_id: str, expected: object, actual: object
+) -> None:
     raise PatchPreconditionError(
         "PDF native metadata evidence no longer matches the source authority.",
         details={
@@ -111,7 +115,9 @@ def resolve_pdf_metadata_edit(
         raise UnsupportedEditError(
             "Fresh PDF authority is not writable under H9 policy.",
             details={
-                "reason": parsed.diagnostics[0] if parsed.diagnostics else "pdf.structure.read_only"
+                "reason": parsed.diagnostics[0]
+                if parsed.diagnostics
+                else "pdf.structure.read_only"
             },
         )
     if set(edit.payload) != {"field", "value"}:
@@ -165,7 +171,12 @@ def resolve_pdf_metadata_edit(
     expected_locator = ("pdf", "/Info", f"{info_objgen[0]}:{info_objgen[1]}", key)
     actual_locator = None
     if locator is not None:
-        actual_locator = (locator.backend, locator.part_uri, locator.object_id, locator.path)
+        actual_locator = (
+            locator.backend,
+            locator.part_uri,
+            locator.object_id,
+            locator.path,
+        )
     if actual_locator != expected_locator:
         _precondition(
             "pdf.native_locator",
@@ -215,7 +226,9 @@ def resolve_pdf_metadata_edit(
             details={"reason": "pdf.metadata.semantic_noop", "field": field},
         )
 
-    total_chars = sum(len(item.value) for item in parsed.fields if item.key != key) + len(value)
+    total_chars = sum(
+        len(item.value) for item in parsed.fields if item.key != key
+    ) + len(value)
     if total_chars > limits.max_total_metadata_chars:
         raise UnsupportedEditError(
             "PDF metadata transaction exceeds the total text limit.",

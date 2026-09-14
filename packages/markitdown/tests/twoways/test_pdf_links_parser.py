@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 
+import pytest
 from pypdf import PdfWriter
 from pypdf.generic import (
     ArrayObject,
@@ -12,36 +13,81 @@ from pypdf.generic import (
     TextStringObject,
 )
 
+from markitdown.twoways.formats.pdf.limits import PdfNativeLimits
+from markitdown.twoways.formats.pdf.model import PdfParseError
 from markitdown.twoways.formats.pdf.parser import parse_pdf_source
+
+
+def _action(uri: str = "https://example.com/old") -> DictionaryObject:
+    return DictionaryObject(
+        {
+            NameObject("/S"): NameObject("/URI"),
+            NameObject("/URI"): TextStringObject(uri),
+        }
+    )
+
+
+def _annotation(action: object, *, left: int = 10) -> DictionaryObject:
+    return DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Annot"),
+            NameObject("/Subtype"): NameObject("/Link"),
+            NameObject("/Rect"): RectangleObject(
+                [
+                    NumberObject(left),
+                    NumberObject(10),
+                    NumberObject(left + 100),
+                    NumberObject(30),
+                ]
+            ),
+            NameObject("/A"): action,
+        }
+    )
+
+
+def _write(writer: PdfWriter) -> bytes:
+    stream = BytesIO()
+    writer.write(stream)
+    return stream.getvalue()
 
 
 def _uri_link_pdf(*, indirect_action: bool) -> bytes:
     writer = PdfWriter()
     page = writer.add_blank_page(width=300, height=200)
     writer.add_metadata({"/Title": "H10 fixture"})
-
-    action = DictionaryObject(
-        {
-            NameObject("/S"): NameObject("/URI"),
-            NameObject("/URI"): TextStringObject("https://example.com/old"),
-        }
-    )
+    action = _action()
     action_value = writer._add_object(action) if indirect_action else action
-    annotation = DictionaryObject(
-        {
-            NameObject("/Type"): NameObject("/Annot"),
-            NameObject("/Subtype"): NameObject("/Link"),
-            NameObject("/Rect"): RectangleObject(
-                [NumberObject(10), NumberObject(10), NumberObject(120), NumberObject(30)]
-            ),
-            NameObject("/A"): action_value,
-        }
+    page[NameObject("/Annots")] = ArrayObject(
+        [writer._add_object(_annotation(action_value))]
     )
-    page[NameObject("/Annots")] = ArrayObject([writer._add_object(annotation)])
+    return _write(writer)
 
-    stream = BytesIO()
-    writer.write(stream)
-    return stream.getvalue()
+
+def _two_links_with_shared_action_pdf() -> bytes:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=300, height=200)
+    writer.add_metadata({"/Title": "H10 fixture"})
+    shared_action = writer._add_object(_action())
+    page[NameObject("/Annots")] = ArrayObject(
+        [
+            writer._add_object(_annotation(shared_action, left=10)),
+            writer._add_object(_annotation(shared_action, left=130)),
+        ]
+    )
+    return _write(writer)
+
+
+def _two_independent_links_pdf() -> bytes:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=300, height=200)
+    writer.add_metadata({"/Title": "H10 fixture"})
+    page[NameObject("/Annots")] = ArrayObject(
+        [
+            writer._add_object(_annotation(_action("https://example.com/a"), left=10)),
+            writer._add_object(_annotation(_action("https://example.com/b"), left=130)),
+        ]
+    )
+    return _write(writer)
 
 
 def test_parser_materializes_direct_action_uri_link_owner() -> None:
@@ -69,3 +115,57 @@ def test_parser_materializes_indirect_action_uri_link_owner() -> None:
     assert link.mutation_owner_objgen == link.action_objgen
     assert link.annotation_objgen != link.action_objgen
     assert link.writable is True
+
+
+def test_parser_marks_shared_action_owner_read_only() -> None:
+    parsed = parse_pdf_source(_two_links_with_shared_action_pdf())
+
+    assert len(parsed.links) == 2
+    assert {link.reason_code for link in parsed.links} == {"pdf.link.shared_owner"}
+    assert all(not link.writable for link in parsed.links)
+
+
+def test_parser_marks_competing_destination_read_only() -> None:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=300, height=200)
+    writer.add_metadata({"/Title": "H10 fixture"})
+    annotation = _annotation(_action())
+    annotation[NameObject("/Dest")] = ArrayObject()
+    page[NameObject("/Annots")] = ArrayObject([writer._add_object(annotation)])
+
+    parsed = parse_pdf_source(_write(writer))
+
+    assert len(parsed.links) == 1
+    assert parsed.links[0].writable is False
+    assert parsed.links[0].reason_code == "pdf.link.competing_destination"
+
+
+def test_parser_does_not_authorize_direct_annotation_entry() -> None:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=300, height=200)
+    writer.add_metadata({"/Title": "H10 fixture"})
+    page[NameObject("/Annots")] = ArrayObject([_annotation(_action())])
+
+    parsed = parse_pdf_source(_write(writer))
+
+    assert parsed.links == ()
+
+
+def test_parser_enforces_total_annotation_limit() -> None:
+    with pytest.raises(PdfParseError) as excinfo:
+        parse_pdf_source(
+            _two_independent_links_pdf(),
+            limits=PdfNativeLimits(max_total_annotations=1),
+        )
+
+    assert excinfo.value.reason == "pdf.annotations.too_many"
+
+
+def test_parser_enforces_uri_character_limit() -> None:
+    with pytest.raises(PdfParseError) as excinfo:
+        parse_pdf_source(
+            _uri_link_pdf(indirect_action=False),
+            limits=PdfNativeLimits(max_uri_chars=4),
+        )
+
+    assert excinfo.value.reason == "pdf.link.uri_too_large"

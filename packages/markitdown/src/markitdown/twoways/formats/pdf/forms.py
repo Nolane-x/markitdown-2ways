@@ -203,7 +203,7 @@ def collect_text_fields(
 
     need_raw = _raw_get(acroform, "/NeedAppearances")
     if isinstance(need_raw, BooleanObject):
-        need_appearances: bool | None = bool(need_raw)
+        need_appearances: bool | None = bool(need_raw.value)
     else:
         need_appearances = None
 
@@ -237,7 +237,6 @@ def collect_text_fields(
             )
         field_objgen = _objgen(field_ref)
         if field_objgen is None:
-            # Direct field dictionaries have no stable mutation authority.
             continue
         if field_objgen in seen:
             ambiguous_owners.add(field_objgen)

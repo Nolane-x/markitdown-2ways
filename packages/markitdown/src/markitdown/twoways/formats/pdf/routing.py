@@ -36,6 +36,21 @@ class PdfRoutedMetadataEdit:
     info_objgen: tuple[int, int]
 
 
+@dataclass(frozen=True)
+class PdfRoutedLinkEdit:
+    operation_id: str
+    target_node_id: str
+    page_index: int
+    annotation_index: int
+    annotation_objgen: tuple[int, int]
+    action_objgen: tuple[int, int] | None
+    owner_kind: str
+    mutation_owner_objgen: tuple[int, int]
+    locator_digest: str
+    old_uri: str
+    uri: str
+
+
 def _source_mismatch(reason: str, *, expected: object, actual: object) -> None:
     raise SourcePackageMismatchError(
         "PDF source does not match the DocumentIR source authority.",
@@ -64,6 +79,20 @@ def _precondition(
 ) -> None:
     raise PatchPreconditionError(
         "PDF native metadata evidence no longer matches the source authority.",
+        details={
+            "reason": reason,
+            "node_id": node_id,
+            "expected": expected,
+            "actual": actual,
+        },
+    )
+
+
+def _link_precondition(
+    reason: str, *, node_id: str, expected: object, actual: object
+) -> None:
+    raise PatchPreconditionError(
+        "PDF URI link evidence no longer matches the source authority.",
         details={
             "reason": reason,
             "node_id": node_id,
@@ -243,4 +272,226 @@ def resolve_pdf_metadata_edit(
         old_value=fresh_field.value,
         value=value,
         info_objgen=info_objgen,
+    )
+
+
+def resolve_pdf_link_uri_edit(
+    document: DocumentIR,
+    source: bytes,
+    edit: EditOperation,
+    *,
+    limits: PdfNativeLimits | None = None,
+) -> PdfRoutedLinkEdit:
+    validate_document(document)
+    _validate_source_authority(document, source)
+    limits = limits or PdfNativeLimits()
+    parsed = parse_pdf_source(source, limits=limits)
+
+    if edit.type != "update_pdf_link_uri":
+        raise UnsupportedEditError(
+            "H10 PDF link routing accepts update_pdf_link_uri edits only.",
+            details={"reason": "pdf.edit_type", "operation_id": edit.operation_id},
+        )
+    if edit.target_node_id is None or edit.target_node_id not in document.nodes:
+        raise PatchPreconditionError(
+            "PDF URI link edit target does not exist in the DocumentIR.",
+            details={
+                "reason": "target_mismatch",
+                "operation_id": edit.operation_id,
+                "target_node_id": edit.target_node_id,
+            },
+        )
+
+    node = document.nodes[edit.target_node_id]
+    validate_edit_preconditions(document, node, edit, format_label="pdf")
+    capability = capabilities_for_node(node).for_operation("update_pdf_link_uri")
+    if capability.state is not CapabilityState.WRITABLE:
+        raise UnsupportedEditError(
+            "PDF URI link target is read-only.",
+            details={
+                "reason": capability.reason_code or "pdf.link.read_only",
+                "target_node_id": node.node_id,
+            },
+        )
+    required_payload = {"page_index", "annotation_index", "old_uri", "uri"}
+    if set(edit.payload) != required_payload:
+        raise UnsupportedEditError(
+            "PDF URI link edits require page, annotation, old URI, and URI payload entries.",
+            details={"reason": "pdf.link.payload_shape"},
+        )
+
+    page_index = edit.payload["page_index"]
+    annotation_index = edit.payload["annotation_index"]
+    old_uri = edit.payload["old_uri"]
+    uri = edit.payload["uri"]
+    if (
+        not isinstance(page_index, int)
+        or isinstance(page_index, bool)
+        or page_index < 0
+        or not isinstance(annotation_index, int)
+        or isinstance(annotation_index, bool)
+        or annotation_index < 0
+    ):
+        raise UnsupportedEditError(
+            "PDF URI link coordinates must be non-negative integers.",
+            details={"reason": "pdf.link.payload_coordinates"},
+        )
+    if not isinstance(old_uri, str) or not isinstance(uri, str):
+        raise UnsupportedEditError(
+            "PDF URI link values must be text.",
+            details={"reason": "pdf.link.uri_type"},
+        )
+    if not uri:
+        raise UnsupportedEditError(
+            "PDF URI link replacement must not be empty.",
+            details={"reason": "pdf.link.uri_empty"},
+        )
+    if len(uri) > limits.max_uri_chars:
+        raise UnsupportedEditError(
+            "PDF URI link replacement exceeds the configured character limit.",
+            details={"reason": "pdf.link.uri_too_large"},
+        )
+
+    node_coordinates = (
+        node.metadata.get("pdf.page_index"),
+        node.metadata.get("pdf.annotation_index"),
+    )
+    payload_coordinates = (page_index, annotation_index)
+    if payload_coordinates != node_coordinates:
+        _link_precondition(
+            "pdf.link.payload_coordinates",
+            node_id=node.node_id,
+            expected=node_coordinates,
+            actual=payload_coordinates,
+        )
+
+    fresh_link = next(
+        (
+            item
+            for item in parsed.links
+            if item.page_index == page_index
+            and item.annotation_index == annotation_index
+        ),
+        None,
+    )
+    if fresh_link is None:
+        raise UnsupportedEditError(
+            "Requested PDF URI link target is not present in the fresh source.",
+            details={"reason": "pdf.link.target_missing"},
+        )
+    if not fresh_link.writable:
+        raise UnsupportedEditError(
+            "Fresh PDF URI link authority is read-only under H10 policy.",
+            details={"reason": fresh_link.reason_code or "pdf.link.read_only"},
+        )
+
+    recorded_binding = (
+        node.semantic_role,
+        node.metadata.get("pdf.page_index"),
+        node.metadata.get("pdf.annotation_index"),
+        node.metadata.get("pdf.annotation_objgen"),
+        node.metadata.get("pdf.action_objgen"),
+        node.metadata.get("pdf.action_owner_kind"),
+        node.metadata.get("pdf.mutation_owner_objgen"),
+        node.metadata.get("pdf.link_locator_digest"),
+        node.metadata.get("pdf.link_subtype"),
+        node.metadata.get("pdf.link_action_type"),
+    )
+    expected_binding = (
+        "pdf-link-uri",
+        fresh_link.page_index,
+        fresh_link.annotation_index,
+        fresh_link.annotation_objgen,
+        fresh_link.action_objgen,
+        fresh_link.owner_kind,
+        fresh_link.mutation_owner_objgen,
+        fresh_link.locator_digest,
+        fresh_link.subtype,
+        fresh_link.action_type,
+    )
+    if recorded_binding != expected_binding:
+        _link_precondition(
+            "pdf.link.native_binding",
+            node_id=node.node_id,
+            expected=expected_binding,
+            actual=recorded_binding,
+        )
+
+    locator = node.native_locator
+    expected_locator = (
+        "pdf",
+        f"/Pages/{page_index}/Annots",
+        f"{fresh_link.annotation_objgen[0]}:{fresh_link.annotation_objgen[1]}",
+        "/A/URI",
+    )
+    actual_locator = None
+    if locator is not None:
+        actual_locator = (
+            locator.backend,
+            locator.part_uri,
+            locator.object_id,
+            locator.path,
+        )
+    if actual_locator != expected_locator:
+        _link_precondition(
+            "pdf.link.native_locator",
+            node_id=node.node_id,
+            expected=expected_locator,
+            actual=actual_locator,
+        )
+
+    if not isinstance(node.payload, TextPayload):
+        _link_precondition(
+            "pdf.link.target_payload",
+            node_id=node.node_id,
+            expected="TextPayload",
+            actual=type(node.payload).__name__,
+        )
+    assert isinstance(node.payload, TextPayload)
+    if old_uri != node.payload.text or old_uri != fresh_link.uri:
+        _link_precondition(
+            "pdf.link.old_uri",
+            node_id=node.node_id,
+            expected=fresh_link.uri,
+            actual=old_uri,
+        )
+    if node.payload.text != fresh_link.uri:
+        _link_precondition(
+            "pdf.link.old_uri",
+            node_id=node.node_id,
+            expected=fresh_link.uri,
+            actual=node.payload.text,
+        )
+    if uri == fresh_link.uri:
+        raise UnsupportedEditError(
+            "PDF URI link edit is a semantic no-op.",
+            details={"reason": "pdf.link.semantic_noop"},
+        )
+
+    total_uri_chars = sum(
+        len(item.uri)
+        for item in parsed.links
+        if not (
+            item.page_index == page_index
+            and item.annotation_index == annotation_index
+        )
+    ) + len(uri)
+    if total_uri_chars > limits.max_total_uri_chars:
+        raise UnsupportedEditError(
+            "PDF URI link transaction exceeds the total URI character limit.",
+            details={"reason": "pdf.link.total_uri_too_large"},
+        )
+
+    return PdfRoutedLinkEdit(
+        operation_id=edit.operation_id,
+        target_node_id=node.node_id,
+        page_index=page_index,
+        annotation_index=annotation_index,
+        annotation_objgen=fresh_link.annotation_objgen,
+        action_objgen=fresh_link.action_objgen,
+        owner_kind=fresh_link.owner_kind,
+        mutation_owner_objgen=fresh_link.mutation_owner_objgen,
+        locator_digest=fresh_link.locator_digest,
+        old_uri=fresh_link.uri,
+        uri=uri,
     )

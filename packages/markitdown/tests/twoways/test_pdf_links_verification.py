@@ -91,16 +91,29 @@ def _hyperlink(uri: str) -> dict[str, object]:
     }
 
 
+def _install_oracle(monkeypatch, responses, calls: list[object]) -> None:
+    pending = iter(responses)
+
+    def fake_open(stream):
+        calls.append(stream)
+        return _FakePdf(next(pending))
+
+    monkeypatch.setattr(pdfplumber, "open", fake_open)
+
+
 def test_pdf_link_verifier_invokes_pdfplumber_oracle(monkeypatch) -> None:
     source = _link_pdf()
     document = read_pdf_ir(BytesIO(source), filename="links.pdf")
     calls: list[object] = []
+    _install_oracle(
+        monkeypatch,
+        (
+            [_hyperlink("https://example.com/old")],
+            [_hyperlink("https://example.com/new")],
+        ),
+        calls,
+    )
 
-    def fake_open(stream):
-        calls.append(stream)
-        return _FakePdf([_hyperlink("https://example.com/new")])
-
-    monkeypatch.setattr(pdfplumber, "open", fake_open)
     output = BytesIO()
     patch_pdf(
         document,
@@ -109,7 +122,7 @@ def test_pdf_link_verifier_invokes_pdfplumber_oracle(monkeypatch) -> None:
         edits=(_link_edit(document),),
     )
 
-    assert calls
+    assert len(calls) == 2
     assert output.getvalue().startswith(source)
 
 
@@ -118,12 +131,16 @@ def test_pdf_link_verifier_rejects_pdfplumber_uri_disagreement_before_output(
 ) -> None:
     source = _link_pdf()
     document = read_pdf_ir(BytesIO(source), filename="links.pdf")
-
-    monkeypatch.setattr(
-        pdfplumber,
-        "open",
-        lambda stream: _FakePdf([_hyperlink("https://example.com/wrong")]),
+    calls: list[object] = []
+    _install_oracle(
+        monkeypatch,
+        (
+            [_hyperlink("https://example.com/old")],
+            [_hyperlink("https://example.com/wrong")],
+        ),
+        calls,
     )
+
     output = BytesIO()
     with pytest.raises(RoundTripVerificationError) as exc:
         patch_pdf(
@@ -142,13 +159,17 @@ def test_pdf_link_verifier_rejects_ambiguous_pdfplumber_match_before_output(
 ) -> None:
     source = _link_pdf()
     document = read_pdf_ir(BytesIO(source), filename="links.pdf")
-
+    calls: list[object] = []
     matching = _hyperlink("https://example.com/new")
-    monkeypatch.setattr(
-        pdfplumber,
-        "open",
-        lambda stream: _FakePdf([matching, dict(matching)]),
+    _install_oracle(
+        monkeypatch,
+        (
+            [_hyperlink("https://example.com/old")],
+            [matching, dict(matching)],
+        ),
+        calls,
     )
+
     output = BytesIO()
     with pytest.raises(RoundTripVerificationError) as exc:
         patch_pdf(

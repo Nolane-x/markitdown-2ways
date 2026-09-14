@@ -14,6 +14,7 @@ from pypdf.generic import (
     TextStringObject,
 )
 
+from .forms import collect_text_fields
 from .limits import PdfNativeLimits
 from .model import (
     ParsedPdfSource,
@@ -577,7 +578,16 @@ def parse_pdf_source(
     page_objgens: tuple[tuple[int, int] | None, ...] = ()
     annotation_topology: tuple[tuple[tuple[int, int] | None, ...], ...] = ()
     annotation_fingerprints: tuple[tuple[str, ...], ...] = ()
+    form_fields = ()
+    acroform_objgen = None
+    acroform_fields_topology = ()
+    form_field_bindings = ()
+    form_field_fingerprints = ()
+    need_appearances = None
     if not encrypted:
+        source_policy_blocked = any(
+            reason in _LINK_SOURCE_BLOCKERS for reason in diagnostics
+        )
         (
             links,
             page_objgens,
@@ -586,9 +596,20 @@ def parse_pdf_source(
         ) = _collect_links(
             reader,
             limits=limits,
-            source_policy_blocked=any(
-                reason in _LINK_SOURCE_BLOCKERS for reason in diagnostics
-            ),
+            source_policy_blocked=source_policy_blocked,
+        )
+        (
+            form_fields,
+            acroform_objgen,
+            acroform_fields_topology,
+            form_field_bindings,
+            form_field_fingerprints,
+            need_appearances,
+        ) = collect_text_fields(
+            reader,
+            limits=limits,
+            source_policy_blocked=source_policy_blocked,
+            annotation_topology=annotation_topology,
         )
 
     header_line = source.splitlines()[0].decode("ascii", errors="replace")
@@ -608,6 +629,11 @@ def parse_pdf_source(
         page_objgens=page_objgens,
         annotation_topology=annotation_topology,
         annotation_fingerprints=annotation_fingerprints,
+        acroform_objgen=acroform_objgen,
+        acroform_fields_topology=acroform_fields_topology,
+        form_field_bindings=form_field_bindings,
+        form_field_fingerprints=form_field_fingerprints,
+        need_appearances=need_appearances,
     )
     return ParsedPdfSource(
         snapshot=snapshot,
@@ -615,4 +641,5 @@ def parse_pdf_source(
         writable=writable,
         diagnostics=tuple(dict.fromkeys(diagnostics)),
         links=links,
+        form_fields=form_fields,
     )

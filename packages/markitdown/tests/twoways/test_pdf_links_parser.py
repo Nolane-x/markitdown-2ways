@@ -166,9 +166,7 @@ def test_parser_does_not_expose_unsupported_action_as_uri_capability() -> None:
             NameObject("/D"): TextStringObject("destination"),
         }
     )
-    page[NameObject("/Annots")] = ArrayObject(
-        [writer._add_object(_annotation(action))]
-    )
+    page[NameObject("/Annots")] = ArrayObject([writer._add_object(_annotation(action))])
 
     parsed = parse_pdf_source(_write(writer))
 
@@ -185,9 +183,7 @@ def test_parser_marks_non_text_uri_read_only() -> None:
             NameObject("/URI"): NumberObject(42),
         }
     )
-    page[NameObject("/Annots")] = ArrayObject(
-        [writer._add_object(_annotation(action))]
-    )
+    page[NameObject("/Annots")] = ArrayObject([writer._add_object(_annotation(action))])
 
     parsed = parse_pdf_source(_write(writer))
 

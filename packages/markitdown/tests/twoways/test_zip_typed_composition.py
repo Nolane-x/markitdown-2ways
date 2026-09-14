@@ -103,7 +103,8 @@ def test_nested_xml_composes_through_h4_writer() -> None:
         "data.xml",
         b"<root><name>Ada</name></root>",
         lambda node: node.metadata.get("xml.kind") == "text"
-        and getattr(node.payload, "text", None) == "Ada",
+        and isinstance(node.payload, dict)
+        and node.payload.get("value") == "Ada",
         edit_type="replace_xml_text",
         edit_payload={"value": "Nolane"},
     )
@@ -115,7 +116,8 @@ def test_nested_html_composes_through_h5_writer() -> None:
         "page.html",
         b"<html><body><p>Ada</p></body></html>",
         lambda node: node.metadata.get("html.kind") == "text"
-        and getattr(node.payload, "text", None) == "Ada",
+        and isinstance(node.payload, dict)
+        and node.payload.get("value") == "Ada",
         edit_type="replace_html_text",
         edit_payload={"value": "Nolane"},
     )

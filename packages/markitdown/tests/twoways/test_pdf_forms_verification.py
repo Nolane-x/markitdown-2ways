@@ -27,7 +27,9 @@ def _form_node(document, field_name: str = "customer.name"):
     )
 
 
-def _form_edit(document, value: str, field_name: str = "customer.name") -> EditOperation:
+def _form_edit(
+    document, value: str, field_name: str = "customer.name"
+) -> EditOperation:
     node = _form_node(document, field_name)
     return EditOperation(
         operation_id=f"form-{field_name}",
@@ -52,12 +54,16 @@ def _candidate(
     edit = _form_edit(document, value, field_name)
     routed = resolve_pdf_text_field_value_edit(document, source, edit)
     output = BytesIO()
-    monkeypatch.setattr(pdf_writer, "verify_pdf_candidate", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        pdf_writer, "verify_pdf_candidate", lambda *args, **kwargs: None
+    )
     patch_pdf(document, BytesIO(source), output, edits=(edit,))
     return routed, output.getvalue()
 
 
-def _assert_reason(exc: pytest.ExceptionInfo[RoundTripVerificationError], reason: str) -> None:
+def _assert_reason(
+    exc: pytest.ExceptionInfo[RoundTripVerificationError], reason: str
+) -> None:
     assert exc.value.details["reason"] == reason
 
 
@@ -127,7 +133,9 @@ def test_pdf_form_verifier_rejects_root_fields_topology_drift(
     candidate_parsed = parse_pdf_source(candidate)
     drifted = replace(
         candidate_parsed,
-        snapshot=replace(candidate_parsed.snapshot, acroform_fields_topology=((999, 0),)),
+        snapshot=replace(
+            candidate_parsed.snapshot, acroform_fields_topology=((999, 0),)
+        ),
     )
     monkeypatch.setattr(
         pdf_verification,
@@ -261,7 +269,9 @@ def test_pdf_form_verifier_rejects_requested_value_mismatch(
 ) -> None:
     source = make_text_form_pdf()
     document = read_pdf_ir(BytesIO(source), filename="form.pdf")
-    requested = resolve_pdf_text_field_value_edit(document, source, _form_edit(document, "Bob"))
+    requested = resolve_pdf_text_field_value_edit(
+        document, source, _form_edit(document, "Bob")
+    )
     _, candidate = _candidate(monkeypatch, source, value="Mallory")
 
     with pytest.raises(RoundTripVerificationError) as exc:

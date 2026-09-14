@@ -12,7 +12,11 @@ from ._pdf_fixtures import make_metadata_pdf
 
 
 def _field(document, key: str):
-    return next(node for node in document.nodes.values() if node.metadata.get("pdf.info_key") == key)
+    return next(
+        node
+        for node in document.nodes.values()
+        if node.metadata.get("pdf.info_key") == key
+    )
 
 
 def _edit(document, key: str, value: str, operation_id: str):

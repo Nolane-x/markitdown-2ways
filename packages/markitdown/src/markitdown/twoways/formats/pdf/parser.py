@@ -7,7 +7,12 @@ import re
 
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
-from pypdf.generic import ArrayObject, DictionaryObject, IndirectObject, TextStringObject
+from pypdf.generic import (
+    ArrayObject,
+    DictionaryObject,
+    IndirectObject,
+    TextStringObject,
+)
 
 from .limits import PdfNativeLimits
 from .model import (

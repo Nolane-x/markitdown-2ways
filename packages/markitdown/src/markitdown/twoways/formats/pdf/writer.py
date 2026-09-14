@@ -17,6 +17,7 @@ from ..._results import FidelityEvidence, FidelityReport, FidelityStatus, Writer
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ir.serialization import validate_document
+from .forms import _field_immutable_digest
 from .limits import PdfNativeLimits
 from .parser import parse_pdf_source
 from .routing import (
@@ -377,6 +378,17 @@ def _apply_form_edit(writer: PdfWriter, item: PdfRoutedTextFieldEdit) -> None:
     if not isinstance(current_value, str) or str(current_value) != item.old_value:
         raise RoundTripVerificationError(
             "PDF form mutation owner value drifted before mutation.",
+            details={"reason": "pdf.writer.native_owner_drift"},
+        )
+    current_immutable_digest = _field_immutable_digest(
+        owner,
+        acroform_objgen=item.acroform_objgen,
+        page_index=item.page_index,
+        annotation_index=item.annotation_index,
+    )
+    if current_immutable_digest != item.immutable_digest:
+        raise RoundTripVerificationError(
+            "PDF form mutation owner immutable semantics drifted before mutation.",
             details={"reason": "pdf.writer.native_owner_drift"},
         )
     owner[NameObject("/V")] = TextStringObject(item.value)

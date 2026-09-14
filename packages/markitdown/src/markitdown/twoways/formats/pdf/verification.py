@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from io import BytesIO
 from typing import Any
 
+import pdfplumber
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfparser import PDFParser
 from pdfminer.utils import decode_text
@@ -130,6 +131,134 @@ def _pdfminer_metadata(data: bytes) -> dict[str, str]:
             details={"reason": "pdf.candidate.pdfminer_metadata"},
         ) from exc
     return result
+
+
+def _pdfplumber_rect(
+    page_height: float,
+    hyperlink: Mapping[str, object],
+) -> tuple[float, float, float, float] | None:
+    try:
+        x0 = float(hyperlink["x0"])
+        x1 = float(hyperlink["x1"])
+        top = float(hyperlink["top"])
+        bottom = float(hyperlink["bottom"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return (x0, page_height - bottom, x1, page_height - top)
+
+
+def _pdfplumber_hyperlinks(
+    data: bytes,
+) -> tuple[tuple[tuple[tuple[float, float, float, float] | None, str | None], ...], ...]:
+    try:
+        with pdfplumber.open(BytesIO(data)) as pdf:
+            pages: list[
+                tuple[tuple[tuple[float, float, float, float] | None, str | None], ...]
+            ] = []
+            for page in pdf.pages:
+                page_height = float(page.height)
+                links: list[
+                    tuple[tuple[float, float, float, float] | None, str | None]
+                ] = []
+                for hyperlink in page.hyperlinks:
+                    if not isinstance(hyperlink, Mapping):
+                        continue
+                    uri = hyperlink.get("uri")
+                    links.append(
+                        (
+                            _pdfplumber_rect(page_height, hyperlink),
+                            uri if isinstance(uri, str) else None,
+                        )
+                    )
+                pages.append(tuple(links))
+            return tuple(pages)
+    except Exception as exc:
+        raise RoundTripVerificationError(
+            "pdfplumber could not independently inspect PDF URI links.",
+            details={"reason": "pdf.candidate.pdfplumber_link"},
+        ) from exc
+
+
+def _rect_matches(
+    left: tuple[float, float, float, float],
+    right: tuple[float, float, float, float],
+) -> bool:
+    return all(abs(a - b) <= 1e-6 for a, b in zip(left, right))
+
+
+def _verify_pdfplumber_links(
+    source: bytes,
+    candidate: bytes,
+    source_parsed,
+    candidate_parsed,
+    routed: tuple[PdfRoutedLinkEdit, ...],
+) -> None:
+    if not routed:
+        return
+
+    source_oracle = _pdfplumber_hyperlinks(source)
+    candidate_oracle = _pdfplumber_hyperlinks(candidate)
+    source_links = {
+        (link.page_index, link.annotation_index): link for link in source_parsed.links
+    }
+    candidate_links = {
+        (link.page_index, link.annotation_index): link
+        for link in candidate_parsed.links
+    }
+
+    for item in routed:
+        key = (item.page_index, item.annotation_index)
+        source_link = source_links.get(key)
+        candidate_link = candidate_links.get(key)
+        if source_link is None or candidate_link is None or source_link.rect is None:
+            _fail(
+                "pdf.candidate.pdfplumber_link",
+                "PDF URI link could not be mapped to independent hyperlink evidence.",
+                target=key,
+            )
+        if item.page_index >= len(source_oracle) or item.page_index >= len(
+            candidate_oracle
+        ):
+            _fail(
+                "pdf.candidate.pdfplumber_link",
+                "pdfplumber page topology did not match the routed PDF URI link.",
+                target=key,
+            )
+
+        source_matches = [
+            uri
+            for rect, uri in source_oracle[item.page_index]
+            if rect is not None and _rect_matches(rect, source_link.rect)
+        ]
+        candidate_matches = [
+            uri
+            for rect, uri in candidate_oracle[item.page_index]
+            if rect is not None and _rect_matches(rect, source_link.rect)
+        ]
+        if len(source_matches) != 1 or len(candidate_matches) != 1:
+            _fail(
+                "pdf.candidate.pdfplumber_link",
+                "pdfplumber hyperlink mapping was missing or ambiguous.",
+                target=key,
+                source_matches=len(source_matches),
+                candidate_matches=len(candidate_matches),
+            )
+        if source_matches[0] != source_link.uri:
+            _fail(
+                "pdf.candidate.pdfplumber_link",
+                "pdfplumber disagreed with the source URI-link semantic.",
+                target=key,
+                expected=source_link.uri,
+                actual=source_matches[0],
+            )
+        if candidate_matches[0] != item.uri:
+            _fail(
+                "pdf.candidate.pdfplumber_link",
+                "pdfplumber disagreed with the requested URI-link semantic.",
+                target=key,
+                expected=item.uri,
+                actual=candidate_matches[0],
+            )
 
 
 def _verify_metadata(
@@ -373,3 +502,10 @@ def verify_pdf_candidate(
         metadata_edits,
     )
     _verify_links(source_parsed, candidate_parsed, link_edits)
+    _verify_pdfplumber_links(
+        source,
+        candidate,
+        source_parsed,
+        candidate_parsed,
+        link_edits,
+    )

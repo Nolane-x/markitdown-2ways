@@ -362,7 +362,10 @@ def _verify_annotation_authority(
             zip(source_page, candidate_page)
         ):
             target = (page_index, annotation_index)
-            if source_digest != candidate_digest and target not in direct_action_targets:
+            if (
+                source_digest != candidate_digest
+                and target not in direct_action_targets
+            ):
                 _fail(
                     "pdf.candidate.annotation_sibling",
                     "PDF candidate changed an annotation outside an authorized native target.",
@@ -511,7 +514,10 @@ def _verify_form_fields(source_parsed, candidate_parsed, routed) -> None:
             expected=source_snapshot.acroform_objgen,
             actual=candidate_snapshot.acroform_objgen,
         )
-    if candidate_snapshot.acroform_fields_topology != source_snapshot.acroform_fields_topology:
+    if (
+        candidate_snapshot.acroform_fields_topology
+        != source_snapshot.acroform_fields_topology
+    ):
         _fail(
             "pdf.candidate.form_topology",
             "PDF candidate changed AcroForm root field topology.",
@@ -542,10 +548,12 @@ def _verify_form_fields(source_parsed, candidate_parsed, routed) -> None:
         )
 
     source_fields = {field.field_objgen: field for field in source_parsed.form_fields}
-    candidate_fields = {field.field_objgen: field for field in candidate_parsed.form_fields}
-    if len(source_fields) != len(source_parsed.form_fields) or len(candidate_fields) != len(
-        candidate_parsed.form_fields
-    ):
+    candidate_fields = {
+        field.field_objgen: field for field in candidate_parsed.form_fields
+    }
+    if len(source_fields) != len(source_parsed.form_fields) or len(
+        candidate_fields
+    ) != len(candidate_parsed.form_fields):
         _fail(
             "pdf.candidate.form_topology",
             "PDF AcroForm field identities are not uniquely authoritative.",
@@ -572,13 +580,17 @@ def _verify_form_fields(source_parsed, candidate_parsed, routed) -> None:
         item = requested.get(objgen)
         if _form_binding(candidate_field) != _form_binding(source_field):
             _fail(
-                "pdf.candidate.form_immutable" if item is not None else "pdf.candidate.form_sibling",
+                "pdf.candidate.form_immutable"
+                if item is not None
+                else "pdf.candidate.form_sibling",
                 "PDF candidate changed immutable AcroForm field binding evidence.",
                 field_objgen=objgen,
             )
         if candidate_field.immutable_digest != source_field.immutable_digest:
             _fail(
-                "pdf.candidate.form_immutable" if item is not None else "pdf.candidate.form_sibling",
+                "pdf.candidate.form_immutable"
+                if item is not None
+                else "pdf.candidate.form_sibling",
                 "PDF candidate changed AcroForm semantics outside the authorized value scalar.",
                 field_objgen=objgen,
                 expected=source_field.immutable_digest,
@@ -613,7 +625,10 @@ def _verify_form_fields(source_parsed, candidate_parsed, routed) -> None:
                 "Routed H11 edit no longer matches source AcroForm authority.",
                 field_objgen=objgen,
             )
-        if source_field.field_name != item.field_name or source_field.value != item.old_value:
+        if (
+            source_field.field_name != item.field_name
+            or source_field.value != item.old_value
+        ):
             _fail(
                 "pdf.candidate.form_value",
                 "Source AcroForm value no longer matches routed H11 authority.",

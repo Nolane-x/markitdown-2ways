@@ -173,10 +173,14 @@ def _verify_metadata(
         candidate_info = _info_inventory(candidate)
         requested_keys = {item.key for item in routed}
         source_untouched = {
-            key: value for key, value in source_info.items() if key not in requested_keys
+            key: value
+            for key, value in source_info.items()
+            if key not in requested_keys
         }
         candidate_untouched = {
-            key: value for key, value in candidate_info.items() if key not in requested_keys
+            key: value
+            for key, value in candidate_info.items()
+            if key not in requested_keys
         }
         if candidate_untouched != source_untouched:
             _fail(
@@ -226,7 +230,8 @@ def _verify_links(
         (link.page_index, link.annotation_index): link for link in source_parsed.links
     }
     candidate_links = {
-        (link.page_index, link.annotation_index): link for link in candidate_parsed.links
+        (link.page_index, link.annotation_index): link
+        for link in candidate_parsed.links
     }
     if len(source_links) != len(source_parsed.links) or len(candidate_links) != len(
         candidate_parsed.links

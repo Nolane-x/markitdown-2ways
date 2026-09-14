@@ -57,7 +57,8 @@ def test_parse_incremental_chain_uses_newest_info_revision() -> None:
 
 
 def test_parse_utf16be_hex_info_string() -> None:
-    encoded = (b"\xfe\xff" + "Nolane Việt".encode("utf-16-be")).hex().upper().encode("ascii")
+    payload = b"\xfe\xff" + "Nolane Việt".encode("utf-16-be")
+    encoded = payload.hex().upper().encode("ascii")
     source = make_classic_pdf(info={"Title": b"<" + encoded + b">"})
 
     parsed = parse_pdf_source(source)

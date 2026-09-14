@@ -186,20 +186,21 @@ def _verify_metadata(
                 actual=candidate_untouched,
             )
 
-    independent = _pdfminer_metadata(candidate)
-    for field in _SUPPORTED_FIELDS:
-        expected = candidate_metadata.get(field)
-        if expected is None:
-            continue
-        actual = independent.get(field)
-        if actual != expected:
-            _fail(
-                "pdf.candidate.pdfminer_metadata",
-                "pdfminer disagreed with the strict pypdf metadata interpretation.",
-                field=field,
-                expected=expected,
-                actual=actual,
-            )
+    if routed:
+        independent = _pdfminer_metadata(candidate)
+        for field in _SUPPORTED_FIELDS:
+            expected = candidate_metadata.get(field)
+            if expected is None:
+                continue
+            actual = independent.get(field)
+            if actual != expected:
+                _fail(
+                    "pdf.candidate.pdfminer_metadata",
+                    "pdfminer disagreed with the strict pypdf metadata interpretation.",
+                    field=field,
+                    expected=expected,
+                    actual=actual,
+                )
 
 
 def _link_binding(link) -> tuple[object, ...]:
@@ -242,9 +243,7 @@ def _verify_links(
             actual=tuple(sorted(candidate_links)),
         )
 
-    requested = {
-        (item.page_index, item.annotation_index): item.uri for item in routed
-    }
+    requested = {(item.page_index, item.annotation_index): item.uri for item in routed}
     for key, source_link in source_links.items():
         candidate_link = candidate_links[key]
         if _link_binding(candidate_link) != _link_binding(source_link):

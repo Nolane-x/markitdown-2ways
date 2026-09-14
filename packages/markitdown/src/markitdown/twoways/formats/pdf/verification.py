@@ -13,9 +13,10 @@ from pypdf.generic import IndirectObject
 from ..._errors import RoundTripVerificationError
 from .limits import PdfNativeLimits
 from .parser import parse_pdf_source
-from .routing import PdfRoutedMetadataEdit
+from .routing import PdfRoutedLinkEdit, PdfRoutedMetadataEdit
 
 _SUPPORTED_FIELDS = ("Title", "Author", "Subject", "Keywords")
+PdfRoutedEdit = PdfRoutedMetadataEdit | PdfRoutedLinkEdit
 
 
 def _fail(reason: str, message: str, **details: object) -> None:
@@ -131,10 +132,144 @@ def _pdfminer_metadata(data: bytes) -> dict[str, str]:
     return result
 
 
+def _verify_metadata(
+    source: bytes,
+    candidate: bytes,
+    source_parsed,
+    candidate_parsed,
+    routed: tuple[PdfRoutedMetadataEdit, ...],
+) -> None:
+    source_snapshot = source_parsed.snapshot
+    candidate_snapshot = candidate_parsed.snapshot
+    requested = {item.field: item.value for item in routed}
+    source_metadata = dict(source_snapshot.supported_metadata)
+    candidate_metadata = dict(candidate_snapshot.supported_metadata)
+
+    for field, value in requested.items():
+        actual = candidate_metadata.get(field)
+        if actual != value:
+            _fail(
+                "pdf.candidate.requested_semantic",
+                "Requested PDF metadata value did not survive strict re-read.",
+                field=field,
+                expected=value,
+                actual=actual,
+            )
+    for field, value in source_metadata.items():
+        if field in requested:
+            continue
+        actual = candidate_metadata.get(field)
+        if actual != value:
+            _fail(
+                "pdf.candidate.unrequested_metadata",
+                "Unrequested supported PDF metadata changed.",
+                field=field,
+                expected=value,
+                actual=actual,
+            )
+
+    if source_snapshot.info_objgen is not None:
+        source_info = _info_inventory(source)
+        candidate_info = _info_inventory(candidate)
+        requested_keys = {item.key for item in routed}
+        source_untouched = {
+            key: value for key, value in source_info.items() if key not in requested_keys
+        }
+        candidate_untouched = {
+            key: value for key, value in candidate_info.items() if key not in requested_keys
+        }
+        if candidate_untouched != source_untouched:
+            _fail(
+                "pdf.candidate.unrequested_metadata",
+                "Unrequested Document Information entries changed.",
+                expected=source_untouched,
+                actual=candidate_untouched,
+            )
+
+    independent = _pdfminer_metadata(candidate)
+    for field in _SUPPORTED_FIELDS:
+        expected = candidate_metadata.get(field)
+        if expected is None:
+            continue
+        actual = independent.get(field)
+        if actual != expected:
+            _fail(
+                "pdf.candidate.pdfminer_metadata",
+                "pdfminer disagreed with the strict pypdf metadata interpretation.",
+                field=field,
+                expected=expected,
+                actual=actual,
+            )
+
+
+def _link_binding(link) -> tuple[object, ...]:
+    return (
+        link.annotation_objgen,
+        link.action_objgen,
+        link.owner_kind,
+        link.mutation_owner_objgen,
+        link.rect,
+        link.subtype,
+        link.action_type,
+        link.writable,
+        link.reason_code,
+    )
+
+
+def _verify_links(
+    source_parsed,
+    candidate_parsed,
+    routed: tuple[PdfRoutedLinkEdit, ...],
+) -> None:
+    source_links = {
+        (link.page_index, link.annotation_index): link for link in source_parsed.links
+    }
+    candidate_links = {
+        (link.page_index, link.annotation_index): link for link in candidate_parsed.links
+    }
+    if len(source_links) != len(source_parsed.links) or len(candidate_links) != len(
+        candidate_parsed.links
+    ):
+        _fail(
+            "pdf.candidate.link_topology",
+            "PDF URI link coordinates are not uniquely authoritative.",
+        )
+    if candidate_links.keys() != source_links.keys():
+        _fail(
+            "pdf.candidate.link_topology",
+            "PDF URI link topology changed during incremental mutation.",
+            expected=tuple(sorted(source_links)),
+            actual=tuple(sorted(candidate_links)),
+        )
+
+    requested = {
+        (item.page_index, item.annotation_index): item.uri for item in routed
+    }
+    for key, source_link in source_links.items():
+        candidate_link = candidate_links[key]
+        if _link_binding(candidate_link) != _link_binding(source_link):
+            _fail(
+                "pdf.candidate.link_binding",
+                "PDF URI link native ownership or immutable annotation evidence changed.",
+                target=key,
+                expected=_link_binding(source_link),
+                actual=_link_binding(candidate_link),
+            )
+        expected_uri = requested.get(key, source_link.uri)
+        if candidate_link.uri != expected_uri:
+            _fail(
+                "pdf.candidate.link_uri",
+                "PDF URI link value did not match the requested target-only result.",
+                target=key,
+                expected=expected_uri,
+                actual=candidate_link.uri,
+            )
+
+
 def verify_pdf_candidate(
     source: bytes,
     candidate: bytes,
-    routed: Sequence[PdfRoutedMetadataEdit],
+    routed: Sequence[PdfRoutedEdit],
     *,
     changed_objects: Sequence[tuple[int, int]],
     limits: PdfNativeLimits | None = None,
@@ -142,6 +277,10 @@ def verify_pdf_candidate(
     limits = limits or PdfNativeLimits()
     routed = tuple(routed)
     changed_objects = tuple(changed_objects)
+    metadata_edits = tuple(
+        item for item in routed if isinstance(item, PdfRoutedMetadataEdit)
+    )
+    link_edits = tuple(item for item in routed if isinstance(item, PdfRoutedLinkEdit))
 
     if not candidate.startswith(source) or len(candidate) <= len(source):
         _fail(
@@ -162,17 +301,19 @@ def verify_pdf_candidate(
     source_snapshot = source_parsed.snapshot
     candidate_snapshot = candidate_parsed.snapshot
 
-    if source_snapshot.info_objgen is None:
-        _fail(
-            "pdf.metadata.info_missing",
-            "Source PDF lacks an authoritative Document Information owner.",
-        )
-    authorized_owner = source_snapshot.info_objgen
-    if set(changed_objects) != {authorized_owner}:
+    expected_owners = {item.mutation_owner_objgen for item in link_edits}
+    if metadata_edits:
+        if source_snapshot.info_objgen is None:
+            _fail(
+                "pdf.metadata.info_missing",
+                "Source PDF lacks an authoritative Document Information owner.",
+            )
+        expected_owners.add(source_snapshot.info_objgen)
+    if set(changed_objects) != expected_owners:
         _fail(
             "pdf.writer.unexpected_increment_object",
-            "PDF incremental update changed an object outside the authorized /Info owner.",
-            expected=(authorized_owner,),
+            "PDF incremental update changed an object outside the authorized owner set.",
+            expected=tuple(sorted(expected_owners)),
             actual=changed_objects,
         )
 
@@ -190,11 +331,11 @@ def verify_pdf_candidate(
             expected=source_snapshot.root_objgen,
             actual=candidate_snapshot.root_objgen,
         )
-    if candidate_snapshot.info_objgen != authorized_owner:
+    if candidate_snapshot.info_objgen != source_snapshot.info_objgen:
         _fail(
             "pdf.candidate.info_authority",
             "PDF candidate changed the Document Information owner identity.",
-            expected=authorized_owner,
+            expected=source_snapshot.info_objgen,
             actual=candidate_snapshot.info_objgen,
         )
 
@@ -220,60 +361,11 @@ def verify_pdf_candidate(
             actual=candidate_policy,
         )
 
-    requested = {item.field: item.value for item in routed}
-    source_metadata = dict(source_snapshot.supported_metadata)
-    candidate_metadata = dict(candidate_snapshot.supported_metadata)
-    for field, value in requested.items():
-        actual = candidate_metadata.get(field)
-        if actual != value:
-            _fail(
-                "pdf.candidate.requested_semantic",
-                "Requested PDF metadata value did not survive strict re-read.",
-                field=field,
-                expected=value,
-                actual=actual,
-            )
-    for field, value in source_metadata.items():
-        if field in requested:
-            continue
-        actual = candidate_metadata.get(field)
-        if actual != value:
-            _fail(
-                "pdf.candidate.unrequested_metadata",
-                "Unrequested supported PDF metadata changed.",
-                field=field,
-                expected=value,
-                actual=actual,
-            )
-
-    source_info = _info_inventory(source)
-    candidate_info = _info_inventory(candidate)
-    requested_keys = {item.key for item in routed}
-    source_untouched = {
-        key: value for key, value in source_info.items() if key not in requested_keys
-    }
-    candidate_untouched = {
-        key: value for key, value in candidate_info.items() if key not in requested_keys
-    }
-    if candidate_untouched != source_untouched:
-        _fail(
-            "pdf.candidate.unrequested_metadata",
-            "Unrequested Document Information entries changed.",
-            expected=source_untouched,
-            actual=candidate_untouched,
-        )
-
-    independent = _pdfminer_metadata(candidate)
-    for field in _SUPPORTED_FIELDS:
-        expected = candidate_metadata.get(field)
-        if expected is None:
-            continue
-        actual = independent.get(field)
-        if actual != expected:
-            _fail(
-                "pdf.candidate.pdfminer_metadata",
-                "pdfminer disagreed with the strict pypdf metadata interpretation.",
-                field=field,
-                expected=expected,
-                actual=actual,
-            )
+    _verify_metadata(
+        source,
+        candidate,
+        source_parsed,
+        candidate_parsed,
+        metadata_edits,
+    )
+    _verify_links(source_parsed, candidate_parsed, link_edits)

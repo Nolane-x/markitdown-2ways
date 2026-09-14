@@ -6,6 +6,7 @@ from io import BytesIO
 from typing import BinaryIO
 
 from pypdf import PdfWriter
+from pypdf.generic import DictionaryObject, IndirectObject, NameObject, TextStringObject
 
 from ..._errors import (
     RoundTripVerificationError,
@@ -18,8 +19,15 @@ from ...ir.edits import EditOperation
 from ...ir.serialization import validate_document
 from .limits import PdfNativeLimits
 from .parser import parse_pdf_source
-from .routing import PdfRoutedMetadataEdit, resolve_pdf_metadata_edit
+from .routing import (
+    PdfRoutedLinkEdit,
+    PdfRoutedMetadataEdit,
+    resolve_pdf_link_uri_edit,
+    resolve_pdf_metadata_edit,
+)
 from .verification import verify_pdf_candidate
+
+PdfRoutedEdit = PdfRoutedMetadataEdit | PdfRoutedLinkEdit
 
 
 def _read_source_bytes(source_stream: BinaryIO) -> bytes:
@@ -60,8 +68,9 @@ def _validate_edit_set(edits: tuple[EditOperation, ...]) -> None:
     operation_ids: set[str] = set()
     for edit in edits:
         if edit.operation_id in operation_ids:
+            # Preserve the H9 reason code as part of the public error contract.
             raise UnsupportedEditError(
-                "PDF metadata transaction contains a duplicate operation id.",
+                "PDF transaction contains a duplicate operation id.",
                 details={
                     "reason": "pdf.metadata.duplicate_operation_id",
                     "operation_id": edit.operation_id,
@@ -75,32 +84,87 @@ def _route_all(
     source: bytes,
     edits: tuple[EditOperation, ...],
     limits: PdfNativeLimits,
-) -> tuple[PdfRoutedMetadataEdit, ...]:
-    routed: list[PdfRoutedMetadataEdit] = []
-    fields: set[str] = set()
+) -> tuple[PdfRoutedEdit, ...]:
+    routed: list[PdfRoutedEdit] = []
+    metadata_fields: set[str] = set()
+    link_targets: set[tuple[int, int]] = set()
+    link_owners: set[tuple[int, int]] = set()
+
     for edit in edits:
-        item = resolve_pdf_metadata_edit(document, source, edit, limits=limits)
-        if item.field in fields:
-            raise UnsupportedEditError(
-                "PDF metadata transaction contains a duplicate logical target.",
-                details={
-                    "reason": "pdf.metadata.duplicate_target",
-                    "field": item.field,
-                },
-            )
-        fields.add(item.field)
-        routed.append(item)
+        if edit.type == "update_pdf_metadata":
+            metadata = resolve_pdf_metadata_edit(document, source, edit, limits=limits)
+            if metadata.field in metadata_fields:
+                raise UnsupportedEditError(
+                    "PDF metadata transaction contains a duplicate logical target.",
+                    details={
+                        "reason": "pdf.metadata.duplicate_target",
+                        "field": metadata.field,
+                    },
+                )
+            metadata_fields.add(metadata.field)
+            routed.append(metadata)
+            continue
+
+        if edit.type == "update_pdf_link_uri":
+            link = resolve_pdf_link_uri_edit(document, source, edit, limits=limits)
+            target = (link.page_index, link.annotation_index)
+            if target in link_targets:
+                raise UnsupportedEditError(
+                    "PDF URI link transaction contains a duplicate logical target.",
+                    details={
+                        "reason": "pdf.link.duplicate_target",
+                        "page_index": link.page_index,
+                        "annotation_index": link.annotation_index,
+                    },
+                )
+            if link.mutation_owner_objgen in link_owners:
+                raise UnsupportedEditError(
+                    "PDF URI link transaction resolved multiple edits to one native owner.",
+                    details={
+                        "reason": "pdf.link.owner_collision",
+                        "owner_objgen": link.mutation_owner_objgen,
+                    },
+                )
+            link_targets.add(target)
+            link_owners.add(link.mutation_owner_objgen)
+            routed.append(link)
+            continue
+
+        raise UnsupportedEditError(
+            "PDF transaction contains an unsupported edit type.",
+            details={"reason": "pdf.edit_type", "operation_id": edit.operation_id},
+        )
 
     parsed = parse_pdf_source(source, limits=limits)
-    requested = {item.field: item.value for item in routed}
-    final_total = sum(
-        len(requested.get(field.field, field.value)) for field in parsed.fields
+    requested_metadata = {
+        item.field: item.value
+        for item in routed
+        if isinstance(item, PdfRoutedMetadataEdit)
+    }
+    final_metadata_total = sum(
+        len(requested_metadata.get(field.field, field.value)) for field in parsed.fields
     )
-    if final_total > limits.max_total_metadata_chars:
+    if final_metadata_total > limits.max_total_metadata_chars:
         raise UnsupportedEditError(
             "PDF metadata transaction exceeds the total text limit.",
             details={"reason": "pdf.metadata.total_too_large"},
         )
+
+    requested_links = {
+        (item.page_index, item.annotation_index): item.uri
+        for item in routed
+        if isinstance(item, PdfRoutedLinkEdit)
+    }
+    final_uri_total = sum(
+        len(requested_links.get((link.page_index, link.annotation_index), link.uri))
+        for link in parsed.links
+    )
+    if final_uri_total > limits.max_total_uri_chars:
+        raise UnsupportedEditError(
+            "PDF URI link transaction exceeds the total URI character limit.",
+            details={"reason": "pdf.link.total_uri_too_large"},
+        )
+
     return tuple(routed)
 
 
@@ -131,12 +195,12 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
                 FidelityEvidence(
                     check_code="pdf.increment_object_audit",
                     status=FidelityStatus.PASSED,
-                    description="Only the authorized Document Information object changed.",
+                    description="Only explicitly authorized native PDF owners changed.",
                 ),
                 FidelityEvidence(
                     check_code="pdf.final_verification",
                     status=FidelityStatus.PASSED,
-                    description="Strict pypdf and independent pdfminer metadata verification agreed.",
+                    description="Strict PDF re-read verified requested metadata and URI-link semantics.",
                 ),
             )
         )
@@ -148,6 +212,55 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
             claimed_tier="exact-preserve" if zero_edit else "high",
             evidence=tuple(evidence),
         ),
+    )
+
+
+def _owner_object(writer: PdfWriter, objgen: tuple[int, int]) -> DictionaryObject:
+    reference = IndirectObject(objgen[0], objgen[1], writer)
+    owner = reference.get_object()
+    if not isinstance(owner, DictionaryObject):
+        raise RoundTripVerificationError(
+            "PDF URI link mutation owner did not resolve to a dictionary.",
+            details={
+                "reason": "pdf.writer.native_owner_drift",
+                "owner_objgen": objgen,
+                "owner_type": type(owner).__name__,
+            },
+        )
+    return owner
+
+
+def _apply_link_edit(writer: PdfWriter, item: PdfRoutedLinkEdit) -> None:
+    owner = _owner_object(writer, item.mutation_owner_objgen)
+    if item.owner_kind == "annotation":
+        try:
+            action = owner.raw_get("/A")
+        except KeyError as exc:
+            raise RoundTripVerificationError(
+                "PDF link annotation lost its direct action dictionary.",
+                details={"reason": "pdf.writer.native_owner_drift"},
+            ) from exc
+        if not isinstance(action, DictionaryObject):
+            raise RoundTripVerificationError(
+                "PDF link annotation action ownership drifted before mutation.",
+                details={
+                    "reason": "pdf.writer.native_owner_drift",
+                    "action_type": type(action).__name__,
+                },
+            )
+        action[NameObject("/URI")] = TextStringObject(item.uri)
+        return
+
+    if item.owner_kind == "action":
+        owner[NameObject("/URI")] = TextStringObject(item.uri)
+        return
+
+    raise RoundTripVerificationError(
+        "PDF URI link mutation owner kind is unsupported.",
+        details={
+            "reason": "pdf.writer.native_owner_drift",
+            "owner_kind": item.owner_kind,
+        },
     )
 
 
@@ -171,16 +284,17 @@ def patch_pdf(
 
     _validate_edit_set(edits)
     routed = _route_all(document, source, edits, limits)
-    info_objgens = {item.info_objgen for item in routed}
-    if len(info_objgens) != 1:
-        raise UnsupportedEditError(
-            "PDF metadata transaction resolved to ambiguous native owners.",
-            details={"reason": "pdf.structure.authority_ambiguous"},
-        )
+    metadata_edits = tuple(
+        item for item in routed if isinstance(item, PdfRoutedMetadataEdit)
+    )
+    link_edits = tuple(item for item in routed if isinstance(item, PdfRoutedLinkEdit))
 
     try:
         writer = PdfWriter(BytesIO(source), incremental=True, strict=True)
-        writer.add_metadata({item.key: item.value for item in routed})
+        if metadata_edits:
+            writer.add_metadata({item.key: item.value for item in metadata_edits})
+        for item in link_edits:
+            _apply_link_edit(writer, item)
         changed_objects = tuple(
             (reference.idnum, reference.generation)
             for reference in writer.list_objects_in_increment()

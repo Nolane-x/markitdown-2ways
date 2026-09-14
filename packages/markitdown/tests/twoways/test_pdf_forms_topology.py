@@ -57,4 +57,6 @@ def test_duplicate_root_owner_fails_closed_without_recursion() -> None:
     parsed = parse_pdf_source(make_text_form_pdf(duplicate_field_name=True))
 
     assert len(parsed.form_fields) == 2
-    assert all(field.reason_code == "pdf.form.tree_ambiguous" for field in parsed.form_fields)
+    assert all(
+        field.reason_code == "pdf.form.tree_ambiguous" for field in parsed.form_fields
+    )

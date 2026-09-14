@@ -41,6 +41,7 @@ class PdfLinkEvidence:
     locator_digest: str
     writable: bool
     reason_code: str | None = None
+    immutable_digest: str = ""
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,9 @@ class PdfSourceSnapshot:
     has_signature: bool
     has_certification: bool
     linearized: bool
+    page_objgens: tuple[tuple[int, int] | None, ...] = ()
+    annotation_topology: tuple[tuple[tuple[int, int] | None, ...], ...] = ()
+    annotation_fingerprints: tuple[tuple[str, ...], ...] = ()
 
 
 @dataclass(frozen=True)

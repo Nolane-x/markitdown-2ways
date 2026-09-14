@@ -330,7 +330,7 @@ def _verify_annotation_authority(
     source_snapshot,
     candidate_snapshot,
     *,
-    authorized_targets: frozenset[tuple[int, int]],
+    direct_action_targets: frozenset[tuple[int, int]],
 ) -> None:
     if candidate_snapshot.page_objgens != source_snapshot.page_objgens:
         _fail(
@@ -362,7 +362,7 @@ def _verify_annotation_authority(
             zip(source_page, candidate_page)
         ):
             target = (page_index, annotation_index)
-            if source_digest != candidate_digest and target not in authorized_targets:
+            if source_digest != candidate_digest and target not in direct_action_targets:
                 _fail(
                     "pdf.candidate.annotation_sibling",
                     "PDF candidate changed an annotation outside an authorized native target.",
@@ -772,7 +772,7 @@ def verify_pdf_candidate(
     _verify_annotation_authority(
         source_snapshot,
         candidate_snapshot,
-        authorized_targets=frozenset(authorized_annotation_targets),
+        direct_action_targets=frozenset(authorized_annotation_targets),
     )
     _verify_metadata(source, candidate, source_parsed, candidate_parsed, metadata_edits)
     _verify_links(source_parsed, candidate_parsed, link_edits)

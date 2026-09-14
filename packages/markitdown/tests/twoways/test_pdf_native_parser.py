@@ -18,6 +18,7 @@ def test_pdf_parser_binds_source_and_info_authority() -> None:
     assert parsed.snapshot.source_sha256 == sha256(source).hexdigest()
     assert parsed.snapshot.source_size == len(source)
     assert parsed.snapshot.page_count == 1
+    assert parsed.snapshot.root_objgen == (1, 0)
     assert parsed.snapshot.info_objgen == (4, 0)
     assert parsed.snapshot.supported_metadata == {
         "Title": "Alpha",

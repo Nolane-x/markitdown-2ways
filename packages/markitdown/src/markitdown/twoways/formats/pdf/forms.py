@@ -282,7 +282,7 @@ def collect_text_fields(
         acroform_reason = "pdf.form.xfa"
     elif "/CO" in acroform:
         acroform_reason = "pdf.form.calculation_order"
-    elif "/AA" in acroform:
+    elif "/AA" in acroform or "/A" in acroform:
         acroform_reason = "pdf.form.additional_actions"
 
     default_fonts = _default_resource_fonts(acroform)

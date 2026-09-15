@@ -135,7 +135,11 @@ def _link_immutable_digest(
     return sha256(repr(evidence).encode("utf-8")).hexdigest()
 
 
-def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
+def _detect_signature_policy(
+    reader: PdfReader,
+    *,
+    limits: PdfNativeLimits,
+) -> tuple[bool, bool]:
     try:
         root = reader.root_object
     except Exception:
@@ -153,10 +157,27 @@ def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
             fields = acroform.get("/Fields", ())
         else:
             fields = ()
-        stack = list(fields or ())
+        stack: list[tuple[object, int]] = [(item, 1) for item in fields or ()]
         seen: set[tuple[int, int]] = set()
+        traversed_fields = 0
         while stack:
-            field_ref = stack.pop()
+            field_ref, depth = stack.pop()
+            if depth > limits.max_field_tree_depth:
+                raise PdfParseError(
+                    "PDF AcroForm signature-policy traversal exceeds the configured depth limit.",
+                    reason="pdf.form.tree_ambiguous",
+                    details={"depth": depth, "limit": limits.max_field_tree_depth},
+                )
+            traversed_fields += 1
+            if traversed_fields > limits.max_total_form_fields:
+                raise PdfParseError(
+                    "PDF AcroForm signature-policy traversal exceeds the configured field limit.",
+                    reason="pdf.form.too_many_fields",
+                    details={
+                        "field_count": traversed_fields,
+                        "limit": limits.max_total_form_fields,
+                    },
+                )
             field_objgen = _objgen(field_ref)
             if field_objgen is not None:
                 if field_objgen in seen:
@@ -172,7 +193,9 @@ def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
                 has_signature = True
                 break
             kids = field.get("/Kids", ())
-            stack.extend(kids or ())
+            stack.extend((kid, depth + 1) for kid in kids or ())
+    except PdfParseError:
+        raise
     except Exception:
         has_signature = True
     return (has_signature, has_certification)
@@ -551,7 +574,10 @@ def parse_pdf_source(
             has_xmp = "/Metadata" in root
         except Exception:
             diagnostics.append("pdf.structure.authority_ambiguous")
-        has_signature, has_certification = _detect_signature_policy(reader)
+        has_signature, has_certification = _detect_signature_policy(
+            reader,
+            limits=limits,
+        )
 
     if encrypted:
         diagnostics.append("pdf.security.encrypted")

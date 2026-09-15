@@ -22,15 +22,13 @@ def _form_pdf(
     include_da: bool = True,
     include_dr: bool = True,
     da_value: bytes = b"/Helv 0 Tf 0 g",
+    font_resource: bytes = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
 ) -> bytes:
     appearance = b""
     if include_da:
         appearance += b" /DA (" + da_value + b")"
     if include_dr:
-        appearance += (
-            b" /DR << /Font << /Helv << /Type /Font /Subtype /Type1 "
-            b"/BaseFont /Helvetica >> >> >>"
-        )
+        appearance += b" /DR << /Font << /Helv " + font_resource + b" >> >>"
     objects = {
         1: b"<< /Type /Catalog /Pages 2 0 R /AcroForm 5 0 R >>",
         2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -178,6 +176,24 @@ def test_pdf_form_parser_requires_da_font_resource_authority(da_value: bytes) ->
         fields=b"[6 0 R]",
         field=_plain_field(),
         da_value=da_value,
+    )
+
+    parsed = parse_pdf_source(source)
+
+    assert len(parsed.form_fields) == 1
+    assert parsed.form_fields[0].writable is False
+    assert parsed.form_fields[0].reason_code == "pdf.form.appearance_authority"
+
+
+@pytest.mark.parametrize(
+    "font_resource",
+    [b"<< /Type /ExtGState >>", b"<< /Type /Font >>"],
+)
+def test_pdf_form_parser_requires_valid_da_font_dictionary(font_resource: bytes) -> None:
+    source = _form_pdf(
+        fields=b"[6 0 R]",
+        field=_plain_field(),
+        font_resource=font_resource,
     )
 
     parsed = parse_pdf_source(source)

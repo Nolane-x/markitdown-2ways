@@ -14,6 +14,7 @@ from pypdf.generic import (
 
 from markitdown.twoways._errors import RoundTripVerificationError
 from markitdown.twoways.formats.pdf import writer as pdf_writer
+from markitdown.twoways.formats.pdf.limits import PdfNativeLimits
 from markitdown.twoways.formats.pdf.reader import read_pdf_ir
 from markitdown.twoways.formats.pdf.routing import resolve_pdf_text_field_value_edit
 from markitdown.twoways.ir.edits import EditOperation, EditPrecondition
@@ -73,7 +74,7 @@ def test_pdf_form_native_apply_rechecks_complete_immutable_owner_shape(
         )
 
     with pytest.raises(RoundTripVerificationError) as exc:
-        pdf_writer._apply_form_edit(writer, routed)
+        pdf_writer._apply_form_edit(writer, routed, limits=PdfNativeLimits())
 
     assert exc.value.details["reason"] == "pdf.writer.native_owner_drift"
     assert str(owner.raw_get("/V")) == "Alice"

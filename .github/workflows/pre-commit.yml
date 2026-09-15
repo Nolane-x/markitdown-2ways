@@ -9,12 +9,16 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.x"
+          python-version: "3.13"
 
-      - name: Install pre-commit
+      - name: Install pre-commit and Hatch
         run: |
           pip install pre-commit
           pre-commit install --install-hooks
+          pipx install hatch
 
       - name: Run pre-commit
         run: pre-commit run --all-files
+
+      - name: Run focused H11 SigFlags RED contract
+        run: cd packages/markitdown; hatch run test:pytest tests/twoways/test_pdf_forms_signature_policy.py -q

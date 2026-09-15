@@ -9,13 +9,31 @@ from markitdown.twoways.formats.pdf.parser import parse_pdf_source
 from ._pdf_fixtures import _build_pdf
 
 
-def _form_pdf(*, fields: bytes, field: bytes) -> bytes:
+def _form_pdf(
+    *,
+    fields: bytes,
+    field: bytes,
+    include_da: bool = True,
+    include_dr: bool = True,
+) -> bytes:
+    appearance = b""
+    if include_da:
+        appearance += b" /DA (/Helv 0 Tf 0 g)"
+    if include_dr:
+        appearance += (
+            b" /DR << /Font << /Helv << /Type /Font /Subtype /Type1 "
+            b"/BaseFont /Helvetica >> >> >>"
+        )
     objects = {
         1: b"<< /Type /Catalog /Pages 2 0 R /AcroForm 5 0 R >>",
         2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         3: b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [6 0 R] >>",
         4: b"<< /Title (H11 adversarial) >>",
-        5: b"<< /Fields " + fields + b" /NeedAppearances true /DA (/Helv 0 Tf 0 g) >>",
+        5: b"<< /Fields "
+        + fields
+        + b" /NeedAppearances true"
+        + appearance
+        + b" >>",
         6: field,
     }
     return _build_pdf(objects)
@@ -120,3 +138,25 @@ def test_pdf_form_parser_counts_direct_field_entries_against_budget() -> None:
         parse_pdf_source(source, limits=PdfNativeLimits(max_total_form_fields=1))
 
     assert excinfo.value.reason == "pdf.form.too_many_fields"
+
+
+@pytest.mark.parametrize(
+    ("include_da", "include_dr"),
+    [(False, True), (True, False)],
+)
+def test_pdf_form_parser_requires_default_appearance_authority(
+    include_da: bool,
+    include_dr: bool,
+) -> None:
+    source = _form_pdf(
+        fields=b"[6 0 R]",
+        field=_plain_field(),
+        include_da=include_da,
+        include_dr=include_dr,
+    )
+
+    parsed = parse_pdf_source(source)
+
+    assert len(parsed.form_fields) == 1
+    assert parsed.form_fields[0].writable is False
+    assert parsed.form_fields[0].reason_code == "pdf.form.appearance_authority"

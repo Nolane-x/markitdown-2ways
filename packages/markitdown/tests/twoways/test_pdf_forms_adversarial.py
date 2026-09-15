@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from markitdown.twoways.formats.pdf.limits import PdfNativeLimits
+from markitdown.twoways.formats.pdf.model import PdfParseError
 from markitdown.twoways.formats.pdf.parser import parse_pdf_source
 
 from ._pdf_fixtures import _build_pdf
@@ -37,6 +39,14 @@ def _field_with_max_len(max_len: bytes) -> bytes:
     return (
         b"<< /FT /Tx /Subtype /Widget /T (customer.name) /V (Alice) "
         b"/Rect [72 700 240 724] /Ff 0 /MaxLen " + max_len + b" >>"
+    )
+
+
+def _field_with_name(name: bytes) -> bytes:
+    return (
+        b"<< /FT /Tx /Subtype /Widget /T "
+        + name
+        + b" /V (Alice) /Rect [72 700 240 724] /Ff 0 >>"
     )
 
 
@@ -90,3 +100,23 @@ def test_pdf_form_parser_rejects_coerced_non_integer_max_len(max_len: bytes) -> 
     assert len(parsed.form_fields) == 1
     assert parsed.form_fields[0].writable is False
     assert parsed.form_fields[0].reason_code == "pdf.form.max_length"
+
+
+def test_pdf_form_parser_rejects_empty_terminal_field_name() -> None:
+    source = _form_pdf(fields=b"[6 0 R]", field=_field_with_name(b"()"))
+
+    parsed = parse_pdf_source(source)
+
+    assert len(parsed.form_fields) == 1
+    assert parsed.form_fields[0].writable is False
+    assert parsed.form_fields[0].reason_code == "pdf.form.field_name"
+
+
+def test_pdf_form_parser_counts_direct_field_entries_against_budget() -> None:
+    direct = _plain_field()
+    source = _form_pdf(fields=b"[" + direct + b" " + direct + b"]", field=_plain_field())
+
+    with pytest.raises(PdfParseError) as excinfo:
+        parse_pdf_source(source, limits=PdfNativeLimits(max_total_form_fields=1))
+
+    assert excinfo.value.reason == "pdf.form.too_many_fields"

@@ -368,7 +368,12 @@ def _apply_link_edit(writer: PdfWriter, item: PdfRoutedLinkEdit) -> None:
     )
 
 
-def _apply_form_edit(writer: PdfWriter, item: PdfRoutedTextFieldEdit) -> None:
+def _apply_form_edit(
+    writer: PdfWriter,
+    item: PdfRoutedTextFieldEdit,
+    *,
+    limits: PdfNativeLimits,
+) -> None:
     owner = _owner_object(writer, item.field_objgen)
     if str(owner.get("/FT")) != "/Tx" or str(owner.get("/Subtype")) != "/Widget":
         raise RoundTripVerificationError(
@@ -402,6 +407,7 @@ def _apply_form_edit(writer: PdfWriter, item: PdfRoutedTextFieldEdit) -> None:
         acroform_objgen=item.acroform_objgen,
         page_index=item.page_index,
         annotation_index=item.annotation_index,
+        max_depth=limits.max_field_tree_depth,
     )
     if current_immutable_digest != item.immutable_digest:
         raise RoundTripVerificationError(
@@ -446,7 +452,7 @@ def patch_pdf(
         for item in link_edits:
             _apply_link_edit(writer, item)
         for item in form_edits:
-            _apply_form_edit(writer, item)
+            _apply_form_edit(writer, item, limits=limits)
         changed_objects = tuple(
             (reference.idnum, reference.generation)
             for reference in writer.list_objects_in_increment()

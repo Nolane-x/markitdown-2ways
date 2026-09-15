@@ -19,4 +19,5 @@ jobs:
           hatch test -py=3.13
           tests/twoways/test_pdf_forms_adversarial.py
           tests/twoways/test_pdf_forms_writer_native_recheck.py
+          tests/twoways/test_pdf_forms_fidelity.py
           -q

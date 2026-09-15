@@ -255,7 +255,12 @@ def _route_all(
     return tuple(routed)
 
 
-def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
+def _result(
+    bytes_written: int,
+    *,
+    zero_edit: bool,
+    has_form_edits: bool = False,
+) -> WriterResult:
     evidence = [
         FidelityEvidence(
             check_code="pdf.source_authority",
@@ -291,6 +296,18 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
                 ),
             )
         )
+        if has_form_edits:
+            evidence.append(
+                FidelityEvidence(
+                    check_code="pdf.form.viewer_regenerated_appearance",
+                    status=FidelityStatus.PASSED,
+                    description=(
+                        "Verified H11 /V semantics preserve NeedAppearances=true and "
+                        "delegate appearance regeneration to the viewer; this is not an "
+                        "engine-independent visual rendering guarantee."
+                    ),
+                )
+            )
     return WriterResult(
         format="pdf",
         mode="patch",
@@ -453,4 +470,8 @@ def patch_pdf(
         limits=limits,
     )
     output.write(candidate)
-    return _result(len(candidate), zero_edit=False)
+    return _result(
+        len(candidate),
+        zero_edit=False,
+        has_form_edits=bool(form_edits),
+    )

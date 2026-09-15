@@ -5,7 +5,7 @@ from markitdown.twoways.formats.pdf.parser import parse_pdf_source
 from ._pdf_fixtures import _build_pdf
 
 
-def test_pdf_form_parser_blocks_indirect_field_when_tree_contains_direct_owner() -> None:
+def test_pdf_form_parser_blocks_indirect_field_with_direct_owner() -> None:
     direct_field = (
         b"<< /FT /Tx /Subtype /Widget /T (direct.name) /V (Direct) "
         b"/Rect [300 700 468 724] /Ff 0 >>"

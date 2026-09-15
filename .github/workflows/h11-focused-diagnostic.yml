@@ -13,5 +13,10 @@ jobs:
           python-version: "3.13"
       - name: Install Hatch
         run: pipx install hatch
-      - name: Run focused H11 native-owner recheck
-        run: cd packages/markitdown; hatch test -py=3.13 tests/twoways/test_pdf_forms_writer_native_recheck.py -q
+      - name: Run focused H11 hardening contracts
+        run: >-
+          cd packages/markitdown;
+          hatch test -py=3.13
+          tests/twoways/test_pdf_forms_adversarial.py
+          tests/twoways/test_pdf_forms_writer_native_recheck.py
+          -q

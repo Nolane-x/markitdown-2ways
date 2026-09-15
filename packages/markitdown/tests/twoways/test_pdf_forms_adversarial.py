@@ -139,7 +139,9 @@ def test_pdf_form_parser_rejects_empty_terminal_field_name() -> None:
 
 def test_pdf_form_parser_counts_direct_field_entries_against_budget() -> None:
     direct = _plain_field()
-    source = _form_pdf(fields=b"[" + direct + b" " + direct + b"]", field=_plain_field())
+    source = _form_pdf(
+        fields=b"[" + direct + b" " + direct + b"]", field=_plain_field()
+    )
 
     with pytest.raises(PdfParseError) as excinfo:
         parse_pdf_source(source, limits=PdfNativeLimits(max_total_form_fields=1))
@@ -191,7 +193,9 @@ def test_pdf_form_parser_requires_da_font_resource_authority(da_value: bytes) ->
     "font_resource",
     [b"<< /Type /ExtGState >>", b"<< /Type /Font >>"],
 )
-def test_pdf_form_parser_requires_valid_da_font_dictionary(font_resource: bytes) -> None:
+def test_pdf_form_parser_requires_valid_da_font_dictionary(
+    font_resource: bytes,
+) -> None:
     source = _form_pdf(
         fields=b"[6 0 R]",
         field=_plain_field(),

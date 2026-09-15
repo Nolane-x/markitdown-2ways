@@ -53,7 +53,18 @@ def _resolve(value: object) -> object:
     return value
 
 
-def _canonical_pdf_value(value: object) -> object:
+def _canonical_pdf_value(
+    value: object,
+    *,
+    depth: int,
+    max_depth: int,
+) -> object:
+    if depth > max_depth:
+        raise PdfParseError(
+            "PDF AcroForm semantic nesting exceeds the configured depth limit.",
+            reason="pdf.form.tree_ambiguous",
+            details={"depth": depth, "limit": max_depth},
+        )
     if isinstance(value, IndirectObject):
         return ("ref", value.idnum, value.generation)
     if isinstance(value, DictionaryObject):
@@ -61,13 +72,30 @@ def _canonical_pdf_value(value: object) -> object:
             "dict",
             tuple(
                 sorted(
-                    (str(key), _canonical_pdf_value(item))
+                    (
+                        str(key),
+                        _canonical_pdf_value(
+                            item,
+                            depth=depth + 1,
+                            max_depth=max_depth,
+                        ),
+                    )
                     for key, item in value.items()
                 )
             ),
         )
     if isinstance(value, (ArrayObject, list, tuple)):
-        return ("array", tuple(_canonical_pdf_value(item) for item in value))
+        return (
+            "array",
+            tuple(
+                _canonical_pdf_value(
+                    item,
+                    depth=depth + 1,
+                    max_depth=max_depth,
+                )
+                for item in value
+            ),
+        )
     if isinstance(value, bytes):
         return ("bytes", value.hex())
     if isinstance(value, str):
@@ -83,8 +111,9 @@ def _canonical_pdf_value(value: object) -> object:
     return (type(value).__name__, repr(value))
 
 
-def _semantic_digest(value: object) -> str:
-    return sha256(repr(_canonical_pdf_value(value)).encode("utf-8")).hexdigest()
+def _semantic_digest(value: object, *, max_depth: int) -> str:
+    canonical = _canonical_pdf_value(value, depth=0, max_depth=max_depth)
+    return sha256(repr(canonical).encode("utf-8")).hexdigest()
 
 
 def _field_immutable_digest(
@@ -93,6 +122,7 @@ def _field_immutable_digest(
     acroform_objgen: tuple[int, int],
     page_index: int,
     annotation_index: int,
+    max_depth: int,
 ) -> str:
     items: list[tuple[str, object]] = []
     for key, value in field.items():
@@ -100,7 +130,11 @@ def _field_immutable_digest(
         encoded = (
             ("editable-form-value",)
             if key_text == "/V"
-            else _canonical_pdf_value(value)
+            else _canonical_pdf_value(
+                value,
+                depth=1,
+                max_depth=max_depth,
+            )
         )
         items.append((key_text, encoded))
     evidence = (
@@ -471,6 +505,7 @@ def collect_text_fields(
                 acroform_objgen=acroform_objgen,
                 page_index=page_index,
                 annotation_index=annotation_index,
+                max_depth=limits.max_field_tree_depth,
             ),
             writable=reason is None,
             reason_code=reason,
@@ -501,7 +536,15 @@ def collect_text_fields(
         slots = bindings_by_objgen.get(evidence.field_objgen, [])
         if len(slots) == 1:
             form_bindings.append((evidence.field_objgen, slots[0][0], slots[0][1]))
-        fingerprints.append((evidence.field_objgen, _semantic_digest(field)))
+        fingerprints.append(
+            (
+                evidence.field_objgen,
+                _semantic_digest(
+                    field,
+                    max_depth=limits.max_field_tree_depth,
+                ),
+            )
+        )
 
     return (
         tuple(final_fields),

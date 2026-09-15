@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from io import BytesIO
+
 import pytest
+from pypdf import PdfReader
 
 from markitdown.twoways.formats.pdf.limits import PdfNativeLimits
 from markitdown.twoways.formats.pdf.model import PdfParseError
-from markitdown.twoways.formats.pdf.parser import parse_pdf_source
+from markitdown.twoways.formats.pdf.parser import (
+    _detect_signature_policy,
+    parse_pdf_source,
+)
 
-from ._pdf_fixtures import _build_pdf
+from ._pdf_fixtures import _build_pdf, make_text_form_pdf
 
 
 def _form_pdf(
@@ -179,3 +185,29 @@ def test_pdf_form_parser_requires_da_font_resource_authority(da_value: bytes) ->
     assert len(parsed.form_fields) == 1
     assert parsed.form_fields[0].writable is False
     assert parsed.form_fields[0].reason_code == "pdf.form.appearance_authority"
+
+
+def test_pdf_signature_policy_prepass_enforces_field_count_budget() -> None:
+    source = make_text_form_pdf(second_field=True)
+    reader = PdfReader(BytesIO(source), strict=True)
+
+    with pytest.raises(PdfParseError) as excinfo:
+        _detect_signature_policy(
+            reader,
+            limits=PdfNativeLimits(max_total_form_fields=1),
+        )
+
+    assert excinfo.value.reason == "pdf.form.too_many_fields"
+
+
+def test_pdf_signature_policy_prepass_enforces_field_depth_budget() -> None:
+    source = make_text_form_pdf(with_parent=True)
+    reader = PdfReader(BytesIO(source), strict=True)
+
+    with pytest.raises(PdfParseError) as excinfo:
+        _detect_signature_policy(
+            reader,
+            limits=PdfNativeLimits(max_field_tree_depth=1),
+        )
+
+    assert excinfo.value.reason == "pdf.form.tree_ambiguous"

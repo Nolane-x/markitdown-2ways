@@ -154,6 +154,42 @@ def _page_bindings(
     return bindings
 
 
+def _default_resource_fonts(acroform: DictionaryObject) -> DictionaryObject | None:
+    dr_ref = _raw_get(acroform, "/DR")
+    if dr_ref is None:
+        return None
+    try:
+        dr = _resolve(dr_ref)
+    except Exception:
+        return None
+    if not isinstance(dr, DictionaryObject):
+        return None
+    font_ref = _raw_get(dr, "/Font")
+    if font_ref is None:
+        return None
+    try:
+        fonts = _resolve(font_ref)
+    except Exception:
+        return None
+    if not isinstance(fonts, DictionaryObject) or not fonts:
+        return None
+    return fonts
+
+
+def _has_default_appearance_authority(
+    acroform: DictionaryObject,
+    field: DictionaryObject,
+    *,
+    default_fonts: DictionaryObject | None,
+) -> bool:
+    if default_fonts is None:
+        return False
+    da_raw = _raw_get(field, "/DA")
+    if da_raw is None:
+        da_raw = _raw_get(acroform, "/DA")
+    return isinstance(da_raw, TextStringObject) and bool(str(da_raw).strip())
+
+
 def collect_text_fields(
     reader: PdfReader,
     *,
@@ -217,6 +253,7 @@ def collect_text_fields(
     elif "/AA" in acroform:
         acroform_reason = "pdf.form.additional_actions"
 
+    default_fonts = _default_resource_fonts(acroform)
     bindings_by_objgen = _page_bindings(annotation_topology)
     stack: list[tuple[object, int]] = [(item, 1) for item in reversed(roots)]
     seen: set[tuple[int, int]] = set()
@@ -233,13 +270,6 @@ def collect_text_fields(
                 reason="pdf.form.tree_ambiguous",
                 details={"depth": depth, "limit": limits.max_field_tree_depth},
             )
-        field_objgen = _objgen(field_ref)
-        if field_objgen is None:
-            continue
-        if field_objgen in seen:
-            ambiguous_owners.add(field_objgen)
-            continue
-        seen.add(field_objgen)
         traversed_fields += 1
         if traversed_fields > limits.max_total_form_fields:
             raise PdfParseError(
@@ -250,6 +280,13 @@ def collect_text_fields(
                     "limit": limits.max_total_form_fields,
                 },
             )
+        field_objgen = _objgen(field_ref)
+        if field_objgen is None:
+            continue
+        if field_objgen in seen:
+            ambiguous_owners.add(field_objgen)
+            continue
+        seen.add(field_objgen)
         try:
             field = _resolve(field_ref)
         except Exception as exc:
@@ -316,24 +353,22 @@ def collect_text_fields(
         if flags_raw is None:
             field_flags = 0
             flags_valid = True
+        elif isinstance(flags_raw, int) and not isinstance(flags_raw, bool):
+            field_flags = int(flags_raw)
+            flags_valid = field_flags >= 0
         else:
-            try:
-                field_flags = int(flags_raw)  # type: ignore[arg-type]
-                flags_valid = field_flags >= 0
-            except (TypeError, ValueError):
-                field_flags = 0
-                flags_valid = False
+            field_flags = 0
+            flags_valid = False
 
         max_len_raw = _raw_get(field, "/MaxLen")
         max_len: int | None = None
         max_len_valid = True
         if max_len_raw is not None:
-            try:
-                max_len = int(max_len_raw)  # type: ignore[arg-type]
+            if isinstance(max_len_raw, int) and not isinstance(max_len_raw, bool):
+                max_len = int(max_len_raw)
                 max_len_valid = max_len >= 0
-            except (TypeError, ValueError):
+            else:
                 max_len_valid = False
-                max_len = None
 
         page_slots = bindings_by_objgen.get(field_objgen, [])
         if len(page_slots) == 1:
@@ -342,7 +377,9 @@ def collect_text_fields(
             page_index, annotation_index = (-1, -1)
 
         reason = acroform_reason
-        if reason is None and ("/Parent" in field or "/Kids" in field):
+        if reason is None and not field_name:
+            reason = "pdf.form.field_name"
+        elif reason is None and ("/Parent" in field or "/Kids" in field):
             reason = "pdf.form.field_hierarchy"
         elif reason is None and field_type != "/Tx":
             reason = "pdf.form.field_type"
@@ -354,6 +391,12 @@ def collect_text_fields(
             reason = "pdf.form.additional_actions"
         elif reason is None and "/AP" in field:
             reason = "pdf.form.appearance_present"
+        elif reason is None and not _has_default_appearance_authority(
+            acroform,
+            field,
+            default_fonts=default_fonts,
+        ):
+            reason = "pdf.form.appearance_authority"
         elif reason is None and not flags_valid:
             reason = "pdf.form.unsupported_text_mode"
         elif reason is None and field_flags & _READ_ONLY_FLAG:

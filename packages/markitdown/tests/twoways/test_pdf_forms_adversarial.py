@@ -23,6 +23,7 @@ def _form_pdf(
     include_dr: bool = True,
     da_value: bytes = b"/Helv 0 Tf 0 g",
     font_resource: bytes = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    acroform_extra: bytes = b"",
 ) -> bytes:
     appearance = b""
     if include_da:
@@ -38,6 +39,7 @@ def _form_pdf(
         + fields
         + b" /NeedAppearances true"
         + appearance
+        + acroform_extra
         + b" >>",
         6: field,
     }
@@ -201,6 +203,20 @@ def test_pdf_form_parser_requires_valid_da_font_dictionary(font_resource: bytes)
     assert len(parsed.form_fields) == 1
     assert parsed.form_fields[0].writable is False
     assert parsed.form_fields[0].reason_code == "pdf.form.appearance_authority"
+
+
+def test_pdf_form_parser_rejects_acroform_action_authority() -> None:
+    source = _form_pdf(
+        fields=b"[6 0 R]",
+        field=_plain_field(),
+        acroform_extra=b" /A << /S /JavaScript /JS (blocked) >>",
+    )
+
+    parsed = parse_pdf_source(source)
+
+    assert len(parsed.form_fields) == 1
+    assert parsed.form_fields[0].writable is False
+    assert parsed.form_fields[0].reason_code == "pdf.form.additional_actions"
 
 
 def test_pdf_signature_policy_prepass_enforces_field_count_budget() -> None:

@@ -7,7 +7,14 @@ permissions:
 
 jobs:
   exact-source-probe:
-    runs-on: "16 core runner"
+    strategy:
+      fail-fast: false
+      matrix:
+        runner-label:
+          - "16 core runner"
+          - "large"
+          - "cpu-16"
+    runs-on: ${{ matrix.runner-label }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -17,6 +24,7 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
+          echo "runner_label=${{ matrix.runner-label }}"
           echo "expected=b420f518e0974ebe5d9e7b9a35199a81ada38e7a"
           echo "actual=${actual}"
           test "${actual}" = "b420f518e0974ebe5d9e7b9a35199a81ada38e7a"

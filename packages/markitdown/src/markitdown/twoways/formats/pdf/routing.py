@@ -586,6 +586,11 @@ def resolve_pdf_text_field_value_edit(
             "PDF form field values must be text.",
             details={"reason": "pdf.form.value_type"},
         )
+    if "\r" in value or "\n" in value:
+        raise UnsupportedEditError(
+            "H11 PDF form replacement must remain single-line text.",
+            details={"reason": "pdf.form.unsupported_text_mode"},
+        )
     if len(value) > limits.max_form_value_chars:
         raise UnsupportedEditError(
             "PDF form replacement exceeds the per-value character limit.",

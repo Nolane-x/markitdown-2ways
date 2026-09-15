@@ -515,17 +515,18 @@ def collect_text_fields(
     name_counts: dict[str, int] = {}
     for evidence, _ in collected:
         name_counts[evidence.field_name] = name_counts.get(evidence.field_name, 0) + 1
+    tree_ambiguous = (
+        unstable_direct_owner_seen
+        or bool(ambiguous_owners)
+        or any(count > 1 for count in name_counts.values())
+    )
 
     final_fields: list[PdfTextFieldEvidence] = []
     form_bindings: list[tuple[tuple[int, int], int, int]] = []
     fingerprints: list[tuple[tuple[int, int], str]] = []
     for evidence, field in collected:
         reason = evidence.reason_code
-        if (
-            unstable_direct_owner_seen
-            or evidence.field_objgen in ambiguous_owners
-            or name_counts[evidence.field_name] > 1
-        ):
+        if tree_ambiguous:
             reason = "pdf.form.tree_ambiguous"
         final = replace(
             evidence,

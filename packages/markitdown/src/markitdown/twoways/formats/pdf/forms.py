@@ -18,6 +18,9 @@ from .model import PdfParseError, PdfTextFieldEvidence
 
 _UNSUPPORTED_TEXT_FLAGS = (1 << 12) | (1 << 13) | (1 << 20) | (1 << 24) | (1 << 25)
 _READ_ONLY_FLAG = 1
+_SUPPORTED_FONT_SUBTYPES = frozenset(
+    {"/Type0", "/Type1", "/MMType1", "/Type3", "/TrueType"}
+)
 _PDF_WS = r"\x00\x09\x0A\x0C\x0D\x20"
 _DA_TF_PATTERN = re.compile(
     rf"(?:^|[{_PDF_WS}])"
@@ -253,7 +256,7 @@ def _has_default_appearance_authority(
         return False
     if str(font.get("/Type", "")) != "/Font":
         return False
-    return str(font.get("/Subtype", "")).startswith("/")
+    return str(font.get("/Subtype", "")) in _SUPPORTED_FONT_SUBTYPES
 
 
 def collect_text_fields(

@@ -15,10 +15,11 @@ def _form_pdf(
     field: bytes,
     include_da: bool = True,
     include_dr: bool = True,
+    da_value: bytes = b"/Helv 0 Tf 0 g",
 ) -> bytes:
     appearance = b""
     if include_da:
-        appearance += b" /DA (/Helv 0 Tf 0 g)"
+        appearance += b" /DA (" + da_value + b")"
     if include_dr:
         appearance += (
             b" /DR << /Font << /Helv << /Type /Font /Subtype /Type1 "
@@ -153,6 +154,24 @@ def test_pdf_form_parser_requires_default_appearance_authority(
         field=_plain_field(),
         include_da=include_da,
         include_dr=include_dr,
+    )
+
+    parsed = parse_pdf_source(source)
+
+    assert len(parsed.form_fields) == 1
+    assert parsed.form_fields[0].writable is False
+    assert parsed.form_fields[0].reason_code == "pdf.form.appearance_authority"
+
+
+@pytest.mark.parametrize(
+    "da_value",
+    [b"0 g", b"/Missing 0 Tf 0 g"],
+)
+def test_pdf_form_parser_requires_da_font_resource_authority(da_value: bytes) -> None:
+    source = _form_pdf(
+        fields=b"[6 0 R]",
+        field=_plain_field(),
+        da_value=da_value,
     )
 
     parsed = parse_pdf_source(source)

@@ -21,7 +21,10 @@ def test_pdf_form_parser_bounds_nested_field_semantics() -> None:
         {
             1: b"<< /Type /Catalog /Pages 2 0 R /AcroForm 5 0 R >>",
             2: b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-            3: b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [6 0 R] >>",
+            3: (
+                b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+                b"/Annots [6 0 R] >>"
+            ),
             4: b"<< /Title (H11 semantic depth) >>",
             5: (
                 b"<< /Fields [6 0 R] /NeedAppearances true "

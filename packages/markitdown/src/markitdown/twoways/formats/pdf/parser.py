@@ -154,6 +154,12 @@ def _detect_signature_policy(
         else:
             acroform = acroform_ref
         if hasattr(acroform, "get"):
+            sig_flags = _raw_get(acroform, "/SigFlags")
+            if sig_flags is not None:
+                if isinstance(sig_flags, int) and not isinstance(sig_flags, bool):
+                    has_signature = sig_flags != 0
+                else:
+                    has_signature = True
             fields = acroform.get("/Fields", ())
         else:
             fields = ()

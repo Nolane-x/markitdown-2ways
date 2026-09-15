@@ -215,7 +215,11 @@ def _has_default_appearance_authority(
         font = _resolve(font_ref)
     except Exception:
         return False
-    return isinstance(font, DictionaryObject)
+    if not isinstance(font, DictionaryObject):
+        return False
+    if str(font.get("/Type", "")) != "/Font":
+        return False
+    return str(font.get("/Subtype", "")).startswith("/")
 
 
 def collect_text_fields(

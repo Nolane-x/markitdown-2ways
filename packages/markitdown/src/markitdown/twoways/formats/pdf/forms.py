@@ -419,6 +419,8 @@ def collect_text_fields(
             reason = "pdf.form.widget_binding"
         elif reason is None and not value_is_text:
             reason = "pdf.form.non_text_value"
+        elif reason is None and ("\r" in value or "\n" in value):
+            reason = "pdf.form.unsupported_text_mode"
         elif reason is None and ("/AA" in field or "/A" in field):
             reason = "pdf.form.additional_actions"
         elif reason is None and "/AP" in field:

@@ -1,0 +1,24 @@
+name: H11 Larger Runner Probe
+
+on: [pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  exact-source-probe:
+    runs-on: "16 core runner"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: b420f518e0974ebe5d9e7b9a35199a81ada38e7a
+      - name: Verify exact H11 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          echo "expected=b420f518e0974ebe5d9e7b9a35199a81ada38e7a"
+          echo "actual=${actual}"
+          test "${actual}" = "b420f518e0974ebe5d9e7b9a35199a81ada38e7a"
+          uname -a || true
+          python --version || true

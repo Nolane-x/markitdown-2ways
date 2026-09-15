@@ -14,6 +14,7 @@ from pypdf.generic import (
     TextStringObject,
 )
 
+from .forms import collect_text_fields
 from .limits import PdfNativeLimits
 from .model import (
     ParsedPdfSource,
@@ -134,7 +135,11 @@ def _link_immutable_digest(
     return sha256(repr(evidence).encode("utf-8")).hexdigest()
 
 
-def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
+def _detect_signature_policy(
+    reader: PdfReader,
+    *,
+    limits: PdfNativeLimits,
+) -> tuple[bool, bool]:
     try:
         root = reader.root_object
     except Exception:
@@ -149,12 +154,41 @@ def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
         else:
             acroform = acroform_ref
         if hasattr(acroform, "get"):
+            sig_flags = _raw_get(acroform, "/SigFlags")
+            if sig_flags is not None:
+                if isinstance(sig_flags, int) and not isinstance(sig_flags, bool):
+                    has_signature = sig_flags != 0
+                else:
+                    has_signature = True
             fields = acroform.get("/Fields", ())
         else:
             fields = ()
-        stack = list(fields or ())
+        stack: list[tuple[object, int]] = [(item, 1) for item in fields or ()]
+        seen: set[tuple[int, int]] = set()
+        traversed_fields = 0
         while stack:
-            field_ref = stack.pop()
+            field_ref, depth = stack.pop()
+            if depth > limits.max_field_tree_depth:
+                raise PdfParseError(
+                    "PDF AcroForm signature-policy traversal exceeds the configured depth limit.",
+                    reason="pdf.form.tree_ambiguous",
+                    details={"depth": depth, "limit": limits.max_field_tree_depth},
+                )
+            traversed_fields += 1
+            if traversed_fields > limits.max_total_form_fields:
+                raise PdfParseError(
+                    "PDF AcroForm signature-policy traversal exceeds the configured field limit.",
+                    reason="pdf.form.too_many_fields",
+                    details={
+                        "field_count": traversed_fields,
+                        "limit": limits.max_total_form_fields,
+                    },
+                )
+            field_objgen = _objgen(field_ref)
+            if field_objgen is not None:
+                if field_objgen in seen:
+                    continue
+                seen.add(field_objgen)
             if isinstance(field_ref, IndirectObject):
                 field = field_ref.get_object()
             else:
@@ -165,7 +199,9 @@ def _detect_signature_policy(reader: PdfReader) -> tuple[bool, bool]:
                 has_signature = True
                 break
             kids = field.get("/Kids", ())
-            stack.extend(kids or ())
+            stack.extend((kid, depth + 1) for kid in kids or ())
+    except PdfParseError:
+        raise
     except Exception:
         has_signature = True
     return (has_signature, has_certification)
@@ -544,7 +580,10 @@ def parse_pdf_source(
             has_xmp = "/Metadata" in root
         except Exception:
             diagnostics.append("pdf.structure.authority_ambiguous")
-        has_signature, has_certification = _detect_signature_policy(reader)
+        has_signature, has_certification = _detect_signature_policy(
+            reader,
+            limits=limits,
+        )
 
     if encrypted:
         diagnostics.append("pdf.security.encrypted")
@@ -577,7 +616,16 @@ def parse_pdf_source(
     page_objgens: tuple[tuple[int, int] | None, ...] = ()
     annotation_topology: tuple[tuple[tuple[int, int] | None, ...], ...] = ()
     annotation_fingerprints: tuple[tuple[str, ...], ...] = ()
+    form_fields = ()
+    acroform_objgen = None
+    acroform_fields_topology = ()
+    form_field_bindings = ()
+    form_field_fingerprints = ()
+    need_appearances = None
     if not encrypted:
+        source_policy_blocked = any(
+            reason in _LINK_SOURCE_BLOCKERS for reason in diagnostics
+        )
         (
             links,
             page_objgens,
@@ -586,9 +634,20 @@ def parse_pdf_source(
         ) = _collect_links(
             reader,
             limits=limits,
-            source_policy_blocked=any(
-                reason in _LINK_SOURCE_BLOCKERS for reason in diagnostics
-            ),
+            source_policy_blocked=source_policy_blocked,
+        )
+        (
+            form_fields,
+            acroform_objgen,
+            acroform_fields_topology,
+            form_field_bindings,
+            form_field_fingerprints,
+            need_appearances,
+        ) = collect_text_fields(
+            reader,
+            limits=limits,
+            source_policy_blocked=source_policy_blocked,
+            annotation_topology=annotation_topology,
         )
 
     header_line = source.splitlines()[0].decode("ascii", errors="replace")
@@ -608,6 +667,11 @@ def parse_pdf_source(
         page_objgens=page_objgens,
         annotation_topology=annotation_topology,
         annotation_fingerprints=annotation_fingerprints,
+        acroform_objgen=acroform_objgen,
+        acroform_fields_topology=acroform_fields_topology,
+        form_field_bindings=form_field_bindings,
+        form_field_fingerprints=form_field_fingerprints,
+        need_appearances=need_appearances,
     )
     return ParsedPdfSource(
         snapshot=snapshot,
@@ -615,4 +679,5 @@ def parse_pdf_source(
         writable=writable,
         diagnostics=tuple(dict.fromkeys(diagnostics)),
         links=links,
+        form_fields=form_fields,
     )

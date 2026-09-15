@@ -14,7 +14,12 @@ from ...ir.provenance import NativeLocator, Provenance
 from ...ir.serialization import validate_document
 from ...readers.base import DocumentIRReader
 from .limits import PdfNativeLimits
-from .model import ParsedPdfSource, PdfInfoFieldEvidence, PdfLinkEvidence
+from .model import (
+    ParsedPdfSource,
+    PdfInfoFieldEvidence,
+    PdfLinkEvidence,
+    PdfTextFieldEvidence,
+)
 from .parser import parse_pdf_source
 
 _PDF_EXTENSIONS = frozenset({".pdf"})
@@ -75,6 +80,27 @@ def _link_capability(link: PdfLinkEvidence) -> CapabilityDecision:
             "source_preservation": "incremental-source-prefix",
             "structural_edits": False,
             "existing_action_only": True,
+            "target_only": True,
+        },
+    )
+
+
+def _form_capability(field: PdfTextFieldEvidence) -> CapabilityDecision:
+    if not field.writable:
+        return CapabilityDecision(
+            operation="update_pdf_text_field_value",
+            state=CapabilityState.READ_ONLY,
+            reason_code=field.reason_code or "pdf.form.read_only",
+        )
+    return CapabilityDecision(
+        operation="update_pdf_text_field_value",
+        state=CapabilityState.WRITABLE,
+        constraints={
+            "identity_markdown": False,
+            "source_preservation": "incremental-source-prefix",
+            "structural_edits": False,
+            "existing_value_only": True,
+            "viewer_regenerated_appearance": True,
             "target_only": True,
         },
     )
@@ -200,6 +226,54 @@ def read_pdf_ir(
             },
         )
 
+    form_order_base = len(child_ids)
+    for offset, field in enumerate(parsed.form_fields, start=1):
+        field_id = (
+            f"pdf-form-{digest[:16]}-{field.field_objgen[0]}-{field.field_objgen[1]}"
+        )
+        child_ids.append(field_id)
+        part_uri = f"/Pages/{field.page_index}/Annots"
+        locator = NativeLocator(
+            backend="pdf",
+            part_uri=part_uri,
+            object_id=f"{field.field_objgen[0]}:{field.field_objgen[1]}",
+            path="/V",
+        )
+        capability = _form_capability(field)
+        nodes[field_id] = Node(
+            node_id=field_id,
+            kind="text",
+            semantic_role="pdf-form-text-value",
+            parent_id=root_id,
+            order=form_order_base + offset,
+            canvas_id=canvas_id,
+            provenance=(
+                Provenance(
+                    source_format="pdf",
+                    canvas_index=0,
+                    part_uri=part_uri,
+                    extraction_method="pypdf-acroform-text-value",
+                ),
+            ),
+            native_locator=locator,
+            payload=TextPayload(text=field.value),
+            metadata={
+                "pdf.form_field_name": field.field_name,
+                "pdf.form_field_objgen": field.field_objgen,
+                "pdf.page_index": field.page_index,
+                "pdf.annotation_index": field.annotation_index,
+                "pdf.acroform_objgen": field.acroform_objgen,
+                "pdf.form_field_type": field.field_type,
+                "pdf.form_field_flags": field.field_flags,
+                "pdf.form_max_len": field.max_len,
+                "pdf.form_locator_digest": field.locator_digest,
+                "pdf.form_immutable_digest": field.immutable_digest,
+                "pdf.form_need_appearances": field.need_appearances,
+                "pdf.identity_markdown": False,
+                CAPABILITY_METADATA_KEY: encode_capabilities((capability,)),
+            },
+        )
+
     root = Node(
         node_id=root_id,
         kind="unknown_native",
@@ -228,6 +302,12 @@ def read_pdf_ir(
             "pdf.has_signature": snapshot.has_signature,
             "pdf.has_certification": snapshot.has_certification,
             "pdf.linearized": snapshot.linearized,
+            "pdf.acroform_objgen": snapshot.acroform_objgen,
+            "pdf.need_appearances": snapshot.need_appearances,
+            "pdf.form_h11_count": len(parsed.form_fields),
+            "pdf.form_h11_supported": any(
+                field.writable for field in parsed.form_fields
+            ),
             "pdf.identity_markdown": False,
             CAPABILITY_METADATA_KEY: encode_capabilities((_root_capability(parsed),)),
         },

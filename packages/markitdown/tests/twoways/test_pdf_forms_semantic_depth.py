@@ -13,9 +13,7 @@ def test_pdf_form_parser_bounds_nested_field_semantics() -> None:
     nested = b"<< /A << /B << /C (deep) >> >> >>"
     field = (
         b"<< /FT /Tx /Subtype /Widget /T (customer.name) /V (Alice) "
-        b"/Rect [72 700 240 724] /Ff 0 /Custom "
-        + nested
-        + b" >>"
+        b"/Rect [72 700 240 724] /Ff 0 /Custom " + nested + b" >>"
     )
     source = _build_pdf(
         {

@@ -14,4 +14,4 @@ jobs:
       - name: Install Hatch
         run: pipx install hatch
       - name: Run focused H11 native-owner recheck
-        run: cd packages/markitdown; hatch run test:pytest tests/twoways/test_pdf_forms_writer_native_recheck.py -q
+        run: cd packages/markitdown; hatch test -py=3.13 tests/twoways/test_pdf_forms_writer_native_recheck.py -q

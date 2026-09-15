@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from hashlib import sha256
+import re
 
 from pypdf import PdfReader
 from pypdf.generic import (
@@ -17,6 +18,14 @@ from .model import PdfParseError, PdfTextFieldEvidence
 
 _UNSUPPORTED_TEXT_FLAGS = (1 << 12) | (1 << 13) | (1 << 20) | (1 << 24) | (1 << 25)
 _READ_ONLY_FLAG = 1
+_PDF_WS = r"\x00\x09\x0A\x0C\x0D\x20"
+_DA_TF_PATTERN = re.compile(
+    rf"(?:^|[{_PDF_WS}])"
+    rf"(/[^\s()<>\[\]{{}}/%]+)"
+    rf"[{_PDF_WS}]+"
+    rf"[+-]?(?:\d+(?:\.\d*)?|\.\d+)"
+    rf"[{_PDF_WS}]+Tf(?=$|[{_PDF_WS}/()<>\[\]{{}}%])"
+)
 
 
 def _raw_get(mapping: object, key: str) -> object | None:
@@ -187,7 +196,26 @@ def _has_default_appearance_authority(
     da_raw = _raw_get(field, "/DA")
     if da_raw is None:
         da_raw = _raw_get(acroform, "/DA")
-    return isinstance(da_raw, TextStringObject) and bool(str(da_raw).strip())
+    if not isinstance(da_raw, TextStringObject):
+        return False
+    da = str(da_raw).strip()
+    if not da or any(char in da for char in "()<>[]{}%"):
+        return False
+    matches = tuple(_DA_TF_PATTERN.finditer(da))
+    if not matches:
+        return False
+    font_name = matches[-1].group(1)
+    font_ref = next(
+        (value for key, value in default_fonts.items() if str(key) == font_name),
+        None,
+    )
+    if font_ref is None:
+        return False
+    try:
+        font = _resolve(font_ref)
+    except Exception:
+        return False
+    return isinstance(font, DictionaryObject)
 
 
 def collect_text_fields(

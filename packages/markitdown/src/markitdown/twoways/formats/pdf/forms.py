@@ -293,6 +293,7 @@ def collect_text_fields(
     collected: list[tuple[PdfTextFieldEvidence, DictionaryObject]] = []
     total_value_chars = 0
     traversed_fields = 0
+    unstable_direct_owner_seen = False
 
     while stack:
         field_ref, depth = stack.pop()
@@ -314,6 +315,7 @@ def collect_text_fields(
             )
         field_objgen = _objgen(field_ref)
         if field_objgen is None:
+            unstable_direct_owner_seen = True
             continue
         if field_objgen in seen:
             ambiguous_owners.add(field_objgen)
@@ -485,7 +487,8 @@ def collect_text_fields(
     for evidence, field in collected:
         reason = evidence.reason_code
         if (
-            evidence.field_objgen in ambiguous_owners
+            unstable_direct_owner_seen
+            or evidence.field_objgen in ambiguous_owners
             or name_counts[evidence.field_name] > 1
         ):
             reason = "pdf.form.tree_ambiguous"

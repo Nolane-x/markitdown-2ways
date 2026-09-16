@@ -6,6 +6,12 @@ from io import BytesIO
 import pytest
 
 from markitdown.twoways._errors import UnsupportedEditError
+from markitdown.twoways.capabilities import (
+    CAPABILITY_METADATA_KEY,
+    CapabilityDecision,
+    CapabilityState,
+    encode_capabilities,
+)
 from markitdown.twoways.formats.png import PngLimits, patch_png, read_png_ir
 from markitdown.twoways.formats.png.parser import PngFormatError, parse_png
 from markitdown.twoways.ir.edits import EditOperation
@@ -33,6 +39,23 @@ def _raw_edit(document, value: str) -> EditOperation:
             "value": value,
         },
     )
+
+
+def _force_writable(document):
+    node = _node(document)
+    writable = encode_capabilities(
+        (
+            CapabilityDecision(
+                operation="update_png_text_metadata",
+                state=CapabilityState.WRITABLE,
+            ),
+        )
+    )
+    forged_node = replace(
+        node,
+        metadata={**node.metadata, CAPABILITY_METADATA_KEY: writable},
+    )
+    return replace(document, nodes={**document.nodes, node.node_id: forged_node})
 
 
 def test_invalid_png_keyword_is_rejected_by_reader() -> None:
@@ -103,6 +126,42 @@ def test_apng_policy_blocker_fails_without_output() -> None:
             BytesIO(source),
             output,
             edits=(_raw_edit(document, "Beta"),),
+        )
+
+    assert output.getvalue() == b""
+
+
+def test_forged_writable_capability_cannot_bypass_fresh_apng_policy() -> None:
+    source = make_png(apng=True)
+    document = _force_writable(
+        read_png_ir(BytesIO(source), filename="animated.png")
+    )
+    output = BytesIO()
+
+    with pytest.raises(UnsupportedEditError, match="APNG"):
+        patch_png(
+            document,
+            BytesIO(source),
+            output,
+            edits=(_raw_edit(document, "Beta"),),
+        )
+
+    assert output.getvalue() == b""
+
+
+def test_forged_writable_capability_cannot_bypass_fresh_duplicate_keyword_policy() -> None:
+    source = make_png(text=(("Title", "Alpha"), ("Title", "Beta")))
+    document = _force_writable(
+        read_png_ir(BytesIO(source), filename="duplicate.png")
+    )
+    output = BytesIO()
+
+    with pytest.raises(UnsupportedEditError, match="duplicate keyword"):
+        patch_png(
+            document,
+            BytesIO(source),
+            output,
+            edits=(_raw_edit(document, "Gamma"),),
         )
 
     assert output.getvalue() == b""

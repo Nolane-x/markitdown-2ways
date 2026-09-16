@@ -112,7 +112,9 @@ def test_duplicate_native_target_is_rejected_transactionally() -> None:
     source = make_png()
     document = read_png_ir(BytesIO(source), filename="card.png")
     edit = _raw_edit(document, "Beta")
-    duplicate = replace(edit, operation_id="edit-2", payload={**edit.payload, "value": "Gamma"})
+    duplicate = replace(
+        edit, operation_id="edit-2", payload={**edit.payload, "value": "Gamma"}
+    )
     output = BytesIO()
 
     with pytest.raises(UnsupportedEditError, match="duplicate"):

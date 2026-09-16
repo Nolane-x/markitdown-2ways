@@ -118,7 +118,9 @@ def parse_png(data: bytes, *, limits: PngLimits | None = None) -> ParsedPng:
 
         is_critical = 65 <= chunk_type_raw[0] <= 90
         if is_critical and chunk_type not in _KNOWN_CRITICAL:
-            raise PngFormatError(f"PNG contains unsupported critical chunk {chunk_type}")
+            raise PngFormatError(
+                f"PNG contains unsupported critical chunk {chunk_type}"
+            )
 
         if not saw_ihdr:
             if chunk_type != "IHDR" or length != 13:

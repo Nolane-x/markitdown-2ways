@@ -134,12 +134,18 @@ def _validate_native_binding(
     if node.metadata.get("png.raw_sha256") != owner.raw_sha256:
         raise PatchPreconditionError(
             "PNG metadata raw owner evidence no longer matches the source.",
-            details={"reason": "png_raw_owner_digest_mismatch", "chunk_index": chunk_index},
+            details={
+                "reason": "png_raw_owner_digest_mismatch",
+                "chunk_index": chunk_index,
+            },
         )
     if not isinstance(node.payload, TextPayload) or node.payload.text != owner.value:
         raise PatchPreconditionError(
             "PNG metadata semantic owner no longer matches the source.",
-            details={"reason": "png_owner_semantic_mismatch", "chunk_index": chunk_index},
+            details={
+                "reason": "png_owner_semantic_mismatch",
+                "chunk_index": chunk_index,
+            },
         )
     return chunk_index, owner
 
@@ -268,12 +274,7 @@ def _encode_text_chunk(keyword: str, encoded_value: bytes) -> bytes:
     chunk_type = b"tEXt"
     crc = zlib.crc32(chunk_type)
     crc = zlib.crc32(data, crc) & 0xFFFFFFFF
-    return (
-        struct.pack(">I", len(data))
-        + chunk_type
-        + data
-        + struct.pack(">I", crc)
-    )
+    return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", crc)
 
 
 def _construct_candidate(

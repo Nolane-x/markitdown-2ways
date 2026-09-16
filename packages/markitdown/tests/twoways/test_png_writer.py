@@ -27,7 +27,13 @@ def _node(document, keyword: str = "Title"):
     )
 
 
-def _edit(document, value: str, *, keyword: str = "Title", old_value: str | None = None):
+def _edit(
+    document,
+    value: str,
+    *,
+    keyword: str = "Title",
+    old_value: str | None = None,
+):
     node = _node(document, keyword)
     return EditOperation(
         operation_id=f"edit-{keyword}",
@@ -108,7 +114,11 @@ def test_source_digest_mismatch_fails_before_output() -> None:
     output = BytesIO()
 
     with pytest.raises(SourcePackageMismatchError):
-        patch_png(document, BytesIO(make_png(text=(("Title", "Different"),))), output)
+        patch_png(
+            document,
+            BytesIO(make_png(text=(("Title", "Different"),))),
+            output,
+        )
 
     assert output.getvalue() == b""
 
@@ -154,7 +164,11 @@ def test_forged_locator_fails_before_output() -> None:
                     operation_id="forged",
                     type="update_png_text_metadata",
                     target_node_id=node.node_id,
-                    payload={"keyword": "Title", "old_value": "Alpha", "value": "Beta"},
+                    payload={
+                        "keyword": "Title",
+                        "old_value": "Alpha",
+                        "value": "Beta",
+                    },
                 ),
             ),
         )
@@ -165,7 +179,11 @@ def test_forged_locator_fails_before_output() -> None:
 def test_duplicate_keyword_source_cannot_be_mutated() -> None:
     source = make_png(text=(("Title", "Alpha"), ("Title", "Beta")))
     document = read_png_ir(BytesIO(source), filename="duplicate.png")
-    node = next(node for node in document.nodes.values() if node.semantic_role == "png-text-metadata")
+    node = next(
+        node
+        for node in document.nodes.values()
+        if node.semantic_role == "png-text-metadata"
+    )
     output = BytesIO()
 
     with pytest.raises(UnsupportedEditError):
@@ -178,7 +196,11 @@ def test_duplicate_keyword_source_cannot_be_mutated() -> None:
                     operation_id="duplicate",
                     type="update_png_text_metadata",
                     target_node_id=node.node_id,
-                    payload={"keyword": "Title", "old_value": node.payload.text, "value": "Gamma"},
+                    payload={
+                        "keyword": "Title",
+                        "old_value": node.payload.text,
+                        "value": "Gamma",
+                    },
                 ),
             ),
         )

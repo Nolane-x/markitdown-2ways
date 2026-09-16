@@ -38,7 +38,11 @@ def test_reads_png_text_chunks_into_deterministic_ir() -> None:
 
     nodes = _text_nodes(first)
     assert [node.metadata["png.keyword"] for node in nodes] == ["Title", "Author"]
-    assert [node.payload.text for node in nodes if isinstance(node.payload, TextPayload)] == [
+    assert [
+        node.payload.text
+        for node in nodes
+        if isinstance(node.payload, TextPayload)
+    ] == [
         "Alpha",
         "Nolane",
     ]

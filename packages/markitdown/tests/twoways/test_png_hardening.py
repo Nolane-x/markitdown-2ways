@@ -147,7 +147,9 @@ def test_forged_writable_capability_cannot_bypass_fresh_apng_policy() -> None:
     assert output.getvalue() == b""
 
 
-def test_forged_writable_capability_cannot_bypass_fresh_duplicate_keyword_policy() -> None:
+def test_forged_writable_capability_cannot_bypass_fresh_duplicate_keyword_policy() -> (
+    None
+):
     source = make_png(text=(("Title", "Alpha"), ("Title", "Beta")))
     document = _force_writable(read_png_ir(BytesIO(source), filename="duplicate.png"))
     output = BytesIO()

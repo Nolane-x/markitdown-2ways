@@ -133,9 +133,7 @@ def test_apng_policy_blocker_fails_without_output() -> None:
 
 def test_forged_writable_capability_cannot_bypass_fresh_apng_policy() -> None:
     source = make_png(apng=True)
-    document = _force_writable(
-        read_png_ir(BytesIO(source), filename="animated.png")
-    )
+    document = _force_writable(read_png_ir(BytesIO(source), filename="animated.png"))
     output = BytesIO()
 
     with pytest.raises(UnsupportedEditError, match="APNG"):
@@ -151,9 +149,7 @@ def test_forged_writable_capability_cannot_bypass_fresh_apng_policy() -> None:
 
 def test_forged_writable_capability_cannot_bypass_fresh_duplicate_keyword_policy() -> None:
     source = make_png(text=(("Title", "Alpha"), ("Title", "Beta")))
-    document = _force_writable(
-        read_png_ir(BytesIO(source), filename="duplicate.png")
-    )
+    document = _force_writable(read_png_ir(BytesIO(source), filename="duplicate.png"))
     output = BytesIO()
 
     with pytest.raises(UnsupportedEditError, match="duplicate keyword"):

@@ -16,5 +16,19 @@ jobs:
           pip install pre-commit
           pre-commit install --install-hooks
 
-      - name: Run pre-commit
-        run: pre-commit run --all-files
+      - name: Run pre-commit with formatting evidence
+        shell: bash
+        run: |
+          set +e
+          pre-commit run --all-files
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "=== PRE_COMMIT_WORKTREE_DIFF_BEGIN ==="
+            git --no-pager diff -- \
+              packages/markitdown/src/markitdown/twoways/formats/png/parser.py \
+              packages/markitdown/src/markitdown/twoways/formats/png/writer.py \
+              packages/markitdown/tests/twoways/test_png_reader.py \
+              packages/markitdown/tests/twoways/test_png_hardening.py
+            echo "=== PRE_COMMIT_WORKTREE_DIFF_END ==="
+          fi
+          exit "$status"

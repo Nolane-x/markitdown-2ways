@@ -14,11 +14,11 @@ text/Markdown source preservation, target-only CSV cell mutation, target-only JS
 scalar mutation, target-only XML text/attribute mutation, recovery-aware target-only
 HTML text/quoted-attribute mutation, target-only Jupyter Notebook cell-source mutation,
 package-preserving EPUB 3 metadata/XHTML text mutation, bounded recursive ordinary ZIP
-composition over supported typed inner formats, and conservative PDF Document Information,
-existing URI-link targets, plus bounded terminal plain-text AcroForm `/V` incremental
-mutation. It is not an Office automation platform, workflow engine, document-management
-service, browser automation layer, archive authoring suite, or general application
-framework.
+composition over supported typed inner formats, conservative PDF Document Information,
+existing URI-link targets, bounded terminal plain-text AcroForm `/V` incremental
+mutation, and bounded existing PNG `tEXt` metadata value mutation. It is not an Office
+automation platform, workflow engine, document-management service, browser automation
+layer, archive authoring suite, or general application framework.
 
 ## Install this fork
 
@@ -665,6 +665,65 @@ content streams, outlines and arbitrary PDF object replacement remain read-only 
 scope. PDF identity Markdown remains inspection-only; direct typed operations are the
 only writable PDF path. The existing one-way `PdfConverter` remains unchanged.
 
+## PNG existing tEXt metadata value edits
+
+Phase H12 starts v0.8 with one deliberately narrow media-native mutation boundary. The
+reader strict-parses PNG chunk framing and CRCs, binds source SHA-256/size, records the
+exact chunk index/type/raw digest for each existing `tEXt` owner, and records the
+resource-limit authority under which that IR was accepted. Only an existing uniquely
+owned `tEXt` keyword in a non-APNG source may advertise
+`update_png_text_metadata`.
+
+```python
+from io import BytesIO
+
+from markitdown.twoways import EditOperation
+from markitdown.twoways.formats.png import patch_png, read_png_ir
+
+with open("card.png", "rb") as source_file:
+    source = source_file.read()
+
+document = read_png_ir(BytesIO(source), filename="card.png")
+title_node = next(
+    node
+    for node in document.nodes.values()
+    if node.metadata.get("png.keyword") == "Title"
+)
+edit = EditOperation(
+    operation_id="update-title",
+    type="update_png_text_metadata",
+    target_node_id=title_node.node_id,
+    payload={
+        "keyword": "Title",
+        "old_value": title_node.payload.text,
+        "value": "Updated title",
+    },
+)
+
+with open("card-edited.png", "wb") as output_file:
+    patch_png(document, BytesIO(source), output_file, edits=(edit,))
+```
+
+H12 does not serialize or re-encode the image. After transaction-wide preflight, the
+writer replaces only the complete native bytes of requested `tEXt` chunks, recomputing
+only those chunks' length and CRC fields. It then strict-re-reads source and candidate,
+requires the exact chunk type/order topology to remain stable, proves every unrequested
+chunk byte-for-byte identical, and requires each requested keyword to remain immutable
+with exactly the requested Latin-1 value. Zero edits return the exact source bytes.
+
+Read-time resource authority is monotonic: a later caller may make limits stricter but
+cannot make them looser. The writer intersects caller limits with the limits recorded in
+`DocumentIR`, so a candidate cannot exceed the authority under which the source was
+originally accepted. Malformed/truncated chunks, CRC failure, trailing bytes after IEND,
+unknown critical chunks, invalid keyword/value representation, ambiguous duplicate
+keywords, writable APNG, and resource-limit violations fail closed before output.
+
+H12 does not add/delete/rename/reorder chunks; mutate pixels, IHDR, IDAT, palette,
+transparency or color profiles; edit `zTXt`, `iTXt`, XMP, EXIF or ICC data; or provide an
+identity-Markdown writeback path. The existing one-way `ImageConverter`, including its
+ExifTool metadata extraction and optional LLM-derived description behavior, remains
+unchanged; derived descriptions are not native writable PNG text owners.
+
 ## PPTX and DOCX round trips
 
 PPTX and DOCX use identity Markdown where the projection/importer can prove a semantic
@@ -722,20 +781,21 @@ a serializer; `openpyxl` is an independent regression oracle.
 
 ## Current capability boundary
 
-| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9-H11 | PPTX | DOCX | XLSX tranche one |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners + URI-link topology + bounded AcroForm text-field evidence | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
-| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | routes the existing typed inner operation through the exact member chain; ZIP structure itself is read-only | `update_pdf_metadata` + `update_pdf_link_uri` + `update_pdf_text_field_value` for existing H11-safe terminal plain-text fields | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
-| Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only for every ZIP-backed imported node | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
-| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | root/member SHA+size, ordered nested inventory, member metadata, full chain + shared global budgets | exact source prefix + root/Info/page/annotation/AcroForm identities + annotation/form topology/fingerprints + immutable target digests + exact changed-object audit + pypdf/pdfminer/pdfplumber agreement | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
-| Structural edits | unsupported | unsupported | unsupported | unsupported | unsupported | unsupported; notebook/cell structure and non-source state are read-only | unsupported; package graph/inventory/nav/media are read-only | unsupported; add/delete/rename/reorder/comment/compression/encryption/raw member replacement are read-only | unsupported; no new metadata keys, annotation structure, form structure, page/object-graph edits, appearance regeneration or non-H11 form controls | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
+| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9-H11 | PNG H12 | PPTX | DOCX | XLSX tranche one |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners + URI-link topology + bounded AcroForm text-field evidence | strict PNG chunk topology + existing `tEXt` owners + read-time resource authority | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
+| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | routes the existing typed inner operation through the exact member chain; ZIP structure itself is read-only | `update_pdf_metadata` + `update_pdf_link_uri` + `update_pdf_text_field_value` for existing H11-safe terminal plain-text fields | `update_png_text_metadata` for an existing uniquely owned `tEXt` value | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
+| Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only for every ZIP-backed imported node | inspection-only | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
+| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | root/member SHA+size, ordered nested inventory, member metadata, full chain + shared global budgets | exact source prefix + root/Info/page/annotation/AcroForm identities + annotation/form topology/fingerprints + immutable target digests + exact changed-object audit + pypdf/pdfminer/pdfplumber agreement | source SHA/size + read-time limits + chunk order/type/CRC/raw digests + exact unrequested chunk bytes | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
+| Structural edits | unsupported | unsupported | unsupported | unsupported | unsupported | unsupported; notebook/cell structure and non-source state are read-only | unsupported; package graph/inventory/nav/media are read-only | unsupported; add/delete/rename/reorder/comment/compression/encryption/raw member replacement are read-only | unsupported; no new metadata keys, annotation structure, form structure, page/object-graph edits, appearance regeneration or non-H11 form controls | unsupported; existing unique `tEXt` value only, with keyword/chunk topology immutable | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
 
 H1-H5 together form the v0.5 text/structured-text parity tranche. H6-H8 extend v0.6
 with bounded Jupyter Notebook source preservation, EPUB 3 package-preserving text
 mutation and recursive ordinary ZIP composition. H9-H11 extend v0.7 with conservative
 PDF Document Information mutation, existing URI-link target preservation, and bounded
-existing terminal plain-text AcroForm value mutation. Every tranche remains isolated
-behind exact source and native ownership authority.
+existing terminal plain-text AcroForm value mutation. H12 begins v0.8 with conservative
+existing PNG `tEXt` metadata value preservation. Every tranche remains isolated behind
+exact source and native ownership authority.
 
 ## Fidelity details
 
@@ -764,6 +824,9 @@ Format-specific proof strengthens the common safety model:
 - H11 PDF form fidelity proves semantic `/V` mutation and exact native-owner preservation
   while explicitly delegating visual appearance regeneration to viewers; it does not
   claim engine-independent visual rendering equivalence;
+- PNG binds source SHA/size, monotonic read-time resource limits, exact chunk topology,
+  CRC/raw owner evidence, unique writable `tEXt` ownership and byte-identical preservation
+  of every unrequested chunk;
 - CSV, JSON, XML, HTML and IPYNB prove every encoded byte segment outside requested
   targets remains exact through their native or composed preservation contracts;
 - EPUB proves byte-identical content for every untouched archive member and strict graph
@@ -771,7 +834,7 @@ Format-specific proof strengthens the common safety model:
 - ZIP proves byte-identical uncompressed content for untouched members, delegates touched
   terminal semantics to existing typed inner writers and re-reads the complete recursive
   candidate before output;
-- text, CSV, JSON, XML, HTML, IPYNB, EPUB, ZIP and PDF candidates are re-read before
+- text, CSV, JSON, XML, HTML, IPYNB, EPUB, ZIP, PDF and PNG candidates are re-read before
   destination emission according to their native or composed verifier contract;
 - XML additionally rejects DTD/entity/external-resolution surfaces before mutation;
 - HTML additionally rejects recovery-sensitive/foreign/template/table/rawtext/RCDATA
@@ -787,6 +850,9 @@ Format-specific proof strengthens the common safety model:
   unsupported field modes, appearance-backed or action-bearing form fields, XFA,
   calculations, invalid appearance authority, and configured source/page/metadata/
   annotation/URI/form/increment limits before caller output;
+- PNG additionally rejects malformed/truncated framing, CRC mismatch, trailing bytes,
+  unsupported critical chunks, invalid `tEXt` ownership/encoding, duplicate writable
+  keywords, APNG mutation and effective read-time/writer resource-limit violations;
 - OOXML writers start from the original package and restrict mutation to authorized
   parts/subtrees, with unrelated package members verified after writes.
 
@@ -802,8 +868,9 @@ identity projections. IPYNB H6 and EPUB H7 keep the same inspection-only identit
 boundary. H8 preserves visible projection of supported nested content but forces
 `editable_capabilities=()` for every ZIP-backed imported block, so identity Markdown
 cannot become an alternate archive mutation path. H9-H11 apply the same inspection-only
-boundary to PDF metadata, URI-link and form-value blocks. Direct typed native paths remain
-writable only where source evidence is sufficient.
+boundary to PDF metadata, URI-link and form-value blocks. H12 keeps PNG `tEXt` identity
+projection inspection-only as well. Direct typed native paths remain writable only where
+source evidence is sufficient.
 
 ## Scope discipline and roadmap
 
@@ -844,6 +911,11 @@ Current v0.7 execution documents include:
 - `docs/superpowers/specs/2026-09-14-markitdown-2ways-phase-h11-pdf-acroform-text-value-preservation-design.md`
 - `docs/superpowers/plans/2026-09-14-markitdown-2ways-phase-h11-pdf-acroform-text-value-preservation-implementation.md`
 
+Current v0.8 execution documents include:
+
+- `docs/superpowers/specs/2026-09-16-markitdown-2ways-phase-h12-png-text-metadata-preservation-design.md`
+- `docs/superpowers/plans/2026-09-16-markitdown-2ways-phase-h12-png-text-metadata-preservation-implementation.md`
+
 Each tranche is complete only after its exact final branch head passes pre-commit plus
 the package and OCR matrices on Python 3.10-3.13. H5 uses a separate recovery-aware
 contract and leaves the one-way HTML path unchanged. H6 composes notebook-specific
@@ -854,7 +926,9 @@ the existing typed H1-H7/native package writers, leaves the one-way `ZipConverte
 unchanged. H9 adds conservative PDF Document Information incremental mutation; H10 adds
 only existing safe URI-link target mutation; H11 adds only existing H11-safe terminal
 plain-text AcroForm `/V` mutation and leaves the existing one-way `PdfConverter`
-unchanged. Annotation structural editing, form structure and non-H11 form controls,
-appearance-backed forms, non-URI actions, page text/image/content mutation, outlines,
-new metadata keys, media-native mutation, other archive families, remote writeback and
-archive structural editing remain outside the current completed boundary.
+unchanged. H12 starts v0.8 with only existing unique PNG `tEXt` value mutation and leaves
+the one-way `ImageConverter` unchanged. Annotation structural editing, form structure and
+non-H11 form controls, appearance-backed forms, non-URI actions, page text/image/content
+mutation, outlines, new metadata keys, additional media-native mutation, other archive
+families, remote writeback and archive structural editing remain outside the current
+completed boundary.

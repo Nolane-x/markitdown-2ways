@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
@@ -196,6 +197,7 @@ def _prepare_edits(
 ) -> tuple[_PreparedEdit, ...]:
     prepared: list[_PreparedEdit] = []
     seen_chunks: set[int] = set()
+    keyword_counts = Counter(owner.keyword for owner in fresh.text_owners)
 
     for edit in edits:
         if edit.type != "update_png_text_metadata":
@@ -221,6 +223,19 @@ def _prepare_edits(
             )
 
         chunk_index, owner = _validate_native_binding(node, fresh)
+        if fresh.is_apng:
+            raise UnsupportedEditError(
+                "PNG APNG sources are read-only in H12.",
+                details={"reason": "png.apng.read_only"},
+            )
+        if keyword_counts[owner.keyword] != 1:
+            raise UnsupportedEditError(
+                "PNG duplicate keyword owners are read-only in H12.",
+                details={
+                    "reason": "png.text.duplicate_keyword",
+                    "keyword": owner.keyword,
+                },
+            )
         if chunk_index in seen_chunks:
             raise UnsupportedEditError(
                 "PNG patch contains duplicate edits for one native chunk.",

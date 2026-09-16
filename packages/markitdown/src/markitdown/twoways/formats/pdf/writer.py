@@ -17,17 +17,20 @@ from ..._results import FidelityEvidence, FidelityReport, FidelityStatus, Writer
 from ...ir.document import DocumentIR
 from ...ir.edits import EditOperation
 from ...ir.serialization import validate_document
+from .forms import _field_immutable_digest
 from .limits import PdfNativeLimits
 from .parser import parse_pdf_source
 from .routing import (
     PdfRoutedLinkEdit,
     PdfRoutedMetadataEdit,
+    PdfRoutedTextFieldEdit,
     resolve_pdf_link_uri_edit,
     resolve_pdf_metadata_edit,
+    resolve_pdf_text_field_value_edit,
 )
 from .verification import verify_pdf_candidate
 
-PdfRoutedEdit = PdfRoutedMetadataEdit | PdfRoutedLinkEdit
+PdfRoutedEdit = PdfRoutedMetadataEdit | PdfRoutedLinkEdit | PdfRoutedTextFieldEdit
 
 
 def _read_source_bytes(source_stream: BinaryIO) -> bytes:
@@ -79,6 +82,15 @@ def _validate_edit_set(edits: tuple[EditOperation, ...]) -> None:
         operation_ids.add(edit.operation_id)
 
 
+def _cross_kind_owner_collision(
+    owner_kinds: dict[tuple[int, int], str],
+    owner: tuple[int, int],
+    kind: str,
+) -> bool:
+    existing = owner_kinds.get(owner)
+    return existing is not None and existing != kind
+
+
 def _route_all(
     document: DocumentIR,
     source: bytes,
@@ -89,6 +101,9 @@ def _route_all(
     metadata_fields: set[str] = set()
     link_targets: set[tuple[int, int]] = set()
     link_owners: set[tuple[int, int]] = set()
+    form_targets: set[tuple[int, int]] = set()
+    form_owners: set[tuple[int, int]] = set()
+    owner_kinds: dict[tuple[int, int], str] = {}
 
     for edit in edits:
         if edit.type == "update_pdf_metadata":
@@ -101,7 +116,18 @@ def _route_all(
                         "field": metadata.field,
                     },
                 )
+            if _cross_kind_owner_collision(
+                owner_kinds, metadata.info_objgen, "metadata"
+            ):
+                raise UnsupportedEditError(
+                    "PDF transaction resolved different edit kinds to one native owner.",
+                    details={
+                        "reason": "pdf.writer.owner_collision",
+                        "owner_objgen": metadata.info_objgen,
+                    },
+                )
             metadata_fields.add(metadata.field)
+            owner_kinds[metadata.info_objgen] = "metadata"
             routed.append(metadata)
             continue
 
@@ -125,9 +151,55 @@ def _route_all(
                         "owner_objgen": link.mutation_owner_objgen,
                     },
                 )
+            if _cross_kind_owner_collision(
+                owner_kinds, link.mutation_owner_objgen, "link"
+            ):
+                raise UnsupportedEditError(
+                    "PDF transaction resolved different edit kinds to one native owner.",
+                    details={
+                        "reason": "pdf.writer.owner_collision",
+                        "owner_objgen": link.mutation_owner_objgen,
+                    },
+                )
             link_targets.add(target)
             link_owners.add(link.mutation_owner_objgen)
+            owner_kinds[link.mutation_owner_objgen] = "link"
             routed.append(link)
+            continue
+
+        if edit.type == "update_pdf_text_field_value":
+            form = resolve_pdf_text_field_value_edit(
+                document, source, edit, limits=limits
+            )
+            target = form.field_objgen
+            if target in form_targets:
+                raise UnsupportedEditError(
+                    "PDF form transaction contains a duplicate logical target.",
+                    details={
+                        "reason": "pdf.form.duplicate_target",
+                        "field_name": form.field_name,
+                    },
+                )
+            if form.field_objgen in form_owners:
+                raise UnsupportedEditError(
+                    "PDF form transaction resolved multiple edits to one native owner.",
+                    details={
+                        "reason": "pdf.form.owner_collision",
+                        "owner_objgen": form.field_objgen,
+                    },
+                )
+            if _cross_kind_owner_collision(owner_kinds, form.field_objgen, "form"):
+                raise UnsupportedEditError(
+                    "PDF transaction resolved different edit kinds to one native owner.",
+                    details={
+                        "reason": "pdf.writer.owner_collision",
+                        "owner_objgen": form.field_objgen,
+                    },
+                )
+            form_targets.add(target)
+            form_owners.add(form.field_objgen)
+            owner_kinds[form.field_objgen] = "form"
+            routed.append(form)
             continue
 
         raise UnsupportedEditError(
@@ -165,10 +237,30 @@ def _route_all(
             details={"reason": "pdf.link.total_uri_too_large"},
         )
 
+    requested_form_values = {
+        item.field_objgen: item.value
+        for item in routed
+        if isinstance(item, PdfRoutedTextFieldEdit)
+    }
+    final_form_value_total = sum(
+        len(requested_form_values.get(field.field_objgen, field.value))
+        for field in parsed.form_fields
+    )
+    if final_form_value_total > limits.max_total_form_value_chars:
+        raise UnsupportedEditError(
+            "PDF form transaction exceeds the total form-value character limit.",
+            details={"reason": "pdf.form.total_value_too_large"},
+        )
+
     return tuple(routed)
 
 
-def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
+def _result(
+    bytes_written: int,
+    *,
+    zero_edit: bool,
+    has_form_edits: bool = False,
+) -> WriterResult:
     evidence = [
         FidelityEvidence(
             check_code="pdf.source_authority",
@@ -200,10 +292,22 @@ def _result(bytes_written: int, *, zero_edit: bool) -> WriterResult:
                 FidelityEvidence(
                     check_code="pdf.final_verification",
                     status=FidelityStatus.PASSED,
-                    description="Strict PDF re-read verified requested metadata and URI-link semantics.",
+                    description="Strict PDF re-read verified requested native PDF semantics.",
                 ),
             )
         )
+        if has_form_edits:
+            evidence.append(
+                FidelityEvidence(
+                    check_code="pdf.form.viewer_regenerated_appearance",
+                    status=FidelityStatus.PASSED,
+                    description=(
+                        "Verified H11 /V semantics preserve NeedAppearances=true and "
+                        "delegate appearance regeneration to the viewer; this is not an "
+                        "engine-independent visual rendering guarantee."
+                    ),
+                )
+            )
     return WriterResult(
         format="pdf",
         mode="patch",
@@ -220,7 +324,7 @@ def _owner_object(writer: PdfWriter, objgen: tuple[int, int]) -> DictionaryObjec
     owner = reference.get_object()
     if not isinstance(owner, DictionaryObject):
         raise RoundTripVerificationError(
-            "PDF URI link mutation owner did not resolve to a dictionary.",
+            "PDF native mutation owner did not resolve to a dictionary.",
             details={
                 "reason": "pdf.writer.native_owner_drift",
                 "owner_objgen": objgen,
@@ -264,6 +368,55 @@ def _apply_link_edit(writer: PdfWriter, item: PdfRoutedLinkEdit) -> None:
     )
 
 
+def _apply_form_edit(
+    writer: PdfWriter,
+    item: PdfRoutedTextFieldEdit,
+    *,
+    limits: PdfNativeLimits,
+) -> None:
+    owner = _owner_object(writer, item.field_objgen)
+    if str(owner.get("/FT")) != "/Tx" or str(owner.get("/Subtype")) != "/Widget":
+        raise RoundTripVerificationError(
+            "PDF form mutation owner field/widget type drifted before mutation.",
+            details={"reason": "pdf.writer.native_owner_drift"},
+        )
+    if str(owner.get("/T")) != item.field_name:
+        raise RoundTripVerificationError(
+            "PDF form mutation owner field name drifted before mutation.",
+            details={"reason": "pdf.writer.native_owner_drift"},
+        )
+    if "/AP" in owner or "/Parent" in owner or "/Kids" in owner:
+        raise RoundTripVerificationError(
+            "PDF form mutation owner left the H11 terminal no-appearance profile.",
+            details={"reason": "pdf.writer.native_owner_drift"},
+        )
+    try:
+        current_value = owner.raw_get("/V")
+    except KeyError as exc:
+        raise RoundTripVerificationError(
+            "PDF form mutation owner lost its existing value.",
+            details={"reason": "pdf.writer.native_owner_drift"},
+        ) from exc
+    if not isinstance(current_value, str) or str(current_value) != item.old_value:
+        raise RoundTripVerificationError(
+            "PDF form mutation owner value drifted before mutation.",
+            details={"reason": "pdf.writer.native_owner_drift"},
+        )
+    current_immutable_digest = _field_immutable_digest(
+        owner,
+        acroform_objgen=item.acroform_objgen,
+        page_index=item.page_index,
+        annotation_index=item.annotation_index,
+        max_depth=limits.max_field_tree_depth,
+    )
+    if current_immutable_digest != item.immutable_digest:
+        raise RoundTripVerificationError(
+            "PDF form mutation owner immutable semantics drifted before mutation.",
+            details={"reason": "pdf.writer.native_owner_drift"},
+        )
+    owner[NameObject("/V")] = TextStringObject(item.value)
+
+
 def patch_pdf(
     document: DocumentIR,
     source_stream: BinaryIO,
@@ -288,6 +441,9 @@ def patch_pdf(
         item for item in routed if isinstance(item, PdfRoutedMetadataEdit)
     )
     link_edits = tuple(item for item in routed if isinstance(item, PdfRoutedLinkEdit))
+    form_edits = tuple(
+        item for item in routed if isinstance(item, PdfRoutedTextFieldEdit)
+    )
 
     try:
         writer = PdfWriter(BytesIO(source), incremental=True, strict=True)
@@ -295,6 +451,8 @@ def patch_pdf(
             writer.add_metadata({item.key: item.value for item in metadata_edits})
         for item in link_edits:
             _apply_link_edit(writer, item)
+        for item in form_edits:
+            _apply_form_edit(writer, item, limits=limits)
         changed_objects = tuple(
             (reference.idnum, reference.generation)
             for reference in writer.list_objects_in_increment()
@@ -318,4 +476,8 @@ def patch_pdf(
         limits=limits,
     )
     output.write(candidate)
-    return _result(len(candidate), zero_edit=False)
+    return _result(
+        len(candidate),
+        zero_edit=False,
+        has_form_edits=bool(form_edits),
+    )

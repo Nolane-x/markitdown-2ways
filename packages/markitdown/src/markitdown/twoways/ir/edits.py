@@ -17,6 +17,11 @@ INITIAL_EDIT_TYPES = frozenset(
         "replace_json_scalar",
         "replace_xml_text",
         "replace_xml_attribute",
+        "replace_html_text",
+        "replace_html_attribute",
+        "replace_ipynb_cell_source",
+        "replace_epub_metadata_text",
+        "replace_epub_xhtml_text",
         "add_node",
         "remove_node",
     }

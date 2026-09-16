@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 import struct
@@ -24,6 +24,14 @@ from .limits import PngLimits
 from .model import ParsedPng, PngTextOwner
 from .parser import PngFormatError, parse_png
 from .verification import verify_png_candidate
+
+_PNG_READ_LIMITS_KEY = "png.read_limits.v1"
+_LIMIT_FIELD_NAMES = (
+    "max_source_bytes",
+    "max_chunks",
+    "max_chunk_data_bytes",
+    "max_text_value_bytes",
+)
 
 
 @dataclass(frozen=True)
@@ -71,6 +79,36 @@ def _validate_source_authority(document: DocumentIR, source_bytes: bytes) -> Non
                 "actual": len(source_bytes),
             },
         )
+
+
+def _read_time_limits(document: DocumentIR) -> PngLimits:
+    raw = document.metadata.custom.get(_PNG_READ_LIMITS_KEY)
+    if not isinstance(raw, Mapping) or set(raw) != set(_LIMIT_FIELD_NAMES):
+        raise PatchPreconditionError(
+            "PNG DocumentIR is missing authoritative read-time limits.",
+            details={"reason": "png_read_limits_missing_or_invalid"},
+        )
+    try:
+        values = {name: raw[name] for name in _LIMIT_FIELD_NAMES}
+        return PngLimits(**values)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PatchPreconditionError(
+            "PNG DocumentIR contains invalid authoritative read-time limits.",
+            details={"reason": "png_read_limits_missing_or_invalid"},
+        ) from exc
+
+
+def _intersect_limits(requested: PngLimits, read_time: PngLimits) -> PngLimits:
+    return PngLimits(
+        max_source_bytes=min(requested.max_source_bytes, read_time.max_source_bytes),
+        max_chunks=min(requested.max_chunks, read_time.max_chunks),
+        max_chunk_data_bytes=min(
+            requested.max_chunk_data_bytes, read_time.max_chunk_data_bytes
+        ),
+        max_text_value_bytes=min(
+            requested.max_text_value_bytes, read_time.max_text_value_bytes
+        ),
+    )
 
 
 def _fresh_parse(source_bytes: bytes, limits: PngLimits) -> ParsedPng:
@@ -245,13 +283,13 @@ def _prepare_edits(
             ) from exc
         if len(encoded_value) > limits.max_text_value_bytes:
             raise UnsupportedEditError(
-                "PNG tEXt replacement exceeds the configured value limit.",
+                "PNG tEXt replacement exceeds the effective read-time/writer value limit.",
                 details={"reason": "png_text_value_limit"},
             )
         keyword_bytes = keyword.encode("latin-1")
         if len(keyword_bytes) + 1 + len(encoded_value) > limits.max_chunk_data_bytes:
             raise UnsupportedEditError(
-                "PNG tEXt replacement exceeds the configured chunk limit.",
+                "PNG tEXt replacement exceeds the effective read-time/writer chunk limit.",
                 details={"reason": "png_chunk_data_limit"},
             )
 
@@ -310,7 +348,8 @@ def patch_png(
     limits: PngLimits | None = None,
 ) -> WriterResult:
     validate_document(document)
-    active_limits = limits or PngLimits()
+    requested_limits = limits or PngLimits()
+    active_limits = _intersect_limits(requested_limits, _read_time_limits(document))
     source_bytes = _read_source_bytes(source_stream)
     _validate_source_authority(document, source_bytes)
     fresh = _fresh_parse(source_bytes, active_limits)

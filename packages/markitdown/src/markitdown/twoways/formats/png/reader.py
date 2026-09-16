@@ -10,13 +10,15 @@ from ...capabilities import (
     CapabilityState,
     encode_capabilities,
 )
-from ...ir.document import Canvas, DocumentIR, SourceDescriptor
+from ...ir.document import Canvas, DocumentIR, DocumentMetadata, SourceDescriptor
 from ...ir.nodes import Node, TextPayload
 from ...ir.provenance import NativeLocator, Provenance
 from ...ir.serialization import validate_document
 from ...readers.base import DocumentIRReader
 from .limits import PngLimits
 from .parser import parse_png
+
+_PNG_READ_LIMITS_KEY = "png.read_limits.v1"
 
 
 def _read_source_bytes(source: BinaryIO) -> bytes:
@@ -26,6 +28,15 @@ def _read_source_bytes(source: BinaryIO) -> bytes:
     if not isinstance(data, (bytes, bytearray, memoryview)):
         raise TypeError("PNG source stream returned a non-bytes value")
     return bytes(data)
+
+
+def _limits_metadata(limits: PngLimits) -> dict[str, int]:
+    return {
+        "max_source_bytes": limits.max_source_bytes,
+        "max_chunks": limits.max_chunks,
+        "max_chunk_data_bytes": limits.max_chunk_data_bytes,
+        "max_text_value_bytes": limits.max_text_value_bytes,
+    }
 
 
 def _text_capability(
@@ -142,6 +153,9 @@ def read_png_ir(
             sha256=source_digest,
             size_bytes=len(source_bytes),
             preserved_source_ref=f"png:sha256:{source_digest}",
+        ),
+        metadata=DocumentMetadata(
+            custom={_PNG_READ_LIMITS_KEY: _limits_metadata(active_limits)}
         ),
         canvases=(
             Canvas(

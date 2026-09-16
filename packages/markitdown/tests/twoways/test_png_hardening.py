@@ -160,3 +160,21 @@ def test_shorter_replacement_preserves_every_unrequested_raw_chunk() -> None:
     for before, after in zip(source_parsed.chunks, candidate_parsed.chunks):
         if before.index != target_index:
             assert after.raw == before.raw
+
+
+def test_writer_cannot_relax_read_time_limits() -> None:
+    source = make_png(text=(("Title", "A"),))
+    read_limits = PngLimits(max_text_value_bytes=3)
+    document = read_png_ir(BytesIO(source), filename="card.png", limits=read_limits)
+    output = BytesIO()
+
+    with pytest.raises(UnsupportedEditError, match="read-time"):
+        patch_png(
+            document,
+            BytesIO(source),
+            output,
+            edits=(_raw_edit(document, "four"),),
+            limits=PngLimits(max_text_value_bytes=16),
+        )
+
+    assert output.getvalue() == b""

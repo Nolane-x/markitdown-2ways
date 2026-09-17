@@ -21,7 +21,11 @@ def test_mp3_reader_adapter_accepts_extension_and_mimetype() -> None:
 def test_mp3_reader_adapter_builds_same_ir_surface() -> None:
     source = make_mp3()
     reader = Mp3IRReader()
-    stream_info = StreamInfo(filename="song.mp3", extension=".mp3", mimetype="audio/mpeg")
+    stream_info = StreamInfo(
+        filename="song.mp3",
+        extension=".mp3",
+        mimetype="audio/mpeg",
+    )
 
     document = reader.read(BytesIO(source), stream_info)
 

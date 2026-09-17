@@ -35,7 +35,7 @@ H13 does not add, delete, reorder or convert text chunks. In particular it does 
 - change a `zTXt` compression method;
 - change keyword, language tag or translated keyword;
 - create a missing text owner;
-- mutate XMP semantics merely because XMP happens to be stored in an `iTXt` chunk;
+- mutate XMP semantics merely because XMP happens to be stored in an `iTXt` chunk; the standard `XML:com.adobe.xmp` owner is inspection-only and explicitly read-only;
 - mutate EXIF, ICC, pixels, palette, transparency, APNG control/data chunks or arbitrary ancillary chunks;
 - add identity-Markdown writeback;
 - modify the one-way image converter.
@@ -69,7 +69,7 @@ A successful edit preserves the keyword and method byte, recompresses only the r
 
 A writable H13 `iTXt` owner must have:
 
-- valid PNG keyword;
+- valid PNG keyword other than the standard XMP keyword `XML:com.adobe.xmp`;
 - compression flag `0` or `1`;
 - compression method `0`;
 - language tag either empty or a hyphen-separated sequence of 1–8 ASCII alphanumeric characters per component;
@@ -77,15 +77,15 @@ A writable H13 `iTXt` owner must have:
 - text valid UTF-8 and containing no NUL;
 - if compressed, one complete zlib datastream with bounded decompressed bytes and no trailing compressed stream bytes.
 
-The keyword, compression flag, compression method, language tag raw bytes and translated-keyword raw bytes are immutable native evidence. Only the text field may change. Uncompressed `iTXt` remains uncompressed; compressed `iTXt` remains compressed.
+The keyword, compression flag, compression method, language tag raw bytes and translated-keyword raw bytes are immutable native evidence. Only the text field may change. Uncompressed `iTXt` remains uncompressed; compressed `iTXt` remains compressed. XMP `iTXt` remains projected for inspection but never advertises writable capability.
 
 ## Ownership and ambiguity
 
 PNG permits multiple text chunks with the same keyword. 2Ways therefore cannot infer a unique semantic owner merely from the keyword.
 
-H13 projects every valid text owner for inspection but advertises `update_png_text_metadata` as writable only when that keyword occurs exactly once across the complete parsed set of `tEXt` + `zTXt` + `iTXt` owners.
+H13 projects every valid text owner for inspection but advertises `update_png_text_metadata` as writable only when that keyword occurs exactly once across the complete parsed set of `tEXt` + `zTXt` + `iTXt` owners and the owner is not the standard XMP `iTXt` carrier.
 
-This cross-type uniqueness rule is re-evaluated from a fresh authoritative source at write time. Cached or forged capability metadata cannot bypass it.
+This cross-type uniqueness and XMP exclusion policy is re-evaluated from a fresh authoritative source at write time. Cached or forged capability metadata cannot bypass it.
 
 ## IR mapping
 
@@ -131,7 +131,7 @@ Before any output bytes are emitted, the writer must:
 3. intersect requested limits with persisted read-time limits;
 4. fresh-parse the complete source PNG under those effective limits;
 5. reject APNG mutation from fresh source evidence;
-6. recompute cross-type text keyword counts from the fresh source;
+6. recompute cross-type text keyword counts and the XMP read-only policy from the fresh source;
 7. resolve each target by exact native chunk index, type and immutable keyword;
 8. verify raw-owner digest and immutable owner metadata;
 9. verify capability plus semantic/native/old-value preconditions;
@@ -181,6 +181,7 @@ Representative reason codes:
 - `png.itxt.unsupported_compression_method`
 - `png.itxt.invalid_language_tag`
 - `png.itxt.invalid_utf8`
+- `png.itxt.xmp_read_only`
 - `png.text.decompression_limit`
 - `png.apng.read_only`
 - `png.resource_limit`
@@ -189,7 +190,7 @@ Unknown or absent capability remains read-only through the common capability ker
 
 ## Security and failure behavior
 
-Malformed separators, invalid UTF-8, invalid language tags, unsupported compression methods, incomplete/trailing zlib streams, decompression-limit violations, duplicate semantic ownership, APNG policy blockers, stale owner evidence and resource-limit violations all fail closed before caller output receives bytes.
+Malformed separators, invalid UTF-8, invalid language tags, unsupported compression methods, incomplete/trailing zlib streams, decompression-limit violations, duplicate semantic ownership, XMP `iTXt` owners, APNG policy blockers, stale owner evidence and resource-limit violations all fail closed before caller output receives bytes.
 
 ## Independent validation
 
@@ -200,12 +201,13 @@ Production H13 remains stdlib-only for this tranche (`struct`, `hashlib`, `zlib`
 H13 is complete only after:
 
 - design and implementation plan are committed on the H13 branch;
-- RED evidence exists for `zTXt`, compressed/uncompressed `iTXt`, cross-type duplicate ownership and decompression hardening;
+- test-first RED evidence exists for `zTXt`, compressed/uncompressed `iTXt`, cross-type duplicate ownership, XMP exclusion and decompression hardening;
 - focused H13 tests are GREEN;
 - H12 `tEXt` behavior remains GREEN unchanged;
 - malformed compression, trailing zlib bytes, invalid UTF-8/language-tag and decompression-bomb tests are GREEN;
 - zero-edit byte identity and unrequested raw-chunk preservation are proven;
 - optional independent decoder checks pass where available;
+- existing one-way image behavior is unchanged;
 - full repository regression is GREEN;
 - pre-commit plus package/OCR Python 3.10–3.13 are GREEN on the exact final tree;
 - only then may H13 merge into `main`.

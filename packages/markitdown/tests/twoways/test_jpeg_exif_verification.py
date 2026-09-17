@@ -22,7 +22,9 @@ def _node(document):
     )
 
 
-def _edited_candidate(source: bytes) -> tuple[bytes, tuple[int, int, int], tuple[int, int]]:
+def _edited_candidate(
+    source: bytes,
+) -> tuple[bytes, tuple[int, int, int], tuple[int, int]]:
     document = read_jpeg_ir(BytesIO(source), filename="card.jpg")
     node = _node(document)
     output = BytesIO()

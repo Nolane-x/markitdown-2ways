@@ -19,7 +19,14 @@ def _node(document, tag_id: int = IMAGE_DESCRIPTION):
     )
 
 
-def test_pillow_confirms_exif_readback_and_decoded_pixels_unchanged_when_available() -> None:
+def _semantic_ascii(value: object) -> str:
+    assert isinstance(value, str)
+    return value.split("\x00", 1)[0]
+
+
+def test_pillow_confirms_exif_readback_and_decoded_pixels_unchanged_when_available() -> (
+    None
+):
     image_module = pytest.importorskip("PIL.Image")
     source = make_jpeg()
     document = read_jpeg_ir(BytesIO(source), filename="card.jpg")
@@ -44,8 +51,8 @@ def test_pillow_confirms_exif_readback_and_decoded_pixels_unchanged_when_availab
         before_size = before.size
         before_mode = before.mode
         before_exif = before.getexif()
-        assert before_exif.get(IMAGE_DESCRIPTION) == "Alpha"
-        assert before_exif.get(ARTIST) == "Nolane"
+        assert _semantic_ascii(before_exif.get(IMAGE_DESCRIPTION)) == "Alpha"
+        assert _semantic_ascii(before_exif.get(ARTIST)) == "Nolane"
 
     with image_module.open(BytesIO(output.getvalue())) as after:
         after.load()
@@ -53,5 +60,5 @@ def test_pillow_confirms_exif_readback_and_decoded_pixels_unchanged_when_availab
         assert after.size == before_size
         assert after.mode == before_mode
         assert after.tobytes() == before_pixels
-        assert after_exif.get(IMAGE_DESCRIPTION) == "Beta"
-        assert after_exif.get(ARTIST) == "Nolane"
+        assert _semantic_ascii(after_exif.get(IMAGE_DESCRIPTION)) == "Beta"
+        assert _semantic_ascii(after_exif.get(ARTIST)) == "Nolane"

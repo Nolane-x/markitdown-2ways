@@ -26,9 +26,7 @@ def _nodes(document):
 
 def _node(document, field: str):
     return next(
-        node
-        for node in _nodes(document)
-        if node.metadata["mp3.id3v1_field"] == field
+        node for node in _nodes(document) if node.metadata["mp3.id3v1_field"] == field
     )
 
 
@@ -67,8 +65,7 @@ def test_reads_id3v1_into_deterministic_ir() -> None:
         assert node.native_locator.backend == "mp3"
         assert node.native_locator.part_uri == "/"
         assert (
-            node.native_locator.object_id
-            == f"id3v1:{node.metadata['mp3.id3v1_field']}"
+            node.native_locator.object_id == f"id3v1:{node.metadata['mp3.id3v1_field']}"
         )
         assert node.metadata["mp3.slot_length"] == 30
         assert isinstance(node.metadata["mp3.slot_start"], int)

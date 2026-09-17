@@ -20,7 +20,9 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: "3.13"
-      - name: Install package and pytest
-        run: pip install -e ./packages/markitdown pytest
+      - name: Install package, pytest, and formatter
+        run: pip install -e ./packages/markitdown pytest black==23.7.0
       - name: Run focused H14 writer tests
         run: pytest -q packages/markitdown/tests/twoways/test_jpeg_exif_writer.py packages/markitdown/tests/twoways/test_jpeg_exif_hardening.py
+      - name: Print exact Black diff
+        run: black --diff packages/markitdown/tests/twoways/test_jpeg_exif_hardening.py || true

@@ -27,9 +27,7 @@ def _nodes(document):
 
 def _decision(document, tag_id: int):
     node = next(
-        node
-        for node in _nodes(document)
-        if node.metadata["jpeg.exif_tag_id"] == tag_id
+        node for node in _nodes(document) if node.metadata["jpeg.exif_tag_id"] == tag_id
     )
     return capabilities_for_node(node).for_operation("update_jpeg_exif_text")
 

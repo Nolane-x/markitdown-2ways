@@ -69,6 +69,10 @@ def test_reads_exif_ifd0_text_into_deterministic_ir() -> None:
         assert node.metadata["jpeg.ifd_path"] == "IFD0"
         assert node.metadata["jpeg.tiff_type"] == 2
         assert isinstance(node.metadata["jpeg.marker_index"], int)
+        assert isinstance(node.metadata["jpeg.segment_start"], int)
+        assert isinstance(node.metadata["jpeg.segment_end"], int)
+        assert node.metadata["jpeg.segment_start"] < node.metadata["jpeg.segment_end"]
+        assert node.metadata["jpeg.tiff_byte_order"] in {"little", "big"}
         assert isinstance(node.metadata["jpeg.ifd_entry_offset"], int)
         assert isinstance(node.metadata["jpeg.value_offset"], int)
         assert isinstance(node.metadata["jpeg.value_slot_sha256"], str)

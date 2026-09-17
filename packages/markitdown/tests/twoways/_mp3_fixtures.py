@@ -169,9 +169,13 @@ def make_mp3(
     artist_slot: bytes | None = None,
     album_slot: bytes | None = None,
 ) -> bytes:
-    audio_frames = tuple(frames) if frames is not None else (
-        mpeg_l3_frame(fill=0x11),
-        mpeg_l3_frame(fill=0x22),
+    audio_frames = (
+        tuple(frames)
+        if frames is not None
+        else (
+            mpeg_l3_frame(fill=0x11),
+            mpeg_l3_frame(fill=0x22),
+        )
     )
     return (
         leading

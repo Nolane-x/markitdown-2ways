@@ -11,6 +11,7 @@ from markitdown.twoways.capabilities import (
     CAPABILITY_METADATA_KEY,
     CapabilityDecision,
     CapabilityState,
+    capabilities_for_node,
     encode_capabilities,
 )
 from markitdown.twoways.formats.png import patch_png, read_png_ir
@@ -122,6 +123,41 @@ def test_compressed_itxt_trailing_zlib_bytes_fail_closed() -> None:
 
     with pytest.raises(PngFormatError, match="trailing"):
         parse_png(source)
+
+
+def test_xmp_itxt_owner_is_read_only() -> None:
+    source = _insert_before_idat(
+        make_png(text=()),
+        itxt_chunk("XML:com.adobe.xmp", "<x:xmpmeta/>", compressed=False),
+    )
+    document = read_png_ir(BytesIO(source), filename="xmp.png")
+    node = _node(document, "XML:com.adobe.xmp")
+
+    decision = capabilities_for_node(node).for_operation("update_png_text_metadata")
+    assert decision.state is CapabilityState.READ_ONLY
+    assert decision.reason_code == "png.itxt.xmp_read_only"
+
+
+def test_forged_writable_cannot_bypass_fresh_xmp_policy() -> None:
+    source = _insert_before_idat(
+        make_png(text=()),
+        itxt_chunk("XML:com.adobe.xmp", "<x:xmpmeta/>", compressed=False),
+    )
+    document = read_png_ir(BytesIO(source), filename="xmp.png")
+    node = _node(document, "XML:com.adobe.xmp")
+    forged_document = _force_writable(document, node)
+    forged_node = forged_document.nodes[node.node_id]
+    output = BytesIO()
+
+    with pytest.raises(UnsupportedEditError, match="XMP"):
+        patch_png(
+            forged_document,
+            BytesIO(source),
+            output,
+            edits=(_edit(forged_node, "<x:xmpmeta>changed</x:xmpmeta>"),),
+        )
+
+    assert output.getvalue() == b""
 
 
 def test_forged_writable_cannot_bypass_cross_type_duplicate_policy() -> None:

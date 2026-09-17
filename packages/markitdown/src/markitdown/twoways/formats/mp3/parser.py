@@ -29,7 +29,9 @@ def _append_unique(items: list[str], value: str) -> None:
         items.append(value)
 
 
-def _parse_owner(data: bytes, *, tag_start: int, field: str, relative: int) -> Mp3Id3v1Owner:
+def _parse_owner(
+    data: bytes, *, tag_start: int, field: str, relative: int
+) -> Mp3Id3v1Owner:
     slot_start = tag_start + relative
     slot_end = slot_start + 30
     raw = data[slot_start:slot_end]

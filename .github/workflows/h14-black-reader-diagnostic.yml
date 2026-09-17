@@ -1,0 +1,19 @@
+name: h14-black-reader-diagnostic
+
+on:
+  pull_request:
+    paths:
+      - "packages/markitdown/tests/twoways/test_jpeg_exif_reader.py"
+      - ".github/workflows/h14-black-reader-diagnostic.yml"
+
+jobs:
+  black-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.x"
+      - run: pip install black==23.7.0
+      - name: Print exact Black diff
+        run: black --diff packages/markitdown/tests/twoways/test_jpeg_exif_reader.py || true

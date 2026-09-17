@@ -26,7 +26,11 @@ def _nodes(document):
 
 
 def _decision(document, tag_id: int):
-    node = next(node for node in _nodes(document) if node.metadata["jpeg.exif_tag_id"] == tag_id)
+    node = next(
+        node
+        for node in _nodes(document)
+        if node.metadata["jpeg.exif_tag_id"] == tag_id
+    )
     return capabilities_for_node(node).for_operation("update_jpeg_exif_text")
 
 
@@ -53,7 +57,9 @@ def test_reads_exif_ifd0_text_into_deterministic_ir() -> None:
         IMAGE_DESCRIPTION,
         ARTIST,
     ]
-    assert [node.payload.text for node in nodes if isinstance(node.payload, TextPayload)] == [
+    assert [
+        node.payload.text for node in nodes if isinstance(node.payload, TextPayload)
+    ] == [
         "Alpha",
         "Nolane",
     ]

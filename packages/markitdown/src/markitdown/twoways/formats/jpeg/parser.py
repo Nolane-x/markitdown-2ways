@@ -106,7 +106,9 @@ def _parse_markers(
         code = data[position]
         position += 1
         if code == 0x00:
-            raise JpegFormatError("JPEG stuffed marker byte is invalid outside scan data")
+            raise JpegFormatError(
+                "JPEG stuffed marker byte is invalid outside scan data"
+            )
         if code == _SOI:
             raise JpegFormatError("JPEG contains an unexpected nested SOI")
 
@@ -296,7 +298,9 @@ def _parse_exif(
                 relative_value_offset = u32(entry_offset + 8, "value offset")
                 value_offset = tiff_base + relative_value_offset
                 require_span(value_offset, value_length, "external value")
-                external_ranges.append((value_offset, value_offset + value_length, entry_offset))
+                external_ranges.append(
+                    (value_offset, value_offset + value_length, entry_offset)
+                )
 
             if path == "IFD0" and tag_id in _SUPPORTED_TAGS:
                 if tiff_type != 2:
@@ -432,10 +436,14 @@ def parse_jpeg(source: bytes, *, limits: JpegLimits | None = None) -> ParsedJpeg
     tag_counts = Counter(owner.tag_id for owner in owners)
     final_owners: list[JpegExifTextOwner] = []
     for owner in owners:
-        ambiguous = tag_counts[owner.tag_id] != 1 or (
-            owner.marker_index,
-            owner.entry_offset,
-        ) in overlapping_entries
+        ambiguous = (
+            tag_counts[owner.tag_id] != 1
+            or (
+                owner.marker_index,
+                owner.entry_offset,
+            )
+            in overlapping_entries
+        )
         final_owners.append(owner.with_ambiguity() if ambiguous else owner)
 
     if any(count != 1 for count in tag_counts.values()):

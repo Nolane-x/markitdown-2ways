@@ -26,11 +26,11 @@ def test_pillow_confirms_pixels_unchanged_when_available() -> None:
     patch_png(document, BytesIO(source), output, edits=(edit,))
 
     with image_module.open(BytesIO(source)) as before:
-        before_pixels = tuple(before.getdata())
+        before_pixels = before.tobytes()
         before_size = before.size
         before_mode = before.mode
     with image_module.open(BytesIO(output.getvalue())) as after:
-        after_pixels = tuple(after.getdata())
+        after_pixels = after.tobytes()
         assert after.size == before_size
         assert after.mode == before_mode
         assert after_pixels == before_pixels

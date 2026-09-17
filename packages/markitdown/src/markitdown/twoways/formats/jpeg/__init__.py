@@ -2,5 +2,12 @@
 
 from .limits import JpegLimits
 from .reader import JpegIRReader, read_jpeg_ir
+from .writer import JpegPatchWriter, patch_jpeg
 
-__all__ = ["JpegIRReader", "JpegLimits", "read_jpeg_ir"]
+__all__ = [
+    "JpegIRReader",
+    "JpegLimits",
+    "JpegPatchWriter",
+    "patch_jpeg",
+    "read_jpeg_ir",
+]

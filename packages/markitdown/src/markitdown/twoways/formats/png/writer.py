@@ -34,6 +34,7 @@ _LIMIT_FIELD_NAMES = (
     "max_text_value_bytes",
 )
 _SUPPORTED_TEXT_CHUNK_TYPES = frozenset({"tEXt", "zTXt", "iTXt"})
+_XMP_ITXT_KEYWORD = "XML:com.adobe.xmp"
 
 
 @dataclass(frozen=True)
@@ -369,6 +370,11 @@ def _prepare_edits(
             raise UnsupportedEditError(
                 "PNG APNG sources are read-only in H13.",
                 details={"reason": "png.apng.read_only"},
+            )
+        if owner.chunk_type == "iTXt" and owner.keyword == _XMP_ITXT_KEYWORD:
+            raise UnsupportedEditError(
+                "PNG XMP iTXt owners are read-only in H13.",
+                details={"reason": "png.itxt.xmp_read_only"},
             )
         if keyword_counts[owner.keyword] != 1:
             raise UnsupportedEditError(

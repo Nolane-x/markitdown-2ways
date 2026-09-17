@@ -13,7 +13,7 @@ _APNG_TYPES = frozenset({"acTL", "fcTL", "fdAT"})
 
 
 class PngFormatError(ValueError):
-    """Raised when strict H12 PNG authority cannot be proven."""
+    """Raised when strict PNG round-trip authority cannot be proven."""
 
 
 def _valid_chunk_type(raw: bytes) -> bool:
@@ -33,6 +33,27 @@ def _valid_keyword(raw: bytes) -> bool:
     return all(32 <= byte <= 126 or 161 <= byte <= 255 for byte in raw)
 
 
+def _bounded_zlib_decompress(
+    compressed: bytes,
+    *,
+    limit: int,
+    label: str,
+) -> bytes:
+    try:
+        decompressor = zlib.decompressobj()
+        decoded = decompressor.decompress(compressed, limit + 1)
+    except zlib.error as exc:
+        raise PngFormatError(f"PNG {label} zlib stream is invalid") from exc
+
+    if len(decoded) > limit or decompressor.unconsumed_tail:
+        raise PngFormatError(f"PNG {label} text value exceeds decompression limit")
+    if not decompressor.eof:
+        raise PngFormatError(f"PNG {label} zlib stream is incomplete")
+    if decompressor.unused_data:
+        raise PngFormatError(f"PNG {label} zlib stream contains trailing bytes")
+    return decoded
+
+
 def _parse_text_owner(chunk: PngChunk) -> PngTextOwner:
     separator = chunk.data.find(b"\x00")
     if separator <= 0:
@@ -45,10 +66,137 @@ def _parse_text_owner(chunk: PngChunk) -> PngTextOwner:
         raise PngFormatError("PNG tEXt value contains an unsupported NUL byte")
     return PngTextOwner(
         chunk_index=chunk.index,
+        chunk_type="tEXt",
         keyword=keyword_raw.decode("latin-1"),
         value=value_raw.decode("latin-1"),
         raw_sha256=chunk.raw_sha256,
         data_sha256=chunk.data_sha256,
+    )
+
+
+def _parse_ztxt_owner(chunk: PngChunk, *, limits: PngLimits) -> PngTextOwner:
+    separator = chunk.data.find(b"\x00")
+    if separator <= 0:
+        raise PngFormatError("PNG zTXt chunk is missing a valid keyword separator")
+    keyword_raw = chunk.data[:separator]
+    remainder = chunk.data[separator + 1 :]
+    if not _valid_keyword(keyword_raw):
+        raise PngFormatError("PNG zTXt keyword is invalid")
+    if len(remainder) < 1:
+        raise PngFormatError("PNG zTXt chunk is missing compression method")
+
+    compression_method = remainder[0]
+    if compression_method != 0:
+        raise PngFormatError("PNG zTXt compression method is unsupported")
+    value_raw = _bounded_zlib_decompress(
+        remainder[1:],
+        limit=limits.max_text_value_bytes,
+        label="zTXt",
+    )
+    if b"\x00" in value_raw:
+        raise PngFormatError("PNG zTXt value contains an unsupported NUL byte")
+    return PngTextOwner(
+        chunk_index=chunk.index,
+        chunk_type="zTXt",
+        keyword=keyword_raw.decode("latin-1"),
+        value=value_raw.decode("latin-1"),
+        raw_sha256=chunk.raw_sha256,
+        data_sha256=chunk.data_sha256,
+        compression_method=compression_method,
+    )
+
+
+def _valid_language_tag(raw: bytes) -> bool:
+    if not raw:
+        return True
+    try:
+        language_tag = raw.decode("ascii")
+    except UnicodeDecodeError:
+        return False
+    parts = language_tag.split("-")
+    return all(
+        1 <= len(part) <= 8
+        and all(
+            "A" <= character <= "Z"
+            or "a" <= character <= "z"
+            or "0" <= character <= "9"
+            for character in part
+        )
+        for part in parts
+    )
+
+
+def _decode_itxt_utf8(raw: bytes, *, field: str) -> str:
+    if b"\x00" in raw:
+        raise PngFormatError(f"PNG iTXt {field} contains an unsupported NUL byte")
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise PngFormatError(f"PNG iTXt {field} is not valid UTF-8") from exc
+
+
+def _parse_itxt_owner(chunk: PngChunk, *, limits: PngLimits) -> PngTextOwner:
+    keyword_end = chunk.data.find(b"\x00")
+    if keyword_end <= 0:
+        raise PngFormatError("PNG iTXt chunk is missing a valid keyword separator")
+    keyword_raw = chunk.data[:keyword_end]
+    if not _valid_keyword(keyword_raw):
+        raise PngFormatError("PNG iTXt keyword is invalid")
+
+    remainder = chunk.data[keyword_end + 1 :]
+    if len(remainder) < 2:
+        raise PngFormatError("PNG iTXt chunk is missing compression fields")
+    compression_flag = remainder[0]
+    compression_method = remainder[1]
+    if compression_flag not in (0, 1):
+        raise PngFormatError("PNG iTXt compression flag is invalid")
+    if compression_method != 0:
+        raise PngFormatError("PNG iTXt compression method is unsupported")
+
+    remainder = remainder[2:]
+    language_end = remainder.find(b"\x00")
+    if language_end < 0:
+        raise PngFormatError("PNG iTXt chunk is missing language tag separator")
+    language_raw = remainder[:language_end]
+    if not _valid_language_tag(language_raw):
+        raise PngFormatError("PNG iTXt language tag is invalid")
+
+    remainder = remainder[language_end + 1 :]
+    translated_end = remainder.find(b"\x00")
+    if translated_end < 0:
+        raise PngFormatError("PNG iTXt chunk is missing translated keyword separator")
+    translated_raw = remainder[:translated_end]
+    translated_keyword = _decode_itxt_utf8(
+        translated_raw,
+        field="translated keyword",
+    )
+    text_raw = remainder[translated_end + 1 :]
+    if compression_flag == 1:
+        text_raw = _bounded_zlib_decompress(
+            text_raw,
+            limit=limits.max_text_value_bytes,
+            label="iTXt",
+        )
+    elif len(text_raw) > limits.max_text_value_bytes:
+        raise PngFormatError(
+            "PNG iTXt text value exceeds the configured text value limit"
+        )
+    value = _decode_itxt_utf8(text_raw, field="text")
+
+    language_tag = language_raw.decode("ascii")
+    return PngTextOwner(
+        chunk_index=chunk.index,
+        chunk_type="iTXt",
+        keyword=keyword_raw.decode("latin-1"),
+        value=value,
+        raw_sha256=chunk.raw_sha256,
+        data_sha256=chunk.data_sha256,
+        compression_method=compression_method,
+        compression_flag=compression_flag,
+        language_tag=language_tag,
+        translated_keyword=translated_keyword,
+        language_tag_sha256=sha256(language_raw).hexdigest(),
+        translated_keyword_sha256=sha256(translated_raw).hexdigest(),
     )
 
 
@@ -148,6 +296,10 @@ def parse_png(data: bytes, *, limits: PngLimits | None = None) -> ParsedPng:
         chunks.append(chunk)
         if chunk_type == "tEXt":
             text_owners.append(_parse_text_owner(chunk))
+        elif chunk_type == "zTXt":
+            text_owners.append(_parse_ztxt_owner(chunk, limits=limits))
+        elif chunk_type == "iTXt":
+            text_owners.append(_parse_itxt_owner(chunk, limits=limits))
 
         offset = end
         if chunk_type == "IEND":

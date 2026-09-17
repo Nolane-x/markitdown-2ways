@@ -23,10 +23,17 @@ class PngChunk:
 @dataclass(frozen=True)
 class PngTextOwner:
     chunk_index: int
+    chunk_type: str
     keyword: str
     value: str
     raw_sha256: str
     data_sha256: str
+    compression_method: int | None = None
+    compression_flag: int | None = None
+    language_tag: str | None = None
+    translated_keyword: str | None = None
+    language_tag_sha256: str | None = None
+    translated_keyword_sha256: str | None = None
 
 
 @dataclass(frozen=True)

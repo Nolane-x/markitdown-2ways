@@ -33,16 +33,18 @@ _LIMIT_FIELD_NAMES = (
     "max_chunk_data_bytes",
     "max_text_value_bytes",
 )
+_SUPPORTED_TEXT_CHUNK_TYPES = frozenset({"tEXt", "zTXt", "iTXt"})
+_XMP_ITXT_KEYWORD = "XML:com.adobe.xmp"
 
 
 @dataclass(frozen=True)
 class _PreparedEdit:
     node: Node
     chunk_index: int
-    keyword: str
+    owner: PngTextOwner
     old_value: str
     value: str
-    encoded_value: bytes
+    replacement_chunk: bytes
 
 
 def _read_source_bytes(source: BinaryIO) -> bytes:
@@ -117,9 +119,34 @@ def _fresh_parse(source_bytes: bytes, limits: PngLimits) -> ParsedPng:
         return parse_png(source_bytes, limits=limits)
     except PngFormatError as exc:
         raise PatchPreconditionError(
-            "Authoritative PNG source no longer satisfies the H12 structural contract.",
+            "Authoritative PNG source no longer satisfies the H13 structural contract.",
             details={"reason": "png_source_parse_failure", "error": str(exc)},
         ) from exc
+
+
+def _validate_owner_metadata(node: Node, owner: PngTextOwner) -> None:
+    expected = {
+        "png.chunk_type": owner.chunk_type,
+        "png.compression_method": owner.compression_method,
+        "png.compression_flag": owner.compression_flag,
+        "png.language_tag": owner.language_tag,
+        "png.translated_keyword": owner.translated_keyword,
+        "png.language_tag_sha256": owner.language_tag_sha256,
+        "png.translated_keyword_sha256": owner.translated_keyword_sha256,
+    }
+    for key, value in expected.items():
+        actual = node.metadata.get(key)
+        if actual != value:
+            raise PatchPreconditionError(
+                "PNG metadata immutable native evidence no longer matches the source.",
+                details={
+                    "reason": "png_owner_metadata_mismatch",
+                    "metadata_key": key,
+                    "expected": value,
+                    "actual": actual,
+                    "target_node_id": node.node_id,
+                },
+            )
 
 
 def _validate_native_binding(
@@ -129,17 +156,19 @@ def _validate_native_binding(
     locator = node.native_locator
     chunk_index = node.metadata.get("png.chunk_index")
     keyword = node.metadata.get("png.keyword")
+    chunk_type = node.metadata.get("png.chunk_type")
     if (
         not isinstance(chunk_index, int)
         or isinstance(chunk_index, bool)
         or not isinstance(keyword, str)
+        or chunk_type not in _SUPPORTED_TEXT_CHUNK_TYPES
         or locator is None
         or locator.backend != "png"
         or locator.part_uri != "/"
         or locator.object_id != f"chunk:{chunk_index}:{keyword}"
         or locator.name != keyword
         or locator.attributes.get("chunk_index") != chunk_index
-        or locator.attributes.get("chunk_type") != "tEXt"
+        or locator.attributes.get("chunk_type") != chunk_type
         or locator.attributes.get("keyword") != keyword
     ):
         raise PatchPreconditionError(
@@ -156,10 +185,19 @@ def _validate_native_binding(
         )
     chunk = fresh.chunk(chunk_index)
     owner = fresh.text_owner(chunk_index)
-    if chunk.chunk_type != "tEXt" or owner is None:
+    if (
+        chunk.chunk_type != chunk_type
+        or owner is None
+        or owner.chunk_type != chunk_type
+    ):
         raise PatchPreconditionError(
-            "PNG metadata native owner is no longer a tEXt chunk.",
-            details={"reason": "png_owner_type_mismatch", "chunk_index": chunk_index},
+            "PNG metadata native owner type no longer matches the authoritative source.",
+            details={
+                "reason": "png_owner_type_mismatch",
+                "chunk_index": chunk_index,
+                "expected": chunk_type,
+                "actual": chunk.chunk_type,
+            },
         )
     if owner.keyword != keyword:
         raise PatchPreconditionError(
@@ -178,6 +216,15 @@ def _validate_native_binding(
                 "chunk_index": chunk_index,
             },
         )
+    if node.metadata.get("png.data_sha256") != owner.data_sha256:
+        raise PatchPreconditionError(
+            "PNG metadata data evidence no longer matches the source.",
+            details={
+                "reason": "png_data_owner_digest_mismatch",
+                "chunk_index": chunk_index,
+            },
+        )
+    _validate_owner_metadata(node, owner)
     if not isinstance(node.payload, TextPayload) or node.payload.text != owner.value:
         raise PatchPreconditionError(
             "PNG metadata semantic owner no longer matches the source.",
@@ -187,6 +234,102 @@ def _validate_native_binding(
             },
         )
     return chunk_index, owner
+
+
+def _encode_png_chunk(chunk_type: str, data: bytes) -> bytes:
+    chunk_type_raw = chunk_type.encode("ascii")
+    crc = zlib.crc32(chunk_type_raw)
+    crc = zlib.crc32(data, crc) & 0xFFFFFFFF
+    return struct.pack(">I", len(data)) + chunk_type_raw + data + struct.pack(">I", crc)
+
+
+def _encode_replacement_chunk(
+    owner: PngTextOwner,
+    value: str,
+    *,
+    limits: PngLimits,
+) -> bytes:
+    if "\x00" in value:
+        raise UnsupportedEditError(
+            "PNG text replacement cannot contain NUL.",
+            details={"reason": "png_text_nul_unsupported"},
+        )
+
+    if owner.chunk_type in {"tEXt", "zTXt"}:
+        try:
+            encoded_value = value.encode("latin-1")
+        except UnicodeEncodeError as exc:
+            raise UnsupportedEditError(
+                "PNG tEXt/zTXt replacement must be representable in ISO-8859-1.",
+                details={"reason": "png_text_value_not_latin1"},
+            ) from exc
+    elif owner.chunk_type == "iTXt":
+        encoded_value = value.encode("utf-8")
+    else:
+        raise UnsupportedEditError(
+            "PNG text owner type is not writable in H13.",
+            details={
+                "reason": "png.text.unsupported_chunk_type",
+                "chunk_type": owner.chunk_type,
+            },
+        )
+
+    if len(encoded_value) > limits.max_text_value_bytes:
+        raise UnsupportedEditError(
+            "PNG text replacement exceeds the effective read-time/writer value limit.",
+            details={"reason": "png_text_value_limit"},
+        )
+
+    keyword_raw = owner.keyword.encode("latin-1")
+    if owner.chunk_type == "tEXt":
+        data = keyword_raw + b"\x00" + encoded_value
+    elif owner.chunk_type == "zTXt":
+        if owner.compression_method != 0:
+            raise UnsupportedEditError(
+                "PNG zTXt compression method is not writable in H13.",
+                details={"reason": "png.ztxt.unsupported_compression_method"},
+            )
+        data = (
+            keyword_raw
+            + b"\x00"
+            + bytes((owner.compression_method,))
+            + zlib.compress(encoded_value)
+        )
+    else:
+        if owner.compression_flag not in (0, 1):
+            raise UnsupportedEditError(
+                "PNG iTXt compression flag is not writable in H13.",
+                details={"reason": "png.itxt.invalid_compression_flag"},
+            )
+        if owner.compression_method != 0:
+            raise UnsupportedEditError(
+                "PNG iTXt compression method is not writable in H13.",
+                details={"reason": "png.itxt.unsupported_compression_method"},
+            )
+        language_raw = (owner.language_tag or "").encode("ascii")
+        translated_raw = (owner.translated_keyword or "").encode("utf-8")
+        text_raw = (
+            zlib.compress(encoded_value)
+            if owner.compression_flag == 1
+            else encoded_value
+        )
+        data = (
+            keyword_raw
+            + b"\x00"
+            + bytes((owner.compression_flag, owner.compression_method))
+            + language_raw
+            + b"\x00"
+            + translated_raw
+            + b"\x00"
+            + text_raw
+        )
+
+    if len(data) > limits.max_chunk_data_bytes:
+        raise UnsupportedEditError(
+            "PNG text replacement exceeds the effective read-time/writer chunk limit.",
+            details={"reason": "png_chunk_data_limit"},
+        )
+    return _encode_png_chunk(owner.chunk_type, data)
 
 
 def _prepare_edits(
@@ -202,7 +345,7 @@ def _prepare_edits(
     for edit in edits:
         if edit.type != "update_png_text_metadata":
             raise UnsupportedEditError(
-                "PNG H12 supports only update_png_text_metadata.",
+                "PNG H13 supports only update_png_text_metadata.",
                 details={"reason": "unsupported_edit_type", "edit_type": edit.type},
             )
         if edit.target_node_id is None or edit.target_node_id not in document.nodes:
@@ -218,19 +361,24 @@ def _prepare_edits(
             node.payload, TextPayload
         ):
             raise UnsupportedEditError(
-                "update_png_text_metadata requires a PNG tEXt metadata node.",
+                "update_png_text_metadata requires a PNG native text metadata node.",
                 details={"reason": "wrong_node_kind", "target_node_id": node.node_id},
             )
 
         chunk_index, owner = _validate_native_binding(node, fresh)
         if fresh.is_apng:
             raise UnsupportedEditError(
-                "PNG APNG sources are read-only in H12.",
+                "PNG APNG sources are read-only in H13.",
                 details={"reason": "png.apng.read_only"},
+            )
+        if owner.chunk_type == "iTXt" and owner.keyword == _XMP_ITXT_KEYWORD:
+            raise UnsupportedEditError(
+                "PNG XMP iTXt owners are read-only in H13.",
+                details={"reason": "png.itxt.xmp_read_only"},
             )
         if keyword_counts[owner.keyword] != 1:
             raise UnsupportedEditError(
-                "PNG duplicate keyword owners are read-only in H12.",
+                "PNG duplicate keyword owners are read-only in H13.",
                 details={
                     "reason": "png.text.duplicate_keyword",
                     "keyword": owner.keyword,
@@ -272,7 +420,7 @@ def _prepare_edits(
         assert isinstance(value, str)
         if keyword != owner.keyword or keyword != node.metadata.get("png.keyword"):
             raise PatchPreconditionError(
-                "PNG metadata keyword is immutable in H12.",
+                "PNG metadata keyword is immutable in H13.",
                 details={"reason": "png_keyword_immutable", "chunk_index": chunk_index},
             )
         if old_value != owner.value or old_value != node.payload.text:
@@ -284,50 +432,20 @@ def _prepare_edits(
                     "actual": old_value,
                 },
             )
-        if "\x00" in value:
-            raise UnsupportedEditError(
-                "PNG tEXt replacement cannot contain NUL.",
-                details={"reason": "png_text_nul_unsupported"},
-            )
-        try:
-            encoded_value = value.encode("latin-1")
-        except UnicodeEncodeError as exc:
-            raise UnsupportedEditError(
-                "PNG tEXt replacement must be representable in ISO-8859-1.",
-                details={"reason": "png_text_value_not_latin1"},
-            ) from exc
-        if len(encoded_value) > limits.max_text_value_bytes:
-            raise UnsupportedEditError(
-                "PNG tEXt replacement exceeds the effective read-time/writer value limit.",
-                details={"reason": "png_text_value_limit"},
-            )
-        keyword_bytes = keyword.encode("latin-1")
-        if len(keyword_bytes) + 1 + len(encoded_value) > limits.max_chunk_data_bytes:
-            raise UnsupportedEditError(
-                "PNG tEXt replacement exceeds the effective read-time/writer chunk limit.",
-                details={"reason": "png_chunk_data_limit"},
-            )
 
+        replacement_chunk = _encode_replacement_chunk(owner, value, limits=limits)
         prepared.append(
             _PreparedEdit(
                 node=node,
                 chunk_index=chunk_index,
-                keyword=keyword,
+                owner=owner,
                 old_value=old_value,
                 value=value,
-                encoded_value=encoded_value,
+                replacement_chunk=replacement_chunk,
             )
         )
 
     return tuple(prepared)
-
-
-def _encode_text_chunk(keyword: str, encoded_value: bytes) -> bytes:
-    data = keyword.encode("latin-1") + b"\x00" + encoded_value
-    chunk_type = b"tEXt"
-    crc = zlib.crc32(chunk_type)
-    crc = zlib.crc32(data, crc) & 0xFFFFFFFF
-    return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", crc)
 
 
 def _construct_candidate(
@@ -340,13 +458,7 @@ def _construct_candidate(
         if item.value == item.old_value:
             continue
         chunk = fresh.chunk(item.chunk_index)
-        replacements.append(
-            (
-                chunk.start,
-                chunk.end,
-                _encode_text_chunk(item.keyword, item.encoded_value),
-            )
-        )
+        replacements.append((chunk.start, chunk.end, item.replacement_chunk))
 
     candidate = source_bytes
     for start, end, replacement in sorted(replacements, reverse=True):
@@ -388,7 +500,7 @@ def patch_png(
     else:
         candidate = _construct_candidate(source_bytes, fresh, prepared)
         requested_values = {
-            item.chunk_index: (item.keyword, item.value) for item in prepared
+            item.chunk_index: (item.owner.keyword, item.value) for item in prepared
         }
         verify_png_candidate(
             source_bytes,
@@ -403,9 +515,9 @@ def patch_png(
                 FidelityEvidence(
                     check_code="png.semantic_readback",
                     status=FidelityStatus.PASSED,
-                    description="Requested PNG tEXt values passed strict semantic re-read.",
-                    expected={item.keyword: item.value for item in prepared},
-                    actual={item.keyword: item.value for item in prepared},
+                    description="Requested PNG text values passed strict semantic re-read.",
+                    expected={item.owner.keyword: item.value for item in prepared},
+                    actual={item.owner.keyword: item.value for item in prepared},
                     affected_node_ids=tuple(item.node.node_id for item in prepared),
                 ),
                 FidelityEvidence(

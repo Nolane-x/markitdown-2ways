@@ -19,6 +19,7 @@ from .limits import PngLimits
 from .parser import parse_png
 
 _PNG_READ_LIMITS_KEY = "png.read_limits.v1"
+_XMP_ITXT_KEYWORD = "XML:com.adobe.xmp"
 
 
 def _read_source_bytes(source: BinaryIO) -> bytes:
@@ -41,6 +42,8 @@ def _limits_metadata(limits: PngLimits) -> dict[str, int]:
 
 def _text_capability(
     *,
+    keyword: str,
+    chunk_type: str,
     keyword_count: int,
     is_apng: bool,
 ) -> CapabilityDecision:
@@ -49,6 +52,12 @@ def _text_capability(
             operation="update_png_text_metadata",
             state=CapabilityState.READ_ONLY,
             reason_code="png.apng.read_only",
+        )
+    if chunk_type == "iTXt" and keyword == _XMP_ITXT_KEYWORD:
+        return CapabilityDecision(
+            operation="update_png_text_metadata",
+            state=CapabilityState.READ_ONLY,
+            reason_code="png.itxt.xmp_read_only",
         )
     if keyword_count != 1:
         return CapabilityDecision(
@@ -133,6 +142,8 @@ def read_png_ir(
             },
         )
         capability = _text_capability(
+            keyword=owner.keyword,
+            chunk_type=owner.chunk_type,
             keyword_count=keyword_counts[owner.keyword],
             is_apng=parsed.is_apng,
         )

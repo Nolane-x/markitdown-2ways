@@ -178,7 +178,9 @@ def _parse_itxt_owner(chunk: PngChunk, *, limits: PngLimits) -> PngTextOwner:
             label="iTXt",
         )
     elif len(text_raw) > limits.max_text_value_bytes:
-        raise PngFormatError("PNG iTXt text value exceeds the configured text value limit")
+        raise PngFormatError(
+            "PNG iTXt text value exceeds the configured text value limit"
+        )
     value = _decode_itxt_utf8(text_raw, field="text")
 
     language_tag = language_raw.decode("ascii")

@@ -58,12 +58,14 @@ def verify_png_candidate(
             continue
 
         expected_keyword, expected_value = requested_values[index]
-        if source_chunk.chunk_type != "tEXt" or candidate_chunk.chunk_type != "tEXt":
+        if source_chunk.chunk_type != candidate_chunk.chunk_type:
             raise RoundTripVerificationError(
-                "PNG requested owner is no longer a tEXt chunk.",
+                "PNG requested owner chunk type changed unexpectedly.",
                 details={
                     "reason": "png_requested_owner_type_drift",
                     "chunk_index": index,
+                    "expected": source_chunk.chunk_type,
+                    "actual": candidate_chunk.chunk_type,
                 },
             )
         source_owner = source.text_owner(index)
@@ -74,6 +76,16 @@ def verify_png_candidate(
                 details={
                     "reason": "png_requested_owner_missing",
                     "chunk_index": index,
+                },
+            )
+        if source_owner.chunk_type != candidate_owner.chunk_type:
+            raise RoundTripVerificationError(
+                "PNG requested text owner type changed during re-read.",
+                details={
+                    "reason": "png_requested_owner_type_drift",
+                    "chunk_index": index,
+                    "expected": source_owner.chunk_type,
+                    "actual": candidate_owner.chunk_type,
                 },
             )
         if (
@@ -90,6 +102,30 @@ def verify_png_candidate(
                     "actual": candidate_owner.keyword,
                 },
             )
+
+        immutable_fields = (
+            "compression_method",
+            "compression_flag",
+            "language_tag",
+            "translated_keyword",
+            "language_tag_sha256",
+            "translated_keyword_sha256",
+        )
+        for field_name in immutable_fields:
+            expected = getattr(source_owner, field_name)
+            actual = getattr(candidate_owner, field_name)
+            if actual != expected:
+                raise RoundTripVerificationError(
+                    "PNG requested owner immutable metadata changed unexpectedly.",
+                    details={
+                        "reason": "png_requested_owner_metadata_drift",
+                        "chunk_index": index,
+                        "field": field_name,
+                        "expected": expected,
+                        "actual": actual,
+                    },
+                )
+
         if candidate_owner.value != expected_value:
             raise RoundTripVerificationError(
                 "PNG requested metadata value failed semantic readback.",

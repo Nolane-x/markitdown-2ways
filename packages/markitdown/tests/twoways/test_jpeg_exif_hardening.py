@@ -113,7 +113,10 @@ def test_forged_native_metadata_fails_before_output(
     source = make_jpeg()
     document = read_jpeg_ir(BytesIO(source), filename="card.jpg")
     node = _node(document)
-    if metadata_key == "jpeg.tiff_byte_order" and node.metadata[metadata_key] == replacement:
+    if (
+        metadata_key == "jpeg.tiff_byte_order"
+        and node.metadata[metadata_key] == replacement
+    ):
         replacement = "little"
     forged_node = replace(
         node,
@@ -220,9 +223,7 @@ def test_forged_writable_capability_cannot_bypass_fresh_source_policy(
 
 
 def test_read_time_text_limit_cannot_be_loosened_by_writer() -> None:
-    source = make_jpeg(
-        entries=(ExifTextEntry(IMAGE_DESCRIPTION, "A", capacity=32),)
-    )
+    source = make_jpeg(entries=(ExifTextEntry(IMAGE_DESCRIPTION, "A", capacity=32),))
     read_limits = JpegLimits(max_text_value_bytes=2)
     document = read_jpeg_ir(
         BytesIO(source),

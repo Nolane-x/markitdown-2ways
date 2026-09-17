@@ -56,9 +56,7 @@ def test_parse_big_endian_exif_text_owner() -> None:
 
 def test_parse_inline_ascii_owner() -> None:
     source = make_jpeg(
-        entries=(
-            ExifTextEntry(IMAGE_DESCRIPTION, "A", capacity=4, force_inline=True),
-        )
+        entries=(ExifTextEntry(IMAGE_DESCRIPTION, "A", capacity=4, force_inline=True),)
     )
 
     parsed = parse_jpeg(source)

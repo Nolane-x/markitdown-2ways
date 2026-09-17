@@ -68,6 +68,33 @@ def _text_capability(
     )
 
 
+def _owner_metadata(owner: Any, chunk: Any, *, is_apng: bool) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "png.keyword": owner.keyword,
+        "png.chunk_index": owner.chunk_index,
+        "png.chunk_type": owner.chunk_type,
+        "png.chunk_start": chunk.start,
+        "png.chunk_end": chunk.end,
+        "png.data_start": chunk.data_start,
+        "png.data_end": chunk.data_end,
+        "png.raw_sha256": owner.raw_sha256,
+        "png.data_sha256": owner.data_sha256,
+        "png.is_apng": is_apng,
+        "png.native_source": True,
+    }
+    if owner.compression_method is not None:
+        metadata["png.compression_method"] = owner.compression_method
+    if owner.compression_flag is not None:
+        metadata["png.compression_flag"] = owner.compression_flag
+    if owner.language_tag is not None:
+        metadata["png.language_tag"] = owner.language_tag
+        metadata["png.language_tag_sha256"] = owner.language_tag_sha256
+    if owner.translated_keyword is not None:
+        metadata["png.translated_keyword"] = owner.translated_keyword
+        metadata["png.translated_keyword_sha256"] = owner.translated_keyword_sha256
+    return metadata
+
+
 def read_png_ir(
     source: BinaryIO,
     *,
@@ -101,7 +128,7 @@ def read_png_ir(
             name=owner.keyword,
             attributes={
                 "chunk_index": owner.chunk_index,
-                "chunk_type": "tEXt",
+                "chunk_type": owner.chunk_type,
                 "keyword": owner.keyword,
             },
         )
@@ -109,6 +136,8 @@ def read_png_ir(
             keyword_count=keyword_counts[owner.keyword],
             is_apng=parsed.is_apng,
         )
+        metadata = _owner_metadata(owner, chunk, is_apng=parsed.is_apng)
+        metadata[CAPABILITY_METADATA_KEY] = encode_capabilities((capability,))
         node = Node(
             node_id=node_id,
             kind="text",
@@ -121,25 +150,15 @@ def read_png_ir(
                     canvas_index=0,
                     part_uri="/",
                     extraction_method="png-text-chunk",
-                    metadata={"chunk_index": owner.chunk_index},
+                    metadata={
+                        "chunk_index": owner.chunk_index,
+                        "chunk_type": owner.chunk_type,
+                    },
                 ),
             ),
             native_locator=locator,
             payload=TextPayload(text=owner.value),
-            metadata={
-                "png.keyword": owner.keyword,
-                "png.chunk_index": owner.chunk_index,
-                "png.chunk_type": "tEXt",
-                "png.chunk_start": chunk.start,
-                "png.chunk_end": chunk.end,
-                "png.data_start": chunk.data_start,
-                "png.data_end": chunk.data_end,
-                "png.raw_sha256": owner.raw_sha256,
-                "png.data_sha256": owner.data_sha256,
-                "png.is_apng": parsed.is_apng,
-                "png.native_source": True,
-                CAPABILITY_METADATA_KEY: encode_capabilities((capability,)),
-            },
+            metadata=metadata,
         )
         nodes[node_id] = node
         root_node_ids.append(node_id)

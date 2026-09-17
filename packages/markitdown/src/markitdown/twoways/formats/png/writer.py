@@ -184,7 +184,11 @@ def _validate_native_binding(
         )
     chunk = fresh.chunk(chunk_index)
     owner = fresh.text_owner(chunk_index)
-    if chunk.chunk_type != chunk_type or owner is None or owner.chunk_type != chunk_type:
+    if (
+        chunk.chunk_type != chunk_type
+        or owner is None
+        or owner.chunk_type != chunk_type
+    ):
         raise PatchPreconditionError(
             "PNG metadata native owner type no longer matches the authoritative source.",
             details={
@@ -235,12 +239,7 @@ def _encode_png_chunk(chunk_type: str, data: bytes) -> bytes:
     chunk_type_raw = chunk_type.encode("ascii")
     crc = zlib.crc32(chunk_type_raw)
     crc = zlib.crc32(data, crc) & 0xFFFFFFFF
-    return (
-        struct.pack(">I", len(data))
-        + chunk_type_raw
-        + data
-        + struct.pack(">I", crc)
-    )
+    return struct.pack(">I", len(data)) + chunk_type_raw + data + struct.pack(">I", crc)
 
 
 def _encode_replacement_chunk(

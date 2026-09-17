@@ -7,15 +7,29 @@ from markitdown.twoways.formats.mp3 import Mp3Limits, read_mp3_ir
 from markitdown.twoways.ir.nodes import TextPayload
 from markitdown.twoways.ir.serialization import canonical_json_digest, validate_document
 
-from ._mp3_fixtures import apev2_tag, leading_id3v2, lyrics3v1_tag, make_mp3, mpeg_l3_frame
+from ._mp3_fixtures import (
+    apev2_tag,
+    leading_id3v2,
+    lyrics3v1_tag,
+    make_mp3,
+    mpeg_l3_frame,
+)
 
 
 def _nodes(document):
-    return [node for node in document.nodes.values() if node.semantic_role == "mp3-id3v1-text"]
+    return [
+        node
+        for node in document.nodes.values()
+        if node.semantic_role == "mp3-id3v1-text"
+    ]
 
 
 def _node(document, field: str):
-    return next(node for node in _nodes(document) if node.metadata["mp3.id3v1_field"] == field)
+    return next(
+        node
+        for node in _nodes(document)
+        if node.metadata["mp3.id3v1_field"] == field
+    )
 
 
 def test_reads_id3v1_into_deterministic_ir() -> None:
@@ -36,8 +50,14 @@ def test_reads_id3v1_into_deterministic_ir() -> None:
     assert first.canvases[0].kind == "audio"
 
     nodes = _nodes(first)
-    assert [node.metadata["mp3.id3v1_field"] for node in nodes] == ["Title", "Artist", "Album"]
-    assert [node.payload.text for node in nodes if isinstance(node.payload, TextPayload)] == [
+    assert [node.metadata["mp3.id3v1_field"] for node in nodes] == [
+        "Title",
+        "Artist",
+        "Album",
+    ]
+    assert [
+        node.payload.text for node in nodes if isinstance(node.payload, TextPayload)
+    ] == [
         "Alpha",
         "Nolane",
         "Lab",
@@ -46,7 +66,10 @@ def test_reads_id3v1_into_deterministic_ir() -> None:
         assert node.native_locator is not None
         assert node.native_locator.backend == "mp3"
         assert node.native_locator.part_uri == "/"
-        assert node.native_locator.object_id == f"id3v1:{node.metadata['mp3.id3v1_field']}"
+        assert (
+            node.native_locator.object_id
+            == f"id3v1:{node.metadata['mp3.id3v1_field']}"
+        )
         assert node.metadata["mp3.slot_length"] == 30
         assert isinstance(node.metadata["mp3.slot_start"], int)
         assert isinstance(node.metadata["mp3.slot_end"], int)
@@ -81,7 +104,9 @@ def test_competing_metadata_and_unproven_audio_are_read_only() -> None:
     for source, reason in cases:
         document = read_mp3_ir(BytesIO(source), filename="blocked.mp3")
         for node in _nodes(document):
-            decision = capabilities_for_node(node).for_operation("update_mp3_id3v1_text")
+            decision = capabilities_for_node(node).for_operation(
+                "update_mp3_id3v1_text"
+            )
             assert decision.state is CapabilityState.READ_ONLY
             assert decision.reason_code == reason
 

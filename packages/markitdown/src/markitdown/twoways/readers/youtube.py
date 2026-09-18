@@ -318,7 +318,9 @@ def read_youtube_snapshot_ir(
         if not isinstance(transcript, YouTubeTranscriptSnapshot):
             raise TypeError("transcript must be a YouTubeTranscriptSnapshot")
         if transcript.video_id != video_id:
-            raise ValueError("transcript video ID does not match YouTube page authority")
+            raise ValueError(
+                "transcript video ID does not match YouTube page authority"
+            )
         transcript_text = " ".join(transcript.parts)
         transcript_bytes = transcript_text.encode("utf-8")
         transcript_size = len(transcript_bytes)

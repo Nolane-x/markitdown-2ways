@@ -102,12 +102,14 @@ def test_reader_binds_source_ordered_sheets_and_exact_projection() -> None:
     sheet_evidence = evidence["sheets"]
     assert sheet_evidence[0]["index"] == 0
     assert sheet_evidence[0]["name"] == "Summary"
-    assert sheet_evidence[0]["raw_markdown_sha256"] == sha256(
-        SHEETS[0].markdown.encode("utf-8")
-    ).hexdigest()
-    assert sheet_evidence[0]["stripped_markdown_sha256"] == sha256(
-        SHEETS[0].markdown.strip().encode("utf-8")
-    ).hexdigest()
+    assert (
+        sheet_evidence[0]["raw_markdown_sha256"]
+        == sha256(SHEETS[0].markdown.encode("utf-8")).hexdigest()
+    )
+    assert (
+        sheet_evidence[0]["stripped_markdown_sha256"]
+        == sha256(SHEETS[0].markdown.strip().encode("utf-8")).hexdigest()
+    )
     assert sheet_evidence[1]["index"] == 1
     assert sheet_evidence[1]["name"] == "Data"
 

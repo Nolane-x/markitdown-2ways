@@ -30,7 +30,24 @@ __all__ = [
     "XlsLimits",
     "XlsNumberOwner",
     "XlsSheet",
+    "XlsIRReader",
     "logical_slice_ranges",
     "parse_cfb",
     "parse_xls",
+    "read_xls_ir",
 ]
+
+
+def read_xls_ir(*args: Any, **kwargs: Any):
+    from .reader import read_xls_ir as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def __getattr__(name: str):
+    if name == "XlsIRReader":
+        from .reader import XlsIRReader
+
+        return XlsIRReader
+    raise AttributeError(name)
+

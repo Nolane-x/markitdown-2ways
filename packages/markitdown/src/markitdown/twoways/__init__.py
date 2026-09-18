@@ -82,6 +82,8 @@ from .markdown import (
 )
 
 from .readers import (
+    AudioConverterSnapshot,
+    AudioDerivedLimits,
     ContentUnderstandingAnalysisSnapshot,
     ContentUnderstandingDerivedLimits,
     DocumentIRReader,
@@ -90,6 +92,7 @@ from .readers import (
     RemoteDerivedLimits,
     YouTubeDerivedLimits,
     YouTubeTranscriptSnapshot,
+    read_audio_snapshot_ir,
     read_bing_serp_snapshot_ir,
     read_content_understanding_analysis_ir,
     read_document_intelligence_analysis_ir,
@@ -100,6 +103,8 @@ from .readers import (
 from .writers import DocumentWriter, TargetInfo
 
 __all__ = [
+    "AudioConverterSnapshot",
+    "AudioDerivedLimits",
     "AmbiguousNativeLocatorError",
     "BoundingBox",
     "Canvas",
@@ -163,6 +168,7 @@ __all__ = [
     "build_capability_report",
     "capabilities_for_node",
     "read_markdown_ir",
+    "read_audio_snapshot_ir",
     "read_bing_serp_snapshot_ir",
     "read_content_understanding_analysis_ir",
     "read_document_intelligence_analysis_ir",

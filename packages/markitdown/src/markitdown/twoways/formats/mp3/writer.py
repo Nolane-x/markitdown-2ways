@@ -24,6 +24,7 @@ from .parser import Mp3FormatError, parse_mp3
 from .verification import verify_mp3_candidate
 
 _MP3_READ_LIMITS_KEY = "mp3.read_limits.v1"
+_MP3_READ_LIMITS_SHA256_KEY = "mp3.read_limits.sha256"
 _LIMIT_FIELD_NAMES = (
     "max_source_bytes",
     "max_audio_frames",
@@ -97,6 +98,13 @@ def _validate_source_authority(document: DocumentIR, source_bytes: bytes) -> Non
         )
 
 
+def _limits_fingerprint(limits: Mp3Limits) -> str:
+    payload = "\n".join(
+        f"{name}={getattr(limits, name)}" for name in _LIMIT_FIELD_NAMES
+    ).encode("ascii")
+    return sha256(payload).hexdigest()
+
+
 def _read_time_limits(document: DocumentIR) -> Mp3Limits:
     raw = document.metadata.custom.get(_MP3_READ_LIMITS_KEY)
     if not isinstance(raw, Mapping) or set(raw) != set(_LIMIT_FIELD_NAMES):
@@ -106,12 +114,28 @@ def _read_time_limits(document: DocumentIR) -> Mp3Limits:
         )
     try:
         values = {name: raw[name] for name in _LIMIT_FIELD_NAMES}
-        return Mp3Limits(**values)
+        read_time = Mp3Limits(**values)
     except (KeyError, TypeError, ValueError) as exc:
         raise PatchPreconditionError(
             "MP3 DocumentIR contains invalid authoritative read-time limits.",
             details={"reason": "mp3_read_limits_missing_or_invalid"},
         ) from exc
+
+    recorded_fingerprint = document.metadata.custom.get(_MP3_READ_LIMITS_SHA256_KEY)
+    actual_fingerprint = _limits_fingerprint(read_time)
+    if (
+        not isinstance(recorded_fingerprint, str)
+        or recorded_fingerprint != actual_fingerprint
+    ):
+        raise PatchPreconditionError(
+            "MP3 authoritative read-time limits are stale or forged.",
+            details={
+                "reason": "mp3_read_limits_stale_or_forged",
+                "expected": recorded_fingerprint,
+                "actual": actual_fingerprint,
+            },
+        )
+    return read_time
 
 
 def _intersect_limits(requested: Mp3Limits, read_time: Mp3Limits) -> Mp3Limits:

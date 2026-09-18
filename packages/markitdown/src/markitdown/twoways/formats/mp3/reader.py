@@ -19,6 +19,13 @@ from .model import Mp3Id3v1Owner, ParsedMp3
 from .parser import parse_mp3
 
 _MP3_READ_LIMITS_KEY = "mp3.read_limits.v1"
+_MP3_READ_LIMITS_SHA256_KEY = "mp3.read_limits.sha256"
+_LIMIT_FIELD_NAMES = (
+    "max_source_bytes",
+    "max_audio_frames",
+    "max_frame_bytes",
+    "max_terminal_metadata_bytes",
+)
 _BLOCKER_PRIORITY = (
     "mp3.metadata.id3v2_read_only",
     "mp3.metadata.ape_read_only",
@@ -46,6 +53,13 @@ def _limits_metadata(limits: Mp3Limits) -> dict[str, int]:
         "max_frame_bytes": limits.max_frame_bytes,
         "max_terminal_metadata_bytes": limits.max_terminal_metadata_bytes,
     }
+
+
+def _limits_fingerprint(limits: Mp3Limits) -> str:
+    payload = "\n".join(
+        f"{name}={getattr(limits, name)}" for name in _LIMIT_FIELD_NAMES
+    ).encode("ascii")
+    return sha256(payload).hexdigest()
 
 
 def _reason_from_blockers(blockers: tuple[str, ...]) -> str | None:
@@ -187,7 +201,10 @@ def read_mp3_ir(
             preserved_source_ref=f"mp3:sha256:{source_digest}",
         ),
         metadata=DocumentMetadata(
-            custom={_MP3_READ_LIMITS_KEY: _limits_metadata(active_limits)}
+            custom={
+                _MP3_READ_LIMITS_KEY: _limits_metadata(active_limits),
+                _MP3_READ_LIMITS_SHA256_KEY: _limits_fingerprint(active_limits),
+            }
         ),
         canvases=(
             Canvas(

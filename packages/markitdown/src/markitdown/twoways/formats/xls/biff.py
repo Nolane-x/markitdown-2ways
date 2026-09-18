@@ -244,7 +244,9 @@ def parse_xls(data: bytes, *, limits: XlsLimits | None = None) -> ParsedXls:
     if any(record.record_type == _FORMULA for record in records):
         blockers.append("xls.workbook.formulas_present")
 
-    offset_to_index = {record.header_offset: index for index, record in enumerate(records)}
+    offset_to_index = {
+        record.header_offset: index for index, record in enumerate(records)
+    }
     if len(offset_to_index) != len(records):
         raise XlsFormatError("XLS BIFF record offsets are ambiguous")
 
@@ -277,7 +279,9 @@ def parse_xls(data: bytes, *, limits: XlsLimits | None = None) -> ParsedXls:
             0x06: 0x0040,
         }[sheet_type]
         if sheet_doc_type != expected_doc_type:
-            raise XlsFormatError("XLS BoundSheet8 pointer resolves to mismatched BOF type")
+            raise XlsFormatError(
+                "XLS BoundSheet8 pointer resolves to mismatched BOF type"
+            )
 
         substream = _sheet_records(records, start_index=start_index)
         is_dialog = False
@@ -286,7 +290,9 @@ def parse_xls(data: bytes, *, limits: XlsLimits | None = None) -> ParsedXls:
                 record for record in substream if record.record_type == _WSBOOL
             )
             if len(wsbool_records) != 1 or wsbool_records[0].payload_size != 2:
-                raise XlsFormatError("XLS worksheet must contain one valid WsBool record")
+                raise XlsFormatError(
+                    "XLS worksheet must contain one valid WsBool record"
+                )
             wsbool_value = _u16(wsbool_records[0].raw, 4)
             is_dialog = bool(wsbool_value & 0x0010)
             if is_dialog:
@@ -310,7 +316,9 @@ def parse_xls(data: bytes, *, limits: XlsLimits | None = None) -> ParsedXls:
                 owners.append(owner)
                 number_owner_count += 1
                 if number_owner_count > active_limits.max_number_owners:
-                    raise XlsFormatError("XLS NUMBER owner count exceeds resource limit")
+                    raise XlsFormatError(
+                        "XLS NUMBER owner count exceeds resource limit"
+                    )
 
         sheets.append(
             XlsSheet(
@@ -333,10 +341,18 @@ def parse_xls(data: bytes, *, limits: XlsLimits | None = None) -> ParsedXls:
         for record in records
     )
     sheet_parts = tuple(
-        (sheet.name.casefold(), sheet.hidden_state, sheet.sheet_type, sheet.bof_offset, sheet.eof_offset)
+        (
+            sheet.name.casefold(),
+            sheet.hidden_state,
+            sheet.sheet_type,
+            sheet.bof_offset,
+            sheet.eof_offset,
+        )
         for sheet in sheets
     )
-    topology_sha256 = sha256(repr((topology_parts, sheet_parts)).encode("utf-8")).hexdigest()
+    topology_sha256 = sha256(
+        repr((topology_parts, sheet_parts)).encode("utf-8")
+    ).hexdigest()
     return ParsedXls(
         cfb=cfb,
         workbook_stream=workbook_stream,

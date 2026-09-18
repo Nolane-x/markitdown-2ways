@@ -107,7 +107,9 @@ def verify_mp3_candidate(
 
     active_limits = limits or Mp3Limits()
     source = _parse_for_verification(source_bytes, active_limits, label="source")
-    candidate = _parse_for_verification(\n        candidate_bytes, active_limits, label="candidate"\n    )
+    candidate = _parse_for_verification(
+        candidate_bytes, active_limits, label="candidate"
+    )
     spans = _validate_requested_ranges(source, requested_values, requested_ranges)
 
     if (

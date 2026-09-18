@@ -7,10 +7,7 @@ from markitdown.twoways.formats.msg import MsgLimits, read_msg_ir
 from markitdown.twoways.ir.nodes import TextPayload
 from markitdown.twoways.ir.serialization import canonical_json_digest, validate_document
 
-from ._msg_fixtures import (
-    PROPATTR_READABLE,
-    make_msg_cfb,
-)
+from ._msg_fixtures import PROPATTR_READABLE, make_msg_cfb
 
 
 def _subject_node(document):

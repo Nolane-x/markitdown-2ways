@@ -308,7 +308,16 @@ def read_youtube_snapshot_ir(
     transcript_digest: str | None = None
     transcript_size = 0
     if transcript is not None:
-        raise ValueError("explicit transcript snapshots are not implemented yet")
+        if not isinstance(transcript, YouTubeTranscriptSnapshot):
+            raise TypeError("transcript must be a YouTubeTranscriptSnapshot")
+        if transcript.video_id != video_id:
+            raise ValueError("transcript video ID does not match YouTube page authority")
+        transcript_text = " ".join(transcript.parts)
+        transcript_bytes = transcript_text.encode("utf-8")
+        transcript_size = len(transcript_bytes)
+        if transcript_size > active_limits.max_transcript_utf8_bytes:
+            raise ValueError("transcript exceeds max_transcript_utf8_bytes")
+        transcript_digest = sha256(transcript_bytes).hexdigest()
 
     title, markdown = _local_projection(
         html_bytes,
@@ -347,10 +356,14 @@ def read_youtube_snapshot_ir(
         "converter_blob_sha": _YOUTUBE_CONVERTER_BLOB_SHA,
         "markdown_sha256": markdown_digest,
         "markdown_utf8_size_bytes": len(markdown_bytes),
-        "transcript_provided": False,
+        "transcript_provided": transcript is not None,
         "network_performed_by_twoways": False,
     }
-    if transcript_digest is not None:
+    if transcript is not None and transcript_digest is not None:
+        evidence["transcript_video_id"] = transcript.video_id
+        evidence["transcript_language_code"] = transcript.language_code
+        evidence["transcript_provider"] = transcript.provider
+        evidence["transcript_part_count"] = len(transcript.parts)
         evidence["transcript_sha256"] = transcript_digest
         evidence["transcript_utf8_size_bytes"] = transcript_size
     if stream_info.filename is not None:
@@ -376,7 +389,8 @@ def read_youtube_snapshot_ir(
                     "html_sha256": html_digest,
                     "video_id": video_id,
                     "markdown_sha256": markdown_digest,
-                    "transcript_provided": False,
+                    "transcript_provided": transcript is not None,
+                    "transcript_sha256": transcript_digest,
                     "remote_writeback": False,
                 },
             ),
@@ -429,7 +443,7 @@ def read_youtube_snapshot_ir(
                 details={
                     "uri": uri,
                     "video_id": video_id,
-                    "transcript_provided": False,
+                    "transcript_provided": transcript is not None,
                     "remote_writeback": False,
                 },
             ),

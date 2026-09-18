@@ -11,7 +11,12 @@ from markitdown.twoways import (
     read_document_intelligence_analysis_ir,
 )
 
-from .test_document_intelligence_reader import ANALYSIS_CONTENT, SOURCE, _analysis, _info
+from .test_document_intelligence_reader import (
+    ANALYSIS_CONTENT,
+    SOURCE,
+    _analysis,
+    _info,
+)
 
 
 class _BoundedReadProbe(BytesIO):
@@ -117,9 +122,7 @@ def test_source_limit_accepts_exact_boundary_and_rejects_one_over() -> None:
             BytesIO(SOURCE),
             stream_info=_info(),
             analysis=_analysis(),
-            limits=DocumentIntelligenceDerivedLimits(
-                max_source_bytes=len(SOURCE) - 1
-            ),
+            limits=DocumentIntelligenceDerivedLimits(max_source_bytes=len(SOURCE) - 1),
         )
 
 
@@ -150,9 +153,7 @@ def test_analysis_limit_accepts_exact_boundary_and_rejects_one_over() -> None:
             BytesIO(SOURCE),
             stream_info=_info(),
             analysis=_analysis(),
-            limits=DocumentIntelligenceDerivedLimits(
-                max_analysis_utf8_bytes=size - 1
-            ),
+            limits=DocumentIntelligenceDerivedLimits(max_analysis_utf8_bytes=size - 1),
         )
 
 
@@ -172,9 +173,7 @@ def test_markdown_limit_accepts_exact_boundary_and_rejects_one_over() -> None:
             BytesIO(SOURCE),
             stream_info=_info(),
             analysis=_analysis(),
-            limits=DocumentIntelligenceDerivedLimits(
-                max_markdown_utf8_bytes=size - 1
-            ),
+            limits=DocumentIntelligenceDerivedLimits(max_markdown_utf8_bytes=size - 1),
         )
 
 

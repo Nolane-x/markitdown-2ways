@@ -10,7 +10,13 @@ from markitdown.twoways import (
     read_pdf_converter_snapshot_ir,
 )
 
-from .test_pdf_converter_snapshot_reader import EXPECTED, INFO, RAW_TEXT, SOURCE, _snapshot
+from .test_pdf_converter_snapshot_reader import (
+    EXPECTED,
+    INFO,
+    RAW_TEXT,
+    SOURCE,
+    _snapshot,
+)
 
 
 class _BoundedReadProbe(BytesIO):

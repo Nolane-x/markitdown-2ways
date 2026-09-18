@@ -8,7 +8,6 @@ import re
 from typing import BinaryIO
 from urllib.parse import parse_qs, unquote, urlparse, urlsplit
 
-import bs4
 
 from ..._stream_info import StreamInfo
 from ..capabilities import (
@@ -213,6 +212,8 @@ def _local_projection(
     transcript_text: str | None,
 ) -> tuple[str, str]:
     encoding = "utf-8" if stream_info.charset is None else stream_info.charset
+    import bs4
+
     soup = bs4.BeautifulSoup(
         BytesIO(source_bytes),
         "html.parser",

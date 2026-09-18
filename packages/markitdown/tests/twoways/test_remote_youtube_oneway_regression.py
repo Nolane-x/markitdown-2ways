@@ -19,7 +19,7 @@ def test_existing_youtube_converter_blob_is_unchanged() -> None:
     assert path.is_file()
     data = path.read_bytes()
     git_blob = sha1(
-        b"blob " + str(len(data)).encode("ascii") + b"\\0" + data
+        b"blob " + str(len(data)).encode("ascii") + b"\0" + data
     ).hexdigest()
     assert git_blob == EXPECTED_CONVERTER_BLOB
 

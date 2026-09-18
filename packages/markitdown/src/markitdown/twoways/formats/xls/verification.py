@@ -5,7 +5,13 @@ from collections.abc import Mapping, Sequence
 from ..._errors import RoundTripVerificationError
 from .biff import parse_xls
 from .limits import XlsLimits
-from .model import CfbPhysicalRange, CfbStream, ParsedXls, XlsFormatError, XlsNumberOwner
+from .model import (
+    CfbPhysicalRange,
+    CfbStream,
+    ParsedXls,
+    XlsFormatError,
+    XlsNumberOwner,
+)
 
 _NUMBER = 0x0203
 

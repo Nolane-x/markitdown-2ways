@@ -51,7 +51,9 @@ def test_olefile_confirms_subject_and_non_subject_stream_preservation() -> None:
         assert before.openstream(PROPERTIES_STREAM).read() == after.openstream(
             PROPERTIES_STREAM
         ).read()
-        assert after.openstream(SUBJECT_STREAM).read() == "Bravo".encode("utf-16-le")
+        assert after.openstream(SUBJECT_STREAM).read() == "Bravo".encode(
+            "utf-16-le"
+        )
 
         for path in before_paths:
             if path == [SUBJECT_STREAM]:

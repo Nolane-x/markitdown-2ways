@@ -41,10 +41,7 @@ class _BoundedReadProbe(BytesIO):
         ("materialization_id", ""),
     ),
 )
-def test_sheet_snapshot_descriptors_reject_blank_values(
-    field: str,
-    value: str,
-) -> None:
+def test_sheet_snapshot_descriptors_reject_blank_values(field: str, value: str) -> None:
     values = {"name": "Sheet1", "markdown": "value", "materialization_id": "id-1"}
     values[field] = value
     with pytest.raises(ValueError, match=field):
@@ -67,8 +64,7 @@ def test_sheet_snapshot_rejects_non_string_markdown() -> None:
     ),
 )
 def test_workbook_snapshot_descriptors_reject_blank_values(
-    field: str,
-    value: str,
+    field: str, value: str
 ) -> None:
     values = {
         "sheets": SHEETS,

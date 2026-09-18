@@ -31,11 +31,19 @@ __all__ = [
     "XlsNumberOwner",
     "XlsSheet",
     "XlsIRReader",
+    "XlsPatchWriter",
     "logical_slice_ranges",
     "parse_cfb",
     "parse_xls",
+    "patch_xls",
     "read_xls_ir",
 ]
+
+
+def patch_xls(*args: Any, **kwargs: Any):
+    from .writer import patch_xls as implementation
+
+    return implementation(*args, **kwargs)
 
 
 def read_xls_ir(*args: Any, **kwargs: Any):
@@ -49,5 +57,9 @@ def __getattr__(name: str):
         from .reader import XlsIRReader
 
         return XlsIRReader
+    if name == "XlsPatchWriter":
+        from .writer import XlsPatchWriter
+
+        return XlsPatchWriter
     raise AttributeError(name)
 

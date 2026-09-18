@@ -156,7 +156,9 @@ H16 requires:
 - entry count within resource limits;
 - exactly one entry with property tag `0x0037001F`;
 - its `Size` field equals `subject_stream_size + 2`;
-- reserved/flags bytes are preserved exactly and treated as immutable;
+- the subject property's Flags field has both `PROPATTR_READABLE (0x00000002)` and `PROPATTR_WRITABLE (0x00000004)` set;
+- the `PidTagStoreSupportMask` entry has `PROPATTR_READABLE (0x00000002)` set;
+- all flags/reserved bytes are preserved exactly and treated as immutable;
 - no duplicate `0x0037001F` entry;
 - no `0x0037001E` subject entry;
 - exactly one `0x340D0003` `PidTagStoreSupportMask` fixed property entry with `STORE_UNICODE_OK (0x00040000)` set;
@@ -336,6 +338,7 @@ Representative reason codes include:
 - `msg.subject.invalid_utf16`;
 - `msg.subject.embedded_nul`;
 - `msg.subject.size_mismatch`;
+- `msg.subject.property_not_writable`;
 - `msg.subject.value_size_change`;
 - `msg.subject.stale_owner`;
 - `msg.subject.competing_semantics`;
@@ -387,6 +390,7 @@ It must reject or remain read-only for:
 - directory topology ambiguity;
 - subject stream aliasing any structural or non-subject stream bytes;
 - contradictory property-entry size;
+- subject property without required readable/writable flags or StoreSupportMask without readable authority;
 - duplicate Unicode subject property entries;
 - missing/duplicate `PidTagStoreSupportMask` or missing `STORE_UNICODE_OK` authority;
 - simultaneous/competing ANSI subject authority;
@@ -420,6 +424,7 @@ H16 is complete only after all of the following are true:
   - exact `0x0037001F` subject owner;
   - declared `Size = stream_size + 2`;
   - exact `PidTagStoreSupportMask` / `STORE_UNICODE_OK` authority;
+  - subject readable/writable flags and readable StoreSupportMask authority;
   - duplicate/missing/ANSI/competing subject authority;
   - explicit `PidTagSubjectPrefix` / `PidTagNormalizedSubject` blockers;
   - strict UTF-16LE;

@@ -112,6 +112,7 @@ Require:
 - 32-byte header plus 16-byte entries;
 - unique `0x0037001F` entry;
 - unique `0x340D0003` store-support entry with `STORE_UNICODE_OK`;
+- subject flags include `PROPATTR_READABLE|PROPATTR_WRITABLE` and StoreSupportMask flags include `PROPATTR_READABLE`;
 - subject entry declared size = stream size + 2;
 - strict UTF-16LE subject decode;
 - no embedded NUL/unpaired surrogate;
@@ -119,7 +120,7 @@ Require:
 
 - [ ] **Step 2: Add blocker RED tests**
 
-Cover missing/duplicate Unicode subject, ANSI `0x0037001E`, missing/duplicate store-support mask, missing Unicode bit, subject-prefix tags `0x003D001F/001E`, normalized-subject tags `0x0E1D001F/001E`, property-size mismatch, duplicate top-level subject stream, and malformed property stream cardinality.
+Cover missing/duplicate Unicode subject, ANSI `0x0037001E`, missing/duplicate store-support mask, missing Unicode bit, missing subject readable/writable flags, unreadable StoreSupportMask, subject-prefix tags `0x003D001F/001E`, normalized-subject tags `0x0E1D001F/001E`, property-size mismatch, duplicate top-level subject stream, and malformed property stream cardinality.
 
 - [ ] **Step 3: Run RED and record exact failure**
 

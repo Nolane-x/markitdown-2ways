@@ -175,9 +175,7 @@ def make_cfb_with_streams(
         start = next_mini
         for index in range(count):
             current = start + index
-            minifat_entries[current] = (
-                current + 1 if index + 1 < count else ENDOFCHAIN
-            )
+            minifat_entries[current] = current + 1 if index + 1 < count else ENDOFCHAIN
         offset = start * 64
         mini_stream[offset : offset + len(data)] = data
         physical.setdefault(name, root_physical_start + offset)

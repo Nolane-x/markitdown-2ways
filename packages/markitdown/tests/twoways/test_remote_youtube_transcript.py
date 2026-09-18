@@ -40,9 +40,7 @@ def test_explicit_transcript_is_joined_and_bound_independently() -> None:
     transcript_bytes = transcript_text.encode("utf-8")
     evidence = document.metadata.custom["twoways.youtube_snapshot.v1"]
 
-    assert node.payload.text.endswith(
-        "\n### Transcript\nHello from the transcript.\n"
-    )
+    assert node.payload.text.endswith("\n### Transcript\nHello from the transcript.\n")
     assert evidence["transcript_provided"] is True
     assert evidence["transcript_video_id"] == VIDEO_ID
     assert evidence["transcript_language_code"] == "en"
@@ -73,10 +71,7 @@ def test_transcript_video_id_must_match_page_authority() -> None:
         ("provider", "   "),
     ),
 )
-def test_transcript_rejects_empty_authority_fields(
-    field: str,
-    value: str,
-) -> None:
+def test_transcript_rejects_empty_authority_fields(field: str, value: str) -> None:
     with pytest.raises(ValueError, match="non-empty"):
         _transcript(**{field: value})
 
@@ -100,9 +95,7 @@ def test_transcript_limit_accepts_exact_boundary_and_rejects_one_over() -> None:
         BytesIO(HTML_SNAPSHOT),
         stream_info=_info(),
         transcript=transcript,
-        limits=YouTubeDerivedLimits(
-            max_transcript_utf8_bytes=transcript_size,
-        ),
+        limits=YouTubeDerivedLimits(max_transcript_utf8_bytes=transcript_size),
     )
     assert exact.root_node_ids
 
@@ -111,9 +104,7 @@ def test_transcript_limit_accepts_exact_boundary_and_rejects_one_over() -> None:
             BytesIO(HTML_SNAPSHOT),
             stream_info=_info(),
             transcript=transcript,
-            limits=YouTubeDerivedLimits(
-                max_transcript_utf8_bytes=transcript_size - 1,
-            ),
+            limits=YouTubeDerivedLimits(max_transcript_utf8_bytes=transcript_size - 1),
         )
 
 

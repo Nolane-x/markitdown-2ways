@@ -16,6 +16,11 @@ from .image import (
     ImageMetadataSnapshot,
     read_image_snapshot_ir,
 )
+from .outlook_msg import (
+    OutlookMsgConverterSnapshot,
+    OutlookMsgDerivedLimits,
+    read_outlook_msg_snapshot_ir,
+)
 from .remote import (
     RemoteDerivedLimits,
     read_bing_serp_snapshot_ir,
@@ -39,6 +44,8 @@ __all__ = [
     "ImageDescriptionSnapshot",
     "ImageDerivedLimits",
     "ImageMetadataSnapshot",
+    "OutlookMsgConverterSnapshot",
+    "OutlookMsgDerivedLimits",
     "RemoteDerivedLimits",
     "YouTubeDerivedLimits",
     "YouTubeTranscriptSnapshot",
@@ -47,6 +54,7 @@ __all__ = [
     "read_content_understanding_analysis_ir",
     "read_document_intelligence_analysis_ir",
     "read_image_snapshot_ir",
+    "read_outlook_msg_snapshot_ir",
     "read_remote_feed_snapshot_ir",
     "read_wikipedia_snapshot_ir",
     "read_youtube_snapshot_ir",

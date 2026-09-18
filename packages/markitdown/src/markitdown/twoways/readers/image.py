@@ -154,9 +154,7 @@ def _description_content_type(stream_info: StreamInfo) -> str:
     if stream_info.mimetype:
         return stream_info.mimetype
 
-    content_type, _ = mimetypes.guess_type(
-        "_dummy" + (stream_info.extension or "")
-    )
+    content_type, _ = mimetypes.guess_type("_dummy" + (stream_info.extension or ""))
     if not content_type:
         return "application/octet-stream"
     return content_type
@@ -238,9 +236,7 @@ def read_image_snapshot_ir(
     if description is not None and not isinstance(
         description, ImageDescriptionSnapshot
     ):
-        raise TypeError(
-            "description must be an ImageDescriptionSnapshot when provided"
-        )
+        raise TypeError("description must be an ImageDescriptionSnapshot when provided")
 
     accepted_by = _accepted_by(stream_info)
     if accepted_by is None:
@@ -267,9 +263,7 @@ def read_image_snapshot_ir(
     if description is not None:
         description_bytes = description.content.encode("utf-8")
         if len(description_bytes) > active_limits.max_description_utf8_bytes:
-            raise ValueError(
-                "description snapshot exceeds max_description_utf8_bytes"
-            )
+            raise ValueError("description snapshot exceeds max_description_utf8_bytes")
 
         description_content_type = _description_content_type(stream_info)
         if description.content_type != description_content_type:
@@ -307,14 +301,18 @@ def read_image_snapshot_ir(
             accepted_by,
             "metadata-present" if metadata is not None else "metadata-absent",
             metadata.provider if metadata is not None else "",
-            metadata.materialization_id if metadata is not None and metadata.materialization_id else "",
+            metadata.materialization_id
+            if metadata is not None and metadata.materialization_id
+            else "",
             metadata_digest,
             "description-present" if description is not None else "description-absent",
             description.provider if description is not None else "",
             description.model if description is not None else "",
             effective_prompt or "",
             description_content_type or "",
-            description.materialization_id if description is not None and description.materialization_id else "",
+            description.materialization_id
+            if description is not None and description.materialization_id
+            else "",
             description_digest,
             description_output_digest,
             markdown_digest,
@@ -360,15 +358,11 @@ def read_image_snapshot_ir(
                 "description_raw_sha256": description_digest,
                 "description_raw_utf8_size_bytes": len(description_bytes),
                 "description_output_sha256": description_output_digest,
-                "description_output_utf8_size_bytes": len(
-                    description_output_bytes
-                ),
+                "description_output_utf8_size_bytes": len(description_output_bytes),
             }
         )
         if description.materialization_id is not None:
-            evidence["description_materialization_id"] = (
-                description.materialization_id
-            )
+            evidence["description_materialization_id"] = description.materialization_id
     if stream_info.filename is not None:
         evidence["filename"] = stream_info.filename
     if stream_info.mimetype is not None:

@@ -179,14 +179,17 @@ def test_source_metadata_and_description_are_independent_identity_authorities() 
         ),
     )
 
-    assert len(
-        {
-            baseline.document_id,
-            source_changed.document_id,
-            metadata_changed.document_id,
-            description_changed.document_id,
-        }
-    ) == 4
+    assert (
+        len(
+            {
+                baseline.document_id,
+                source_changed.document_id,
+                metadata_changed.document_id,
+                description_changed.document_id,
+            }
+        )
+        == 4
+    )
     assert baseline.source is not None
     assert source_changed.source is not None
     assert metadata_changed.source is not None

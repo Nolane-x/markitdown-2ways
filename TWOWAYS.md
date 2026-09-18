@@ -22,8 +22,10 @@ bounded existing MP3 ID3v1/ID3v1.1 `Title`/`Artist`/`Album` fixed-slot text muta
 bounded existing Outlook MSG Unicode `PidTagSubject` exact-size stream mutation,
 bounded existing legacy XLS BIFF8 `Number` Xnum fixed-slot mutation, and read-only
 Wikipedia, Bing SERP, remote RSS/Atom and YouTube multi-input derived-snapshot parity,
-plus caller-materialized Azure Document Intelligence and Content Understanding analysis
-with explicit no-writeback provenance while local feed XML remains under native H4 XML
+plus caller-materialized Azure Document Intelligence and Content Understanding analysis,
+AudioConverter materialized output, ImageConverter metadata/caption materializations,
+Outlook MSG semantic materialization, and PdfConverter extraction materialization with
+explicit no-writeback provenance while local feed XML remains under native H4 XML
 authority. It is
 not an Office automation platform, workflow engine, document-management service, browser
 automation layer, archive authoring suite, or general application framework.

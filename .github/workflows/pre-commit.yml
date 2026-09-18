@@ -16,13 +16,5 @@ jobs:
           pip install pre-commit
           pre-commit install --install-hooks
 
-      - name: Diagnose exact Black rewrite
-        shell: bash
-        run: |
-          set +e
-          pre-commit run --all-files
-          rc=$?
-          echo "=== H21_BLACK_DIFF_BEGIN ==="
-          git diff -- packages/markitdown/tests/twoways/test_remote_youtube_reader.py
-          echo "=== H21_BLACK_DIFF_END ==="
-          exit $rc
+      - name: Run pre-commit
+        run: pre-commit run --all-files

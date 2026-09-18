@@ -106,10 +106,7 @@ class _BoundedReadProbe(BytesIO):
 
 
 def test_youtube_source_capture_never_uses_unbounded_read() -> None:
-    probe = _BoundedReadProbe(
-        HTML_SNAPSHOT,
-        maximum_request=64 * 1024,
-    )
+    probe = _BoundedReadProbe(HTML_SNAPSHOT, maximum_request=64 * 1024)
 
     read_youtube_snapshot_ir(
         probe,
@@ -166,7 +163,9 @@ def test_uppercase_owned_host_is_accepted_without_weakening_authority() -> None:
     )
     assert document.source is not None
     assert document.source.uri == url
-    assert document.metadata.custom["twoways.youtube_snapshot.v1"]["video_id"] == VIDEO_ID
+    assert (
+        document.metadata.custom["twoways.youtube_snapshot.v1"]["video_id"] == VIDEO_ID
+    )
 
 
 def test_escaped_current_converter_url_shape_is_supported() -> None:

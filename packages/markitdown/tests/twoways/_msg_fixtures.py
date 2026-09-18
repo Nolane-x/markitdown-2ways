@@ -98,12 +98,13 @@ def make_cfb(
     struct.pack_into("<109I", header, 76, *difat)
 
     directory = bytearray(sector_size)
+    root_stream_size = 192 if duplicate_subject_name else 128
     root = _directory_entry(
         "Root Entry",
         object_type=5,
         child=1,
         start_sector=2,
-        stream_size=128,
+        stream_size=root_stream_size,
     )
     props = _directory_entry(
         PROPERTIES_STREAM,
@@ -128,7 +129,7 @@ def make_cfb(
         directory[384:512] = _directory_entry(
             SUBJECT_STREAM,
             object_type=2,
-            start_sector=1,
+            start_sector=2,
             stream_size=len(subject),
         )
 
@@ -136,6 +137,7 @@ def make_cfb(
     minifat_entries = [FREESECT] * (sector_size // 4)
     minifat_entries[0] = ENDOFCHAIN
     minifat_entries[1] = 1 if mini_cycle else ENDOFCHAIN
+    minifat_entries[2] = ENDOFCHAIN
     struct.pack_into(
         f"<{len(minifat_entries)}I",
         minifat,
@@ -146,6 +148,8 @@ def make_cfb(
     mini_stream = bytearray(sector_size)
     mini_stream[0 : len(properties)] = properties
     mini_stream[64 : 64 + len(subject)] = subject
+    if duplicate_subject_name:
+        mini_stream[128 : 128 + len(subject)] = subject
 
     fat = bytearray(sector_size)
     fat_entries = [FREESECT] * (sector_size // 4)

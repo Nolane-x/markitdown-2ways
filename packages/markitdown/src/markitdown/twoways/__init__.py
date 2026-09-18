@@ -85,6 +85,7 @@ from .readers import (
     DocumentIRReader,
     RemoteDerivedLimits,
     read_bing_serp_snapshot_ir,
+    read_remote_feed_snapshot_ir,
     read_wikipedia_snapshot_ir,
 )
 from .writers import DocumentWriter, TargetInfo
@@ -148,6 +149,7 @@ __all__ = [
     "capabilities_for_node",
     "read_markdown_ir",
     "read_bing_serp_snapshot_ir",
+    "read_remote_feed_snapshot_ir",
     "read_wikipedia_snapshot_ir",
     "projection_manifest_digest",
     "projection_manifest_bytes",

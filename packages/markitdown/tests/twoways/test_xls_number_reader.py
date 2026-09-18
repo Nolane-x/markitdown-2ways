@@ -40,9 +40,10 @@ def test_reader_projects_number_cells_with_native_authority() -> None:
     assert target.metadata["xls.native_record_kind"] == "NUMBER"
     assert target.metadata["xls.xf_index"] == 7
     assert target.metadata["xls.writable"] is True
-    assert sum(
-        item["length"] for item in target.metadata["xls.value_physical_ranges"]
-    ) == 8
+    assert (
+        sum(item["length"] for item in target.metadata["xls.value_physical_ranges"])
+        == 8
+    )
 
     decision = capabilities_for_node(node).for_operation("update_sheet_cells")
     assert decision.state is CapabilityState.WRITABLE

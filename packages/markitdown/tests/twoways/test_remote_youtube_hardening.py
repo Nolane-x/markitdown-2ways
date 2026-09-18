@@ -34,9 +34,7 @@ from .test_remote_youtube_reader import HTML_SNAPSHOT, VIDEO_ID, WATCH_URL, _inf
         "https://youtu.be/",
     ),
 )
-def test_youtube_reader_rejects_invalid_or_non_owned_origins(
-    url: str | None,
-) -> None:
+def test_youtube_reader_rejects_invalid_or_non_owned_origins(url: str | None) -> None:
     with pytest.raises(ValueError):
         read_youtube_snapshot_ir(
             BytesIO(HTML_SNAPSHOT),
@@ -176,7 +174,9 @@ def test_escaped_current_converter_url_shape_is_supported() -> None:
     )
     assert document.source is not None
     assert document.source.uri == url
-    assert document.metadata.custom["twoways.youtube_snapshot.v1"]["video_id"] == VIDEO_ID
+    assert (
+        document.metadata.custom["twoways.youtube_snapshot.v1"]["video_id"] == VIDEO_ID
+    )
 
 
 def test_http_remains_in_current_h21_frozen_boundary() -> None:

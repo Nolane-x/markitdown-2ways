@@ -1,6 +1,7 @@
 from .cfb import parse_cfb
 from .limits import MsgLimits
 from .parser import parse_msg
+from .reader import MsgIRReader, read_msg_ir
 from .model import (
     CfbDirectoryEntry,
     CfbHeader,
@@ -19,6 +20,7 @@ __all__ = [
     "CfbPhysicalRange",
     "CfbStream",
     "MsgFormatError",
+    "MsgIRReader",
     "MsgLimits",
     "MsgPropertyEntry",
     "MsgSubjectOwner",
@@ -26,4 +28,5 @@ __all__ = [
     "ParsedMsg",
     "parse_cfb",
     "parse_msg",
+    "read_msg_ir",
 ]

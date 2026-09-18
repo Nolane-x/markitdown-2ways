@@ -62,4 +62,3 @@ def __getattr__(name: str):
 
         return XlsPatchWriter
     raise AttributeError(name)
-

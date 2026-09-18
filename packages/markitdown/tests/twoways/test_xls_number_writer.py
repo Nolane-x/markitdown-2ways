@@ -87,9 +87,7 @@ def test_number_value_replacement_changes_only_native_eight_byte_slot() -> None:
 
 
 def test_multiple_disjoint_number_updates_are_transactional() -> None:
-    source = make_xls_cfb(
-        values=((0, 0, 1.5, 0), (0, 1, 2.5, 0))
-    ).data
+    source = make_xls_cfb(values=((0, 0, 1.5, 0), (0, 1, 2.5, 0))).data
     document = read_xls_ir(BytesIO(source), filename="legacy.xls")
     node = _sheet_node(document)
     edit = EditOperation(

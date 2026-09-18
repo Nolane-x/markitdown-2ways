@@ -70,9 +70,7 @@ def test_full_snapshot_reconstructs_exact_one_way_projection_and_title() -> None
     assert document.source.size_bytes == len(SOURCE)
     assert document.metadata.title == "Quarterly update"
 
-    evidence = document.metadata.custom[
-        "twoways.outlook_msg_converter_snapshot.v1"
-    ]
+    evidence = document.metadata.custom["twoways.outlook_msg_converter_snapshot.v1"]
     assert evidence["accepted_by"] == "extension"
     assert evidence["provider"] == "offline-msg-materializer"
     assert evidence["materialization_id"] == "msg-001"
@@ -98,9 +96,7 @@ def test_falsey_fields_follow_one_way_truthiness_and_final_strip() -> None:
     )
 
     assert _root(document).payload.text == (
-        "# Email Message\n\n"
-        "**Subject:** Only subject\n"
-        "\n## Content"
+        "# Email Message\n\n" "**Subject:** Only subject\n" "\n## Content"
     )
     assert document.metadata.title == "Only subject"
 
@@ -170,14 +166,17 @@ def test_source_headers_and_body_are_independent_identity_authorities() -> None:
         ),
     )
 
-    assert len(
-        {
-            baseline.document_id,
-            changed_source.document_id,
-            changed_subject.document_id,
-            changed_body.document_id,
-        }
-    ) == 4
+    assert (
+        len(
+            {
+                baseline.document_id,
+                changed_source.document_id,
+                changed_subject.document_id,
+                changed_body.document_id,
+            }
+        )
+        == 4
+    )
 
 
 def test_repeated_reads_and_canonical_round_trip_are_deterministic() -> None:
@@ -215,9 +214,7 @@ def test_explicit_one_way_acceptance_surface(
         stream_info=info,
         snapshot=OutlookMsgConverterSnapshot(provider="fixture"),
     )
-    evidence = document.metadata.custom[
-        "twoways.outlook_msg_converter_snapshot.v1"
-    ]
+    evidence = document.metadata.custom["twoways.outlook_msg_converter_snapshot.v1"]
     assert evidence["accepted_by"] == accepted_by
 
 

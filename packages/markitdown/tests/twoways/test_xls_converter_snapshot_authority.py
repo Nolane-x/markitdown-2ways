@@ -11,7 +11,13 @@ from markitdown.twoways import (
     read_xls_converter_snapshot_ir,
 )
 
-from .test_xls_converter_snapshot_reader import EXPECTED, INFO, SHEETS, SOURCE, _snapshot
+from .test_xls_converter_snapshot_reader import (
+    EXPECTED,
+    INFO,
+    SHEETS,
+    SOURCE,
+    _snapshot,
+)
 
 
 class _BoundedReadProbe(BytesIO):

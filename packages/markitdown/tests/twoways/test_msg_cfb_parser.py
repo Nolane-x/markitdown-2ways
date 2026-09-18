@@ -30,9 +30,7 @@ def test_parses_v3_and_v4_cfb_with_minifat_streams(major_version: int) -> None:
     assert subject.logical_bytes == fixture.subject_bytes
     assert properties.chain_kind == "mini"
     assert subject.chain_kind == "mini"
-    assert sum(r.length for r in subject.physical_ranges) == len(
-        fixture.subject_bytes
-    )
+    assert sum(r.length for r in subject.physical_ranges) == len(fixture.subject_bytes)
     assert subject.physical_ranges[0].start == fixture.subject_physical_start
 
 

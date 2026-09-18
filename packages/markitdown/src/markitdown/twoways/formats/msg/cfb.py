@@ -167,9 +167,7 @@ def _read_ministream(
     if stream_size > limits.max_stream_bytes:
         raise MsgFormatError(f"CFB {label} stream exceeds resource limit")
 
-    mini_sector_count = (
-        len(root_bytes) + mini_sector_size - 1
-    ) // mini_sector_size
+    mini_sector_count = (len(root_bytes) + mini_sector_size - 1) // mini_sector_size
     chain: list[int] = []
     seen: set[int] = set()
     mini_sector = start_mini_sector
@@ -193,9 +191,7 @@ def _read_ministream(
             raise MsgFormatError(f"CFB MiniFAT {label} chain uses invalid marker")
         mini_sector = next_sector
 
-    expected_sectors = (
-        stream_size + mini_sector_size - 1
-    ) // mini_sector_size
+    expected_sectors = (stream_size + mini_sector_size - 1) // mini_sector_size
     if len(chain) != expected_sectors:
         raise MsgFormatError(f"CFB MiniFAT {label} chain size mismatch")
 
@@ -214,8 +210,8 @@ def _read_ministream(
         if logical_start + take > len(root_bytes):
             raise MsgFormatError(f"CFB MiniFAT {label} range is truncated")
         absolute_start = (
-            (root_chain[root_sector_index] + 1) * sector_size + within_sector
-        )
+            root_chain[root_sector_index] + 1
+        ) * sector_size + within_sector
         chunks.append(root_bytes[logical_start : logical_start + take])
         ranges.append(CfbPhysicalRange(start=absolute_start, length=take))
         remaining -= take
@@ -244,7 +240,9 @@ def _parse_directory_entry(
         try:
             name = name_raw.decode("utf-16-le", errors="strict")
         except UnicodeDecodeError as exc:
-            raise MsgFormatError("CFB directory entry name is invalid UTF-16LE") from exc
+            raise MsgFormatError(
+                "CFB directory entry name is invalid UTF-16LE"
+            ) from exc
         if "\x00" in name:
             raise MsgFormatError("CFB directory entry name contains embedded NUL")
     if object_type not in {0, 1, 2, 5}:
@@ -304,8 +302,7 @@ def _assign_directory_parents(
             raise MsgFormatError("CFB directory contains unreachable allocated entry")
 
     return tuple(
-        replace(entry, parent_id=parents.get(entry.directory_id))
-        for entry in entries
+        replace(entry, parent_id=parents.get(entry.directory_id)) for entry in entries
     )
 
 
@@ -419,7 +416,10 @@ def parse_cfb(data: bytes, *, limits: MsgLimits | None = None) -> ParsedCfb:
         raise MsgFormatError("CFB version 3 directory-sector count must be zero")
     if mini_stream_cutoff != 0x1000:
         raise MsgFormatError("CFB mini stream cutoff is unsupported")
-    if number_of_fat_sectors <= 0 or number_of_fat_sectors > active_limits.max_fat_sectors:
+    if (
+        number_of_fat_sectors <= 0
+        or number_of_fat_sectors > active_limits.max_fat_sectors
+    ):
         raise MsgFormatError("CFB FAT sector count exceeds resource limit")
     if number_of_difat_sectors > active_limits.max_difat_sectors:
         raise MsgFormatError("CFB DIFAT sector count exceeds resource limit")

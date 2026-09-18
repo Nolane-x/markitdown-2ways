@@ -66,9 +66,7 @@ def make_cfb(
 
     properties = properties_bytes if properties_bytes is not None else b"P" * 64
     subject = (
-        subject_bytes
-        if subject_bytes is not None
-        else "Alpha".encode("utf-16-le")
+        subject_bytes if subject_bytes is not None else "Alpha".encode("utf-16-le")
     )
     if len(properties) > 64 or len(subject) > 64:
         raise ValueError("Task-1 fixture keeps both streams in one mini sector")

@@ -1,0 +1,35 @@
+name: h26-black-diagnostic
+
+on:
+  pull_request:
+    paths:
+      - "packages/markitdown/src/markitdown/twoways/readers/outlook_msg.py"
+      - "packages/markitdown/tests/twoways/test_outlook_msg_snapshot_*.py"
+      - ".github/workflows/h26-black-diagnostic.yml"
+
+jobs:
+  black-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.12"
+      - run: python -m pip install black==23.7.0
+      - name: Show exact Black rewrite
+        shell: bash
+        run: |
+          black \
+            packages/markitdown/src/markitdown/twoways/readers/outlook_msg.py \
+            packages/markitdown/tests/twoways/test_outlook_msg_snapshot_authority.py \
+            packages/markitdown/tests/twoways/test_outlook_msg_snapshot_oneway_regression.py \
+            packages/markitdown/tests/twoways/test_outlook_msg_snapshot_reader.py
+          echo "----- H26 BLACK DIFF BEGIN -----"
+          git diff -- \
+            packages/markitdown/src/markitdown/twoways/readers/outlook_msg.py \
+            packages/markitdown/tests/twoways/test_outlook_msg_snapshot_authority.py \
+            packages/markitdown/tests/twoways/test_outlook_msg_snapshot_oneway_regression.py \
+            packages/markitdown/tests/twoways/test_outlook_msg_snapshot_reader.py
+          echo "----- H26 BLACK DIFF END -----"

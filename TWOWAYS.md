@@ -21,7 +21,8 @@ existing JPEG Exif IFD0 `ImageDescription`/`Artist` fixed-allocation text mutati
 bounded existing MP3 ID3v1/ID3v1.1 `Title`/`Artist`/`Album` fixed-slot text mutation,
 bounded existing Outlook MSG Unicode `PidTagSubject` exact-size stream mutation,
 bounded existing legacy XLS BIFF8 `Number` Xnum fixed-slot mutation, and read-only
-Wikipedia plus Bing SERP remote-derived snapshot parity with explicit no-writeback provenance. It is
+Wikipedia, Bing SERP and remote RSS/Atom derived-snapshot parity with explicit
+no-writeback provenance while local feed XML remains under native H4 XML authority. It is
 not an Office automation platform, workflow engine, document-management service, browser
 automation layer, archive authoring suite, or general application framework.
 
@@ -1080,6 +1081,61 @@ unchanged. RSS/Atom is intentionally deferred to H20 because local XML authority
 remote-derived feed provenance require a separate contract.
 
 
+## Remote RSS/Atom snapshot parity with local XML separation
+
+Phase H20 extends the v0.9 Class-D source-adapter program to already-materialized remote
+RSS and Atom snapshots. The caller supplies exact feed bytes plus an explicit HTTP/HTTPS
+origin; H20 never dereferences that URL, follows redirects, polls a feed, resolves DNS or
+opens a socket.
+
+```python
+from io import BytesIO
+
+from markitdown._stream_info import StreamInfo
+from markitdown.twoways import (
+    capabilities_for_node,
+    read_remote_feed_snapshot_ir,
+)
+
+snapshot = b"<rss version='2.0'>...</rss>"
+document = read_remote_feed_snapshot_ir(
+    BytesIO(snapshot),
+    stream_info=StreamInfo(
+        url="https://example.com/feed.xml",
+        mimetype="application/rss+xml",
+        extension=".xml",
+        filename="feed.xml",
+        charset="utf-8",
+    ),
+)
+
+node = document.nodes[document.root_node_ids[0]]
+print(node.payload.text)
+print(capabilities_for_node(node).for_operation("replace_text"))
+```
+
+Remote authority is deliberately separate from native XML authority. The same RSS/Atom
+bytes read through H4 `read_xml_ir` remain native XML with lexical locators and the
+existing bounded XML writer where H4 permits mutation. H20 requires an explicit valid
+HTTP/HTTPS origin plus successful ownership and conversion by the existing
+`RssConverter`; a local feed with no URL is rejected by H20 rather than silently
+downgraded to derived content.
+
+The H20 root is `CapabilityState.DERIVED` with reason
+`remote.source.not_native_writable`. Source URI/SHA-256/size, `RssConverter`
+identity/blob and derived Markdown SHA-256/UTF-8 size are persisted in the same
+versioned remote-snapshot evidence envelope used by H18/H19. The node and canvas have no
+native locator, no writer is registered, and there is no remote feed mutation or
+identity-Markdown writeback path.
+
+Both RSS and Atom must match the existing public one-way `MarkItDown.convert_stream`
+title/Markdown semantics exactly. `RemoteDerivedLimits` bounds materialized source and
+derived Markdown bytes, source capture never uses an unbounded read, and malformed
+origins, credential-bearing URLs, generic non-feed XML, malformed feed bytes or budget
+violations fail closed. H20 changes neither H4 XML production files nor
+`_rss_converter.py`; the URL is provenance only, not a fetch instruction.
+
+
 ## PPTX and DOCX round trips
 
 PPTX and DOCX use identity Markdown where the projection/importer can prove a semantic
@@ -1324,6 +1380,8 @@ Current v0.9 execution documents include:
 - `docs/superpowers/plans/2026-09-18-markitdown-2ways-phase-h18-wikipedia-remote-derived-snapshot-parity-implementation.md`
 - `docs/superpowers/specs/2026-09-18-markitdown-2ways-phase-h19-bing-serp-remote-derived-snapshot-parity-design.md`
 - `docs/superpowers/plans/2026-09-18-markitdown-2ways-phase-h19-bing-serp-remote-derived-snapshot-parity-implementation.md`
+- `docs/superpowers/specs/2026-09-18-markitdown-2ways-phase-h20-remote-feed-snapshot-parity-design.md`
+- `docs/superpowers/plans/2026-09-18-markitdown-2ways-phase-h20-remote-feed-snapshot-parity-implementation.md`
 
 Each tranche is complete only after its exact final branch head passes pre-commit plus
 the package and OCR matrices on Python 3.10-3.13. H5 uses a separate recovery-aware
@@ -1349,9 +1407,11 @@ tamper-evident read limits and exact outside-slot preservation. H18 starts v0.9 
 already-materialized Wikipedia snapshot, deterministic derived Markdown/provenance,
 explicit `DERIVED` capability state and no network or remote/native writeback path. H19
 extends that Class-D boundary to already-materialized Bing SERP HTML while still making
-no search request, network call or remote writeback claim. The one-way `ImageConverter`,
-`AudioConverter`, `OutlookMsgConverter`, `XlsConverter`, `WikipediaConverter` and
-`BingSerpConverter` remain unchanged. Annotation structural editing, form structure and non-H11 form controls,
+no search request, network call or remote writeback claim. H20 adds explicit remote
+RSS/Atom snapshot semantics while preserving local feed bytes under H4 native XML
+authority and still performs no fetch/poll/writeback action. The one-way
+`ImageConverter`, `AudioConverter`, `OutlookMsgConverter`, `XlsConverter`,
+`WikipediaConverter`, `BingSerpConverter` and `RssConverter` remain unchanged. Annotation structural editing, form structure and non-H11 form controls,
 appearance-backed forms, non-URI actions, page text/image/content mutation, outlines, new
 metadata keys, further media-native mutation, other archive families, remote writeback
 and archive structural editing remain outside the current completed boundary.

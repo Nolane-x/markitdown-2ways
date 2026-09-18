@@ -413,8 +413,176 @@ def read_bing_serp_snapshot_ir(
     return document
 
 
+def _validate_remote_feed_url(stream_info: StreamInfo) -> str:
+    uri = stream_info.url
+    if not isinstance(uri, str) or not uri.strip():
+        raise ValueError("remote feed snapshot requires stream_info.url")
+    uri = uri.strip()
+    try:
+        parsed = urlsplit(uri)
+        hostname = parsed.hostname
+        username = parsed.username
+        password = parsed.password
+        parsed.port
+    except ValueError as exc:
+        raise ValueError("remote feed snapshot URL is malformed") from exc
+    if parsed.scheme.lower() not in {"http", "https"}:
+        raise ValueError("remote feed snapshot URL must use http or https")
+    if not hostname:
+        raise ValueError("remote feed snapshot URL must contain a host")
+    if username is not None or password is not None:
+        raise ValueError("remote feed snapshot URL must not contain credentials")
+    return uri
+
+
+def read_remote_feed_snapshot_ir(
+    source_stream: BinaryIO,
+    *,
+    stream_info: StreamInfo,
+    limits: RemoteDerivedLimits | None = None,
+) -> DocumentIR:
+    active_limits = limits or RemoteDerivedLimits()
+    uri = _validate_remote_feed_url(stream_info)
+    source_bytes = _capture_source(
+        source_stream,
+        max_bytes=active_limits.max_source_bytes,
+    )
+
+    # Keep the converter lazy so importing markitdown.twoways does not eagerly
+    # load BeautifulSoup/XML dependencies through markitdown.converters.
+    from ...converters._rss_converter import RssConverter
+
+    converter = RssConverter()
+    private_stream = BytesIO(source_bytes)
+    if not converter.accepts(private_stream, stream_info):
+        raise ValueError(
+            "snapshot is not owned by the existing RssConverter "
+            "under the supplied StreamInfo"
+        )
+    try:
+        result = converter.convert(BytesIO(source_bytes), stream_info)
+    except Exception as exc:
+        raise ValueError(
+            "snapshot is not a valid RSS/Atom feed for the existing RssConverter"
+        ) from exc
+
+    markdown = _normalize_one_way_markdown(result.markdown)
+    markdown_bytes = markdown.encode("utf-8")
+    if len(markdown_bytes) > active_limits.max_markdown_utf8_bytes:
+        raise ValueError("derived Markdown exceeds max_markdown_utf8_bytes")
+
+    source_digest = sha256(source_bytes).hexdigest()
+    markdown_digest = sha256(markdown_bytes).hexdigest()
+    identity_seed = "\0".join(
+        (
+            "remote-feed-snapshot",
+            uri,
+            source_digest,
+            markdown_digest,
+            "RssConverter",
+        )
+    )
+    ids = DocumentIdFactory(seed=identity_seed)
+    document_id = ids.new("document")
+    canvas_id = ids.new("canvas")
+    node_id = ids.new("root")
+
+    evidence: dict[str, object] = {
+        "kind": "feed",
+        "uri": uri,
+        "source_sha256": source_digest,
+        "source_size_bytes": len(source_bytes),
+        "converter": "RssConverter",
+        "converter_blob_sha": "6b7b1201062208f7e24695b388bc4c3baabbb229",
+        "markdown_sha256": markdown_digest,
+        "markdown_utf8_size_bytes": len(markdown_bytes),
+        "network_performed_by_twoways": False,
+    }
+    if stream_info.filename is not None:
+        evidence["filename"] = stream_info.filename
+    if stream_info.mimetype is not None:
+        evidence["mimetype"] = stream_info.mimetype
+    if stream_info.charset is not None:
+        evidence["charset"] = stream_info.charset
+
+    node = Node(
+        node_id=node_id,
+        kind="text",
+        semantic_role="derived_document",
+        order=0,
+        canvas_id=canvas_id,
+        provenance=(
+            Provenance(
+                source_format="remote-feed-snapshot",
+                canvas_index=0,
+                extraction_method="RssConverter",
+                metadata={
+                    "uri": uri,
+                    "source_sha256": source_digest,
+                    "markdown_sha256": markdown_digest,
+                    "remote_writeback": False,
+                },
+            ),
+        ),
+        native_locator=None,
+        payload=TextPayload(text=markdown),
+        metadata={
+            CAPABILITY_METADATA_KEY: _derived_capability(),
+            "twoways.remote_snapshot.kind": "feed",
+            "twoways.remote_snapshot.markdown_sha256": markdown_digest,
+        },
+    )
+
+    document = DocumentIR(
+        document_id=document_id,
+        source=SourceDescriptor(
+            format="remote-feed-snapshot",
+            filename=stream_info.filename,
+            mimetype=stream_info.mimetype,
+            uri=uri,
+            sha256=source_digest,
+            size_bytes=len(source_bytes),
+        ),
+        metadata=DocumentMetadata(
+            title=result.title,
+            custom={_REMOTE_EVIDENCE_KEY: evidence},
+        ),
+        canvases=(
+            Canvas(
+                canvas_id=canvas_id,
+                index=0,
+                kind="remote-derived",
+                name=result.title or stream_info.filename,
+                root_node_ids=(node_id,),
+                native_locator=None,
+            ),
+        ),
+        nodes={node_id: node},
+        root_node_ids=(node_id,),
+        diagnostics=(
+            Diagnostic(
+                code="remote.source.not_native_writable",
+                severity="info",
+                message=(
+                    "Visible Markdown is derived from a materialized remote "
+                    "RSS/Atom feed snapshot and has no H20 remote writeback authority."
+                ),
+                node_id=node_id,
+                canvas_id=canvas_id,
+                details={
+                    "uri": uri,
+                    "remote_writeback": False,
+                },
+            ),
+        ),
+    )
+    validate_document(document)
+    return document
+
+
 __all__ = [
     "RemoteDerivedLimits",
     "read_bing_serp_snapshot_ir",
+    "read_remote_feed_snapshot_ir",
     "read_wikipedia_snapshot_ir",
 ]

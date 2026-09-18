@@ -258,9 +258,7 @@ def _sheet_for_node(node: Node, fresh: ParsedXls) -> XlsSheet:
 def _table_cell(node: Node, row: int, column: int) -> TableCell:
     assert isinstance(node.payload, TablePayload)
     matches = tuple(
-        cell
-        for cell in node.payload.cells
-        if cell.row == row and cell.column == column
+        cell for cell in node.payload.cells if cell.row == row and cell.column == column
     )
     if len(matches) != 1:
         raise UnsupportedEditError(
@@ -575,11 +573,7 @@ def patch_xls(
     candidate_bytes = bytes(candidate)
 
     authorized_ranges = tuple(
-        sorted(
-            range_item
-            for item in prepared
-            for range_item in item.ranges
-        )
+        sorted(range_item for item in prepared for range_item in item.ranges)
     )
     requested_values = {item.key: item.value for item in prepared}
     if verify_output:

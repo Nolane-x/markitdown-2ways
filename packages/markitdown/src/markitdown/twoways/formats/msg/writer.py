@@ -160,7 +160,9 @@ def _reject_fresh_authority(fresh: ParsedMsg) -> None:
         return
     reason = fresh.blockers[0] if fresh.blockers else "msg.subject.missing"
     raise UnsupportedEditError(
-        _BLOCKER_MESSAGES.get(reason, "MSG source is read-only for H16 Subject mutation."),
+        _BLOCKER_MESSAGES.get(
+            reason, "MSG source is read-only for H16 Subject mutation."
+        ),
         details={"reason": reason},
     )
 
@@ -187,7 +189,10 @@ def _validate_native_binding(
     if owner is None:
         raise PatchPreconditionError(
             "MSG Unicode Subject native owner is missing.",
-            details={"reason": "msg.subject.stale_owner", "target_node_id": node.node_id},
+            details={
+                "reason": "msg.subject.stale_owner",
+                "target_node_id": node.node_id,
+            },
         )
 
     locator = node.native_locator
@@ -209,7 +214,10 @@ def _validate_native_binding(
     ):
         raise PatchPreconditionError(
             "MSG Subject target native locator/binding is invalid or stale.",
-            details={"reason": "msg.subject.stale_owner", "target_node_id": node.node_id},
+            details={
+                "reason": "msg.subject.stale_owner",
+                "target_node_id": node.node_id,
+            },
         )
 
     directory_entry = fresh.cfb.directory_entries[owner.stream.directory_id]
@@ -254,7 +262,10 @@ def _validate_native_binding(
     if not isinstance(node.payload, TextPayload) or node.payload.text != owner.value:
         raise PatchPreconditionError(
             "MSG Subject semantic owner is stale relative to the authoritative source.",
-            details={"reason": "msg.subject.stale_owner", "target_node_id": node.node_id},
+            details={
+                "reason": "msg.subject.stale_owner",
+                "target_node_id": node.node_id,
+            },
         )
     return owner
 
@@ -307,7 +318,10 @@ def _prepare_edits(
         if edit.target_node_id is None or edit.target_node_id not in document.nodes:
             raise PatchPreconditionError(
                 "MSG Subject edit target node does not exist in the source IR.",
-                details={"reason": "missing_target", "target_node_id": edit.target_node_id},
+                details={
+                    "reason": "missing_target",
+                    "target_node_id": edit.target_node_id,
+                },
             )
         node = document.nodes[edit.target_node_id]
         if node.semantic_role != "msg-subject-text" or not isinstance(
@@ -483,7 +497,9 @@ def patch_msg(
         fidelity=fidelity,
         metadata={
             "touched_nodes": affected,
-            "touched_property_tags": tuple(item.owner.property_tag for item in prepared),
+            "touched_property_tags": tuple(
+                item.owner.property_tag for item in prepared
+            ),
             "touched_subject_ranges": tuple(
                 range_item for item in prepared for range_item in item.ranges
             ),

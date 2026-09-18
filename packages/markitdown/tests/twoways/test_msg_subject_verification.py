@@ -78,7 +78,7 @@ def test_verifier_rejects_property_stream_drift() -> None:
     drifted = bytearray(candidate)
     drifted[fixture.properties_physical_start + 32] ^= 0x01
 
-    with pytest.raises(RoundTripVerificationError, match="property|outside|drift"):
+    with pytest.raises(RoundTripVerificationError, match="property|non-subject|outside|drift"):
         verify_msg_candidate(
             fixture.data,
             bytes(drifted),

@@ -102,8 +102,7 @@ def test_equal_encoded_length_subject_replacement(value: str) -> None:
 
     ranges = node.metadata["msg.subject_physical_ranges"]
     logical = b"".join(
-        candidate[item["start"] : item["start"] + item["length"]]
-        for item in ranges
+        candidate[item["start"] : item["start"] + item["length"]] for item in ranges
     )
     assert logical == value.encode("utf-16-le")
 

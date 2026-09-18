@@ -137,7 +137,10 @@ def _verify_cfb_topology(source: ParsedMsg, candidate: ParsedMsg) -> None:
                 "MSG stream allocation/topology changed unexpectedly.",
                 details={"reason": "msg_stream_topology_drift", "stream": key[1]},
             )
-        if key != subject_key and source_stream.logical_bytes != candidate_stream.logical_bytes:
+        if (
+            key != subject_key
+            and source_stream.logical_bytes != candidate_stream.logical_bytes
+        ):
             raise RoundTripVerificationError(
                 "MSG non-subject stream bytes changed unexpectedly.",
                 details={"reason": "msg_non_subject_stream_drift", "stream": key[1]},
@@ -145,7 +148,10 @@ def _verify_cfb_topology(source: ParsedMsg, candidate: ParsedMsg) -> None:
 
 
 def _verify_msg_property_authority(source: ParsedMsg, candidate: ParsedMsg) -> None:
-    if source.properties_stream.logical_bytes != candidate.properties_stream.logical_bytes:
+    if (
+        source.properties_stream.logical_bytes
+        != candidate.properties_stream.logical_bytes
+    ):
         raise RoundTripVerificationError(
             "MSG top-level property stream changed unexpectedly.",
             details={"reason": "msg_property_stream_drift"},
@@ -179,7 +185,8 @@ def _verify_msg_property_authority(source: ParsedMsg, candidate: ParsedMsg) -> N
         or source_owner.property_tag != candidate_owner.property_tag
         or source_owner.declared_size != candidate_owner.declared_size
         or source_owner.property_entry != candidate_owner.property_entry
-        or _stream_identity(source_owner.stream) != _stream_identity(candidate_owner.stream)
+        or _stream_identity(source_owner.stream)
+        != _stream_identity(candidate_owner.stream)
         or _physical_range_identity(source_owner.stream.physical_ranges)
         != _physical_range_identity(candidate_owner.stream.physical_ranges)
     ):
@@ -234,7 +241,9 @@ def verify_msg_candidate(
 
     active_limits = limits or MsgLimits()
     source = _parse_for_verification(source_bytes, active_limits, label="source")
-    candidate = _parse_for_verification(candidate_bytes, active_limits, label="candidate")
+    candidate = _parse_for_verification(
+        candidate_bytes, active_limits, label="candidate"
+    )
     expected_ranges = _owner_ranges(source)
     ranges = _normalize_ranges(authorized_ranges, source_size=len(source_bytes))
     if ranges != expected_ranges:

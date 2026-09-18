@@ -13,6 +13,16 @@ CFB_SIGNATURE = bytes.fromhex("D0CF11E0A1B11AE1")
 PROPERTIES_STREAM = "__properties_version1.0"
 SUBJECT_STREAM = "__substg1.0_0037001F"
 
+PROPATTR_READABLE = 0x00000002
+PROPATTR_WRITABLE = 0x00000004
+STORE_UNICODE_OK = 0x00040000
+
+SUBJECT_TAG = 0x0037001F
+ANSI_SUBJECT_TAG = 0x0037001E
+SUBJECT_PREFIX_UNICODE_TAG = 0x003D001F
+NORMALIZED_SUBJECT_UNICODE_TAG = 0x0E1D001F
+STORE_SUPPORT_TAG = 0x340D0003
+
 
 @dataclass(frozen=True)
 class CfbFixture:
@@ -48,6 +58,16 @@ def _directory_entry(
     return bytes(raw)
 
 
+def _mini_count(size: int) -> int:
+    return (size + 63) // 64
+
+
+def _link_minichain(entries: list[int], start: int, count: int) -> None:
+    for index in range(count):
+        current = start + index
+        entries[current] = current + 1 if index + 1 < count else ENDOFCHAIN
+
+
 def make_cfb(
     *,
     major_version: int = 3,
@@ -68,8 +88,20 @@ def make_cfb(
     subject = (
         subject_bytes if subject_bytes is not None else "Alpha".encode("utf-16-le")
     )
-    if len(properties) > 64 or len(subject) > 64:
-        raise ValueError("Task-1 fixture keeps both streams in one mini sector")
+    if not properties or not subject:
+        raise ValueError("Task fixtures require non-empty streams")
+
+    properties_count = _mini_count(len(properties))
+    subject_count = _mini_count(len(subject))
+    properties_start = 0
+    subject_start = 0 if overlap_streams else properties_count
+    next_free = max(properties_count, subject_start + subject_count)
+    duplicate_start = next_free
+    if duplicate_subject_name:
+        next_free += subject_count
+    root_stream_size = next_free * 64
+    if root_stream_size > sector_size:
+        raise ValueError("Task fixture mini stream must fit one FAT sector")
 
     header = bytearray(sector_size)
     header[0:8] = CFB_SIGNATURE
@@ -96,7 +128,6 @@ def make_cfb(
     struct.pack_into("<109I", header, 76, *difat)
 
     directory = bytearray(sector_size)
-    root_stream_size = 192 if duplicate_subject_name else 128
     root = _directory_entry(
         "Root Entry",
         object_type=5,
@@ -108,16 +139,15 @@ def make_cfb(
         PROPERTIES_STREAM,
         object_type=2,
         right=2,
-        start_sector=0,
+        start_sector=properties_start,
         stream_size=len(properties),
     )
-    subject_start_mini_sector = 0 if overlap_streams else 1
     subject_right = 3 if duplicate_subject_name else NOSTREAM
     subj = _directory_entry(
         SUBJECT_STREAM,
         object_type=2,
         right=subject_right,
-        start_sector=subject_start_mini_sector,
+        start_sector=subject_start,
         stream_size=len(subject),
     )
     directory[0:128] = root
@@ -127,15 +157,18 @@ def make_cfb(
         directory[384:512] = _directory_entry(
             SUBJECT_STREAM,
             object_type=2,
-            start_sector=2,
+            start_sector=duplicate_start,
             stream_size=len(subject),
         )
 
     minifat = bytearray(sector_size)
     minifat_entries = [FREESECT] * (sector_size // 4)
-    minifat_entries[0] = ENDOFCHAIN
-    minifat_entries[1] = 1 if mini_cycle else ENDOFCHAIN
-    minifat_entries[2] = ENDOFCHAIN
+    _link_minichain(minifat_entries, properties_start, properties_count)
+    _link_minichain(minifat_entries, subject_start, subject_count)
+    if duplicate_subject_name:
+        _link_minichain(minifat_entries, duplicate_start, subject_count)
+    if mini_cycle:
+        minifat_entries[subject_start + subject_count - 1] = subject_start
     struct.pack_into(
         f"<{len(minifat_entries)}I",
         minifat,
@@ -144,10 +177,13 @@ def make_cfb(
     )
 
     mini_stream = bytearray(sector_size)
-    mini_stream[0 : len(properties)] = properties
-    mini_stream[64 : 64 + len(subject)] = subject
+    props_offset = properties_start * 64
+    subject_offset = subject_start * 64
+    mini_stream[props_offset : props_offset + len(properties)] = properties
+    mini_stream[subject_offset : subject_offset + len(subject)] = subject
     if duplicate_subject_name:
-        mini_stream[128 : 128 + len(subject)] = subject
+        duplicate_offset = duplicate_start * 64
+        mini_stream[duplicate_offset : duplicate_offset + len(subject)] = subject
 
     fat = bytearray(sector_size)
     fat_entries = [FREESECT] * (sector_size // 4)
@@ -164,9 +200,97 @@ def make_cfb(
         sector_size=sector_size,
         properties_bytes=properties,
         subject_bytes=subject,
-        properties_physical_start=root_stream_start,
-        subject_physical_start=root_stream_start + 64,
+        properties_physical_start=root_stream_start + props_offset,
+        subject_physical_start=root_stream_start + subject_offset,
     )
+
+
+def _property_entry(
+    tag: int,
+    *,
+    flags: int,
+    value_or_size: int,
+    reserved: int = 0,
+) -> bytes:
+    return struct.pack("<IIII", tag, flags, value_or_size, reserved)
+
+
+def make_property_stream(
+    subject_bytes: bytes,
+    *,
+    include_subject: bool = True,
+    duplicate_subject: bool = False,
+    include_store_support: bool = True,
+    duplicate_store_support: bool = False,
+    unicode_ok: bool = True,
+    subject_flags: int = PROPATTR_READABLE | PROPATTR_WRITABLE,
+    store_flags: int = PROPATTR_READABLE,
+    include_ansi_subject: bool = False,
+    include_subject_prefix: bool = False,
+    include_normalized_subject: bool = False,
+    subject_size_adjust: int = 0,
+) -> bytes:
+    entries: list[bytes] = []
+    if include_store_support:
+        mask = STORE_UNICODE_OK if unicode_ok else 0
+        store_entry = _property_entry(
+            STORE_SUPPORT_TAG,
+            flags=store_flags,
+            value_or_size=mask,
+        )
+        entries.append(store_entry)
+        if duplicate_store_support:
+            entries.append(store_entry)
+
+    if include_subject:
+        subject_entry = _property_entry(
+            SUBJECT_TAG,
+            flags=subject_flags,
+            value_or_size=len(subject_bytes) + 2 + subject_size_adjust,
+        )
+        entries.append(subject_entry)
+        if duplicate_subject:
+            entries.append(subject_entry)
+
+    if include_ansi_subject:
+        entries.append(
+            _property_entry(
+                ANSI_SUBJECT_TAG,
+                flags=PROPATTR_READABLE,
+                value_or_size=2,
+            )
+        )
+    if include_subject_prefix:
+        entries.append(
+            _property_entry(
+                SUBJECT_PREFIX_UNICODE_TAG,
+                flags=PROPATTR_READABLE,
+                value_or_size=2,
+            )
+        )
+    if include_normalized_subject:
+        entries.append(
+            _property_entry(
+                NORMALIZED_SUBJECT_UNICODE_TAG,
+                flags=PROPATTR_READABLE,
+                value_or_size=2,
+            )
+        )
+
+    return b"\x00" * 32 + b"".join(entries)
+
+
+def make_msg_cfb(
+    *,
+    subject: str = "Alpha",
+    subject_bytes: bytes | None = None,
+    **property_options: object,
+) -> CfbFixture:
+    raw_subject = (
+        subject_bytes if subject_bytes is not None else subject.encode("utf-16-le")
+    )
+    properties = make_property_stream(raw_subject, **property_options)
+    return make_cfb(properties_bytes=properties, subject_bytes=raw_subject)
 
 
 def make_truncated_cfb() -> bytes:

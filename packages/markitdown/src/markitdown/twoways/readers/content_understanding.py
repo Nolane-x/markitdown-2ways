@@ -25,9 +25,7 @@ from ..ir.serialization import validate_document
 
 
 _CONTENT_UNDERSTANDING_EVIDENCE_KEY = "twoways.content_understanding_analysis.v1"
-_CONTENT_UNDERSTANDING_CONVERTER_BLOB_SHA = (
-    "230e3d86bf533241b68dfc3d023e48b3effdc788"
-)
+_CONTENT_UNDERSTANDING_CONVERTER_BLOB_SHA = "230e3d86bf533241b68dfc3d023e48b3effdc788"
 
 _EXTENSION_MAP = {
     ".pdf": "pdf",

@@ -45,6 +45,13 @@ _ACCEPTED_MIME_TYPE_PREFIXES = ("text/html", "application/xhtml")
 _ACCEPTED_FILE_EXTENSIONS = (".html", ".htm")
 
 
+__all__ = [
+    "YouTubeDerivedLimits",
+    "YouTubeTranscriptSnapshot",
+    "read_youtube_snapshot_ir",
+]
+
+
 @dataclass(frozen=True)
 class YouTubeTranscriptSnapshot:
     video_id: str

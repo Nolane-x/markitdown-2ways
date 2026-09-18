@@ -32,6 +32,12 @@ from .remote import (
     read_remote_feed_snapshot_ir,
     read_wikipedia_snapshot_ir,
 )
+from .xls_converter import (
+    XlsConverterSnapshot,
+    XlsDerivedLimits,
+    XlsSheetMarkdownSnapshot,
+    read_xls_converter_snapshot_ir,
+)
 from .youtube import (
     YouTubeDerivedLimits,
     YouTubeTranscriptSnapshot,
@@ -54,6 +60,9 @@ __all__ = [
     "PdfConverterExtractionSnapshot",
     "PdfDerivedLimits",
     "RemoteDerivedLimits",
+    "XlsConverterSnapshot",
+    "XlsDerivedLimits",
+    "XlsSheetMarkdownSnapshot",
     "YouTubeDerivedLimits",
     "YouTubeTranscriptSnapshot",
     "read_audio_snapshot_ir",
@@ -65,5 +74,6 @@ __all__ = [
     "read_pdf_converter_snapshot_ir",
     "read_remote_feed_snapshot_ir",
     "read_wikipedia_snapshot_ir",
+    "read_xls_converter_snapshot_ir",
     "read_youtube_snapshot_ir",
 ]

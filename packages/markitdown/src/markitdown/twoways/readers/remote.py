@@ -29,9 +29,7 @@ from ..ir.serialization import validate_document
 
 
 _REMOTE_EVIDENCE_KEY = "twoways.remote_snapshot.v1"
-_WIKIPEDIA_CONVERTER_BLOB_SHA = (
-    "ba0c751092fa9e37fcf982f1fae9c4dcd774e049"
-)
+_WIKIPEDIA_CONVERTER_BLOB_SHA = "ba0c751092fa9e37fcf982f1fae9c4dcd774e049"
 
 
 @dataclass(frozen=True)
@@ -92,9 +90,7 @@ def _validate_remote_url(stream_info: StreamInfo) -> str:
 
 
 def _normalize_one_way_markdown(markdown: str) -> str:
-    normalized = "\n".join(
-        line.rstrip() for line in re.split(r"\r?\n", markdown)
-    )
+    normalized = "\n".join(line.rstrip() for line in re.split(r"\r?\n", markdown))
     return re.sub(r"\n{3,}", "\n\n", normalized)
 
 

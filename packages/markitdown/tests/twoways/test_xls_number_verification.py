@@ -58,7 +58,9 @@ def test_verifier_rejects_drift_outside_authorized_ranges() -> None:
     drifted = bytearray(candidate)
     drifted[10] ^= 0x01
 
-    with pytest.raises(RoundTripVerificationError, match="outside|header|topology|drift"):
+    with pytest.raises(
+        RoundTripVerificationError, match="outside|header|topology|drift"
+    ):
         verify_xls_candidate(
             source,
             bytes(drifted),

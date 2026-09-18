@@ -38,8 +38,14 @@ def _node(document, field: str = "Title"):
     )
 
 
-def _edit(document, value: str = "Beta", *, field: str = "Title") -> EditOperation:
-    node = _node(document, field)
+def _edit(
+    document,
+    value: str = "Beta",
+    *,
+    field: str = "Title",
+    node_id: str | None = None,
+) -> EditOperation:
+    node = document.nodes[node_id] if node_id is not None else _node(document, field)
     return EditOperation(
         operation_id=f"edit-{field.lower()}",
         type="update_mp3_id3v1_text",
@@ -147,7 +153,7 @@ def test_forged_native_evidence_fails_without_output(
             forged,
             BytesIO(source),
             output,
-            edits=(_edit(forged),),
+            edits=(_edit(forged, node_id=node.node_id),),
         )
 
     assert output.getvalue() == b""

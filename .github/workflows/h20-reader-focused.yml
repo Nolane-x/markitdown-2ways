@@ -6,6 +6,8 @@ on:
       - "packages/markitdown/src/markitdown/twoways/readers/remote.py"
       - "packages/markitdown/tests/twoways/test_remote_feed_reader.py"
       - "packages/markitdown/tests/twoways/test_remote_feed_authority.py"
+      - "packages/markitdown/tests/twoways/test_remote_feed_hardening.py"
+      - "packages/markitdown/tests/twoways/test_remote_feed_public_imports.py"
       - ".github/workflows/h20-reader-focused.yml"
 
 permissions:
@@ -22,4 +24,4 @@ jobs:
       - name: Install package and pytest
         run: pip install -e ./packages/markitdown pytest
       - name: Run H20 reader contract
-        run: pytest -q packages/markitdown/tests/twoways/test_remote_feed_reader.py packages/markitdown/tests/twoways/test_remote_feed_authority.py
+        run: pytest -q packages/markitdown/tests/twoways/test_remote_feed_reader.py packages/markitdown/tests/twoways/test_remote_feed_authority.py packages/markitdown/tests/twoways/test_remote_feed_hardening.py packages/markitdown/tests/twoways/test_remote_feed_public_imports.py

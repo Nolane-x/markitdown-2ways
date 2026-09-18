@@ -95,6 +95,32 @@ def test_reader_binds_source_analysis_and_derived_markdown() -> None:
     assert evidence["credentials_used_by_twoways"] is False
 
 
+def test_source_and_analysis_are_independent_identity_authorities() -> None:
+    baseline = read_document_intelligence_analysis_ir(
+        BytesIO(SOURCE),
+        stream_info=_info(),
+        analysis=_analysis(),
+    )
+    changed_source = read_document_intelligence_analysis_ir(
+        BytesIO(SOURCE + b"changed"),
+        stream_info=_info(),
+        analysis=_analysis(),
+    )
+    changed_analysis = read_document_intelligence_analysis_ir(
+        BytesIO(SOURCE),
+        stream_info=_info(),
+        analysis=_analysis(content=ANALYSIS_CONTENT + "changed"),
+    )
+
+    assert baseline.source is not None
+    assert changed_source.source is not None
+    assert changed_analysis.source is not None
+    assert baseline.document_id != changed_source.document_id
+    assert baseline.document_id != changed_analysis.document_id
+    assert baseline.source.sha256 != changed_source.source.sha256
+    assert baseline.source.sha256 == changed_analysis.source.sha256
+
+
 def test_root_is_derived_and_has_no_native_write_authority() -> None:
     document = read_document_intelligence_analysis_ir(
         BytesIO(SOURCE),
@@ -147,7 +173,20 @@ def test_repeated_reads_and_canonical_round_trip_are_deterministic() -> None:
         (".png", None),
         (".bmp", None),
         (".tiff", None),
+        (
+            None,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+        (
+            None,
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ),
+        (
+            None,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ),
         (None, "application/pdf"),
+        (None, "application/x-pdf"),
         (None, "image/jpeg"),
         (None, "image/png"),
         (None, "image/bmp"),

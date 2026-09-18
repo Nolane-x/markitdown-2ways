@@ -123,7 +123,9 @@ def test_forged_native_evidence_fails_without_output(
     )
     output = BytesIO()
 
-    with pytest.raises(PatchPreconditionError, match="stale|forged|locator|binding|owner"):
+    with pytest.raises(
+        PatchPreconditionError, match="stale|forged|locator|binding|owner"
+    ):
         patch_msg(
             forged,
             BytesIO(source),

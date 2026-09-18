@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from hashlib import sha256
+from hashlib import sha1
 from io import BytesIO
 import inspect
 from pathlib import Path
@@ -17,7 +17,11 @@ EXPECTED_CONVERTER_BLOB = "c3779743c6fe55c4716d8816b9a5a52b929c5e32"
 def test_existing_youtube_converter_blob_is_unchanged() -> None:
     path = Path(inspect.getsourcefile(YouTubeConverter) or "")
     assert path.is_file()
-    assert sha256(path.read_bytes()).hexdigest() == EXPECTED_CONVERTER_BLOB
+    data = path.read_bytes()
+    git_blob = sha1(
+        b"blob " + str(len(data)).encode("ascii") + b"\\0" + data
+    ).hexdigest()
+    assert git_blob == EXPECTED_CONVERTER_BLOB
 
 
 def test_existing_youtube_converter_ownership_shapes_remain_intact() -> None:

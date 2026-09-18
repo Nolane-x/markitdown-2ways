@@ -4,9 +4,7 @@ import importlib
 
 
 def test_h23_symbols_are_public_without_writer_exports() -> None:
-    module = importlib.import_module(
-        "markitdown.twoways.readers.content_understanding"
-    )
+    module = importlib.import_module("markitdown.twoways.readers.content_understanding")
     readers = importlib.import_module("markitdown.twoways.readers")
     tw = importlib.import_module("markitdown.twoways")
 

@@ -82,6 +82,8 @@ from .markdown import (
 )
 
 from .readers import (
+    ContentUnderstandingAnalysisSnapshot,
+    ContentUnderstandingDerivedLimits,
     DocumentIRReader,
     DocumentIntelligenceAnalysisSnapshot,
     DocumentIntelligenceDerivedLimits,
@@ -89,6 +91,7 @@ from .readers import (
     YouTubeDerivedLimits,
     YouTubeTranscriptSnapshot,
     read_bing_serp_snapshot_ir,
+    read_content_understanding_analysis_ir,
     read_document_intelligence_analysis_ir,
     read_remote_feed_snapshot_ir,
     read_wikipedia_snapshot_ir,
@@ -105,6 +108,8 @@ __all__ = [
     "CapabilityReport",
     "CapabilityState",
     "ChartPayload",
+    "ContentUnderstandingAnalysisSnapshot",
+    "ContentUnderstandingDerivedLimits",
     "Diagnostic",
     "DocumentIdFactory",
     "DocumentIR",
@@ -159,6 +164,7 @@ __all__ = [
     "capabilities_for_node",
     "read_markdown_ir",
     "read_bing_serp_snapshot_ir",
+    "read_content_understanding_analysis_ir",
     "read_document_intelligence_analysis_ir",
     "read_remote_feed_snapshot_ir",
     "read_wikipedia_snapshot_ir",

@@ -11,7 +11,12 @@ from markitdown.twoways import (
     read_content_understanding_analysis_ir,
 )
 
-from .test_content_understanding_reader import OUTPUT, PDF_INFO, SOURCE, _snapshot
+from .test_content_understanding_reader import (
+    OUTPUT,
+    PDF_INFO,
+    SOURCE,
+    _snapshot,
+)
 
 
 class _BoundedReadProbe(BytesIO):
@@ -92,9 +97,7 @@ def test_source_limit_accepts_exact_boundary_and_rejects_one_over() -> None:
             BytesIO(SOURCE),
             stream_info=PDF_INFO,
             analysis=_snapshot(),
-            limits=ContentUnderstandingDerivedLimits(
-                max_source_bytes=len(SOURCE) - 1
-            ),
+            limits=ContentUnderstandingDerivedLimits(max_source_bytes=len(SOURCE) - 1),
         )
 
 
@@ -126,9 +129,7 @@ def test_analysis_limit_accepts_exact_boundary_and_rejects_one_over() -> None:
             BytesIO(SOURCE),
             stream_info=PDF_INFO,
             analysis=_snapshot(),
-            limits=ContentUnderstandingDerivedLimits(
-                max_analysis_utf8_bytes=size - 1
-            ),
+            limits=ContentUnderstandingDerivedLimits(max_analysis_utf8_bytes=size - 1),
         )
 
 

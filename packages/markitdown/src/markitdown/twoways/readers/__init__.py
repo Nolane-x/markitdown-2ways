@@ -1,4 +1,9 @@
 from .base import DocumentIRReader
+from .content_understanding import (
+    ContentUnderstandingAnalysisSnapshot,
+    ContentUnderstandingDerivedLimits,
+    read_content_understanding_analysis_ir,
+)
 from .document_intelligence import (
     DocumentIntelligenceAnalysisSnapshot,
     DocumentIntelligenceDerivedLimits,
@@ -17,6 +22,8 @@ from .youtube import (
 )
 
 __all__ = [
+    "ContentUnderstandingAnalysisSnapshot",
+    "ContentUnderstandingDerivedLimits",
     "DocumentIRReader",
     "DocumentIntelligenceAnalysisSnapshot",
     "DocumentIntelligenceDerivedLimits",
@@ -24,6 +31,7 @@ __all__ = [
     "YouTubeDerivedLimits",
     "YouTubeTranscriptSnapshot",
     "read_bing_serp_snapshot_ir",
+    "read_content_understanding_analysis_ir",
     "read_document_intelligence_analysis_ir",
     "read_remote_feed_snapshot_ir",
     "read_wikipedia_snapshot_ir",

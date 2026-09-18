@@ -423,6 +423,7 @@ def _validate_remote_feed_url(stream_info: StreamInfo) -> str:
         hostname = parsed.hostname
         username = parsed.username
         password = parsed.password
+        parsed.port
     except ValueError as exc:
         raise ValueError("remote feed snapshot URL is malformed") from exc
     if parsed.scheme.lower() not in {"http", "https"}:

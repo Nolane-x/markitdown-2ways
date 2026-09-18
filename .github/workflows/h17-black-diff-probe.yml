@@ -1,0 +1,24 @@
+name: h17-black-diff-probe
+
+on:
+  push:
+    branches:
+      - phase-h17-xls-biff8-number-fixed-slot-preservation
+    paths:
+      - .github/workflows/h17-black-diff-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: pip install black==23.7.0
+      - name: Print Black diff
+        run: |
+          black --diff --check             packages/markitdown/src/markitdown/twoways/formats/xls             packages/markitdown/tests/twoways/_xls_fixtures.py             packages/markitdown/tests/twoways/test_xls_number_reader.py             packages/markitdown/tests/twoways/test_xls_number_writer.py             packages/markitdown/tests/twoways/test_xls_number_verification.py || true

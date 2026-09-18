@@ -90,3 +90,39 @@ class ParsedCfb:
                 f"{parent_id}"
             )
         return matches[0]
+
+
+@dataclass(frozen=True)
+class MsgPropertyEntry:
+    index: int
+    property_tag: int
+    property_id: int
+    property_type: int
+    flags: int
+    value_u32: int
+    reserved: int
+    raw: bytes
+    raw_sha256: str
+    logical_offset: int
+    physical_ranges: tuple[CfbPhysicalRange, ...]
+
+
+@dataclass(frozen=True)
+class MsgSubjectOwner:
+    property_id: int
+    property_type: int
+    property_tag: int
+    value: str
+    declared_size: int
+    property_entry: MsgPropertyEntry
+    stream: CfbStream
+
+
+@dataclass(frozen=True)
+class ParsedMsg:
+    cfb: ParsedCfb
+    properties_stream: CfbStream
+    property_entries: tuple[MsgPropertyEntry, ...]
+    subject_owner: MsgSubjectOwner | None
+    store_support_mask: int
+    blockers: tuple[str, ...]

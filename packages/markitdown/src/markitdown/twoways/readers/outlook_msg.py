@@ -103,7 +103,7 @@ def _capture_source(source_stream: BinaryIO, *, max_bytes: int) -> bytes:
         if isinstance(chunk, str):
             raise TypeError("OutlookMsgConverter source stream must return bytes")
         if not isinstance(chunk, (bytes, bytearray, memoryview)):
-            raise TypeError("OutlookMsgConverter source stream returned a non-bytes value")
+            raise TypeError(\n                "OutlookMsgConverter source stream returned a non-bytes value"\n            )
         data = bytes(chunk)
         if not data:
             break
@@ -172,7 +172,7 @@ def read_outlook_msg_snapshot_ir(
         )
 
     active_limits = limits or OutlookMsgDerivedLimits()
-    source_bytes = _capture_source(source_stream, max_bytes=active_limits.max_source_bytes)
+    source_bytes = _capture_source(\n        source_stream, max_bytes=active_limits.max_source_bytes\n    )
     semantic_values = tuple(getattr(snapshot, name) for name in _SEMANTIC_FIELDS)
     snapshot_utf8_size = sum(len(_value_bytes(value)) for value in semantic_values)
     if snapshot_utf8_size > active_limits.max_snapshot_utf8_bytes:

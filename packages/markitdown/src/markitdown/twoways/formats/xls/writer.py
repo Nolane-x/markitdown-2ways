@@ -531,7 +531,6 @@ def patch_xls(
     *,
     edits: Sequence[EditOperation],
     limits: XlsLimits | None = None,
-    verify_output: bool = True,
 ) -> WriterResult:
     validate_document(document)
     source_bytes = _read_source_bytes(source_stream)
@@ -576,36 +575,30 @@ def patch_xls(
         sorted(range_item for item in prepared for range_item in item.ranges)
     )
     requested_values = {item.key: item.value for item in prepared}
-    if verify_output:
-        verify_xls_candidate(
-            source_bytes,
-            candidate_bytes,
-            requested_values=requested_values,
-            authorized_ranges=authorized_ranges,
-            limits=active_limits,
-        )
-        fidelity = FidelityReport(
-            claimed_tier="exact-preserve",
-            evidence=(
-                FidelityEvidence(
-                    check_code="xls.exact_outside_number_slots",
-                    status=FidelityStatus.PASSED,
-                    description=(
-                        "Only authorized existing BIFF8 NUMBER value slots changed."
-                    ),
-                ),
-                FidelityEvidence(
-                    check_code="xls.semantic_readback",
-                    status=FidelityStatus.PASSED,
-                    description="Requested NUMBER values passed strict BIFF8 re-read.",
+    verify_xls_candidate(
+        source_bytes,
+        candidate_bytes,
+        requested_values=requested_values,
+        authorized_ranges=authorized_ranges,
+        limits=active_limits,
+    )
+    fidelity = FidelityReport(
+        claimed_tier="exact-preserve",
+        evidence=(
+            FidelityEvidence(
+                check_code="xls.exact_outside_number_slots",
+                status=FidelityStatus.PASSED,
+                description=(
+                    "Only authorized existing BIFF8 NUMBER value slots changed."
                 ),
             ),
-        )
-    else:
-        fidelity = FidelityReport(
-            claimed_tier="unknown",
-            warnings=("H17 XLS round-trip verification was disabled.",),
-        )
+            FidelityEvidence(
+                check_code="xls.semantic_readback",
+                status=FidelityStatus.PASSED,
+                description="Requested NUMBER values passed strict BIFF8 re-read.",
+            ),
+        ),
+    )
 
     written = output.write(candidate_bytes)
     return WriterResult(
@@ -641,7 +634,6 @@ class XlsPatchWriter(DocumentWriter):
         source_stream = kwargs.pop("source_stream", None)
         edits = kwargs.pop("edits", None)
         limits = kwargs.pop("limits", None)
-        verify_output = kwargs.pop("verify_output", True)
         if source_stream is None or edits is None:
             raise TypeError("XlsPatchWriter.write requires source_stream= and edits=")
         if kwargs:
@@ -652,5 +644,4 @@ class XlsPatchWriter(DocumentWriter):
             output,
             edits=tuple(edits),
             limits=limits,
-            verify_output=verify_output,
         )

@@ -131,6 +131,23 @@ def test_invalid_replacement_values_fail_without_output(value) -> None:
     assert output.getvalue() == b""
 
 
+def test_candidate_verification_cannot_be_disabled() -> None:
+    source = make_xls_cfb().data
+    document = read_xls_ir(BytesIO(source), filename="legacy.xls")
+    output = BytesIO()
+
+    with pytest.raises(TypeError, match="verify_output"):
+        patch_xls(
+            document,
+            BytesIO(source),
+            output,
+            edits=(_edit(document),),
+            verify_output=False,
+        )
+
+    assert output.getvalue() == b""
+
+
 def test_formula_present_workbook_is_read_only() -> None:
     source = make_xls_cfb(include_formula=True).data
     document = read_xls_ir(BytesIO(source), filename="legacy.xls")

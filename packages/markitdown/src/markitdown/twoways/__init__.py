@@ -84,9 +84,12 @@ from .markdown import (
 from .readers import (
     DocumentIRReader,
     RemoteDerivedLimits,
+    YouTubeDerivedLimits,
+    YouTubeTranscriptSnapshot,
     read_bing_serp_snapshot_ir,
     read_remote_feed_snapshot_ir,
     read_wikipedia_snapshot_ir,
+    read_youtube_snapshot_ir,
 )
 from .writers import DocumentWriter, TargetInfo
 
@@ -128,6 +131,8 @@ __all__ = [
     "Provenance",
     "ReaderNotFoundError",
     "RemoteDerivedLimits",
+    "YouTubeDerivedLimits",
+    "YouTubeTranscriptSnapshot",
     "Relationship",
     "Resource",
     "RoundTripVerificationError",
@@ -151,6 +156,7 @@ __all__ = [
     "read_bing_serp_snapshot_ir",
     "read_remote_feed_snapshot_ir",
     "read_wikipedia_snapshot_ir",
+    "read_youtube_snapshot_ir",
     "projection_manifest_digest",
     "projection_manifest_bytes",
     "project_markdown",

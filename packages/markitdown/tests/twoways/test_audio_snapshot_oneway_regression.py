@@ -122,7 +122,9 @@ def test_empty_one_way_output_remains_empty(monkeypatch) -> None:
     assert node.payload.text == ""
 
 
-def test_production_reader_has_no_optional_dependency_network_or_process_paths() -> None:
+def test_production_reader_has_no_optional_dependency_network_or_process_paths() -> (
+    None
+):
     source = inspect.getsource(reader_module)
     forbidden = (
         "_exiftool",

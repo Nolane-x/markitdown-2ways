@@ -156,7 +156,7 @@ def test_youtube_root_is_derived_and_not_native_writable() -> None:
     assert document.diagnostics[0].code == "remote.source.not_native_writable"
 
 
-def test_youtube_html_only_repeated_reads_and_canonical_round_trip_are_deterministic() -> None:
+def test_youtube_html_only_repeated_reads_and_canonical_round_trip_are_deterministic(\n) -> None:
     first = read_youtube_snapshot_ir(
         BytesIO(HTML_SNAPSHOT),
         stream_info=_info(),

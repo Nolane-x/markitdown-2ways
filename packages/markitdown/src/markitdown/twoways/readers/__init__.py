@@ -10,6 +10,12 @@ from .document_intelligence import (
     DocumentIntelligenceDerivedLimits,
     read_document_intelligence_analysis_ir,
 )
+from .image import (
+    ImageDescriptionSnapshot,
+    ImageDerivedLimits,
+    ImageMetadataSnapshot,
+    read_image_snapshot_ir,
+)
 from .remote import (
     RemoteDerivedLimits,
     read_bing_serp_snapshot_ir,
@@ -30,6 +36,9 @@ __all__ = [
     "DocumentIRReader",
     "DocumentIntelligenceAnalysisSnapshot",
     "DocumentIntelligenceDerivedLimits",
+    "ImageDescriptionSnapshot",
+    "ImageDerivedLimits",
+    "ImageMetadataSnapshot",
     "RemoteDerivedLimits",
     "YouTubeDerivedLimits",
     "YouTubeTranscriptSnapshot",
@@ -37,6 +46,7 @@ __all__ = [
     "read_bing_serp_snapshot_ir",
     "read_content_understanding_analysis_ir",
     "read_document_intelligence_analysis_ir",
+    "read_image_snapshot_ir",
     "read_remote_feed_snapshot_ir",
     "read_wikipedia_snapshot_ir",
     "read_youtube_snapshot_ir",

@@ -29,12 +29,7 @@ RAW_TEXT = (
     "Second requirement\n"
     "Tail\n"
 )
-EXPECTED = (
-    "SECTION 01\n"
-    ".1 General requirements\n"
-    ".2 Second requirement\n"
-    "Tail\n"
-)
+EXPECTED = "SECTION 01\n" ".1 General requirements\n" ".2 Second requirement\n" "Tail\n"
 INFO = StreamInfo(
     extension=".pdf",
     mimetype="application/pdf",
@@ -165,13 +160,16 @@ def test_source_and_extraction_are_independent_identity_authorities() -> None:
     assert baseline.source is not None
     assert changed_source.source is not None
     assert changed_snapshot.source is not None
-    assert len(
-        {
-            baseline.document_id,
-            changed_source.document_id,
-            changed_snapshot.document_id,
-        }
-    ) == 3
+    assert (
+        len(
+            {
+                baseline.document_id,
+                changed_source.document_id,
+                changed_snapshot.document_id,
+            }
+        )
+        == 3
+    )
     assert baseline.source.sha256 != changed_source.source.sha256
     assert baseline.source.sha256 == changed_snapshot.source.sha256
 

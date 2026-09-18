@@ -47,7 +47,12 @@ def bof(doc_type: int) -> bytes:
     )
 
 
-def boundsheet8(sheet_offset: int, name: str = "Sheet1", *, sheet_type: int = 0) -> bytes:
+def boundsheet8(
+    sheet_offset: int,
+    name: str = "Sheet1",
+    *,
+    sheet_type: int = 0,
+) -> bytes:
     encoded = name.encode("latin-1")
     if not 1 <= len(encoded) <= 31:
         raise ValueError("fixture sheet name must contain 1..31 compressed characters")
@@ -102,7 +107,9 @@ def make_workbook(
     placeholder = boundsheet8(0, sheet_type=sheet_type)
     encrypted = record(FILEPASS, b"\x00" * 4) if include_filepass else b""
     globals_eof = record(EOF)
-    sheet_offset = len(globals_bof) + len(placeholder) + len(encrypted) + len(globals_eof)
+    sheet_offset = (
+        len(globals_bof) + len(placeholder) + len(encrypted) + len(globals_eof)
+    )
     pointer = sheet_offset + 1 if invalid_sheet_pointer else sheet_offset
     globals_bytes = (
         globals_bof
@@ -146,7 +153,9 @@ def _mini_count(size: int) -> int:
     return (size + 63) // 64
 
 
-def make_cfb_with_streams(streams: tuple[tuple[str, bytes], ...]) -> tuple[bytes, dict[str, int]]:
+def make_cfb_with_streams(
+    streams: tuple[tuple[str, bytes], ...],
+) -> tuple[bytes, dict[str, int]]:
     if not streams or len(streams) > 3:
         raise ValueError("fixture supports 1..3 streams")
     sector_size = 512

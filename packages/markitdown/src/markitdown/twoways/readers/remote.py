@@ -8,7 +8,6 @@ from typing import BinaryIO
 from urllib.parse import urlsplit
 
 from ..._stream_info import StreamInfo
-from ...converters._wikipedia_converter import WikipediaConverter
 from ..capabilities import (
     CAPABILITY_METADATA_KEY,
     CapabilityDecision,
@@ -124,6 +123,10 @@ def read_wikipedia_snapshot_ir(
         source_stream,
         max_bytes=active_limits.max_source_bytes,
     )
+
+    # Keep the one-way converter lazy so importing markitdown.twoways does not
+    # load optional Office/XML dependencies through markitdown.converters.
+    from ...converters._wikipedia_converter import WikipediaConverter
 
     converter = WikipediaConverter()
     private_stream = BytesIO(source_bytes)

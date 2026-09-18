@@ -21,7 +21,7 @@ existing JPEG Exif IFD0 `ImageDescription`/`Artist` fixed-allocation text mutati
 bounded existing MP3 ID3v1/ID3v1.1 `Title`/`Artist`/`Album` fixed-slot text mutation,
 bounded existing Outlook MSG Unicode `PidTagSubject` exact-size stream mutation,
 bounded existing legacy XLS BIFF8 `Number` Xnum fixed-slot mutation, and read-only
-Wikipedia remote-derived snapshot parity with explicit no-writeback provenance. It is
+Wikipedia plus Bing SERP remote-derived snapshot parity with explicit no-writeback provenance. It is
 not an Office automation platform, workflow engine, document-management service, browser
 automation layer, archive authoring suite, or general application framework.
 
@@ -1024,9 +1024,60 @@ bytes. Invalid/non-Wikipedia origins, URL user-info, unsupported URL schemes, co
 ownership mismatch or budget exhaustion fail closed. The 2Ways H18 module imports no
 network/process client and invokes the existing `WikipediaConverter` only on a private
 `BytesIO`. The one-way `WikipediaConverter` and MarkItDown HTTP behavior remain
-unchanged. H19+ may reuse this remote-derived evidence pattern, but sources with
+unchanged. H20+ may reuse this remote-derived evidence pattern, but sources with
 additional service derivation such as YouTube transcripts and Azure analyzers require
 their own provenance contracts.
+
+
+## Bing SERP remote-derived snapshot parity
+
+Phase H19 extends the v0.9 Class-D source-adapter program to an already-materialized Bing
+search-results HTML snapshot. H19 does **not** issue a Bing search or fetch the URL. The
+caller supplies exact snapshot bytes plus an accepted Bing SERP `StreamInfo.url`; the
+reader requires existing `BingSerpConverter` ownership and derives the same normalized
+Markdown as the public one-way stream path.
+
+```python
+from io import BytesIO
+
+from markitdown._stream_info import StreamInfo
+from markitdown.twoways import (
+    capabilities_for_node,
+    read_bing_serp_snapshot_ir,
+)
+
+snapshot = b"<html>...already-materialized Bing SERP...</html>"
+document = read_bing_serp_snapshot_ir(
+    BytesIO(snapshot),
+    stream_info=StreamInfo(
+        url="https://www.bing.com/search?q=markitdown",
+        mimetype="text/html",
+        extension=".html",
+        filename="bing.html",
+        charset="utf-8",
+    ),
+)
+
+node = document.nodes[document.root_node_ids[0]]
+print(node.payload.text)
+print(capabilities_for_node(node).for_operation("replace_text"))
+```
+
+The H19 root is explicitly `DERIVED` with reason
+`remote.source.not_native_writable`. Source URI/SHA-256/size, converter identity/blob
+and derived Markdown SHA-256/UTF-8 size are recorded in the same versioned remote
+snapshot evidence envelope introduced by H18. Neither node nor canvas receives a native
+locator, and there is no Bing writer, search mutation operation or identity-Markdown
+writeback path.
+
+H19 reuses H18's bounded source capture, derived capability and Markdown normalization
+helpers without changing the H18 Wikipedia reader body. Wrong schemes, Bing lookalike
+hosts, credential-bearing URLs, non-search paths, converter ownership mismatches and
+source/Markdown budget violations fail closed. The 2Ways remote reader performs no
+network or subprocess I/O; `BingSerpConverter` runs only over a private `BytesIO`.
+The one-way Bing converter, converter registry and MarkItDown fetching behavior remain
+unchanged. RSS/Atom is intentionally deferred to H20 because local XML authority and
+remote-derived feed provenance require a separate contract.
 
 
 ## PPTX and DOCX round trips
@@ -1086,9 +1137,9 @@ a serializer; `openpyxl` is an independent regression oracle.
 
 ## Current capability boundary
 
-| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9-H11 | PNG H12-H13 | JPEG H14 | MP3 H15 | MSG H16 | XLS H17 | Remote H18 | PPTX | DOCX | XLSX tranche one |
+| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9-H11 | PNG H12-H13 | JPEG H14 | MP3 H15 | MSG H16 | XLS H17 | Remote H18-H19 | PPTX | DOCX | XLSX tranche one |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners + URI-link topology + bounded AcroForm text-field evidence | strict PNG chunk topology + existing `tEXt`/`zTXt`/`iTXt` owners + bounded compressed-text/read-time resource authority | strict JPEG marker/scan topology + bounded Exif APP1/TIFF IFD0 text-owner evidence | terminal ID3v1/1.1 owners + conservative MPEG Layer III topology + competing-metadata authority | bounded CFB v3/v4 topology + top-level Unicode `PidTagSubject`/MAPI authority | bounded CFB v3/v4 + BIFF8 workbook/sheet topology + existing NUMBER owners | materialized Wikipedia HTML snapshot + deterministic derived Markdown/provenance | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
+| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners + URI-link topology + bounded AcroForm text-field evidence | strict PNG chunk topology + existing `tEXt`/`zTXt`/`iTXt` owners + bounded compressed-text/read-time resource authority | strict JPEG marker/scan topology + bounded Exif APP1/TIFF IFD0 text-owner evidence | terminal ID3v1/1.1 owners + conservative MPEG Layer III topology + competing-metadata authority | bounded CFB v3/v4 topology + top-level Unicode `PidTagSubject`/MAPI authority | bounded CFB v3/v4 + BIFF8 workbook/sheet topology + existing NUMBER owners | materialized Wikipedia/Bing SERP HTML snapshots + deterministic derived Markdown/provenance | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
 | Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | routes the existing typed inner operation through the exact member chain; ZIP structure itself is read-only | `update_pdf_metadata` + `update_pdf_link_uri` + `update_pdf_text_field_value` for existing H11-safe terminal plain-text fields | `update_png_text_metadata` for an existing cross-type uniquely owned `tEXt`/`zTXt`/`iTXt` value | `update_jpeg_exif_text` for existing unique safe IFD0 `ImageDescription`/`Artist` type-2 allocations | `update_mp3_id3v1_text` for existing `Title`/`Artist`/`Album` 30-byte slots | `update_msg_subject_text` for one existing top-level Unicode Subject stream with exact encoded length | `update_sheet_cells` for existing unique BIFF8 NUMBER Xnum slots only | none; `replace_text` is explicit DERIVED/read-only | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
 | Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only for every ZIP-backed imported node | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
 | Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | root/member SHA+size, ordered nested inventory, member metadata, full chain + shared global budgets | exact source prefix + root/Info/page/annotation/AcroForm identities + annotation/form topology/fingerprints + immutable target digests + exact changed-object audit + pypdf/pdfminer/pdfplumber agreement | source SHA/size + monotonic read-time limits + chunk order/type/CRC/raw digests + bounded zlib decode + immutable compression/language metadata + exact unrequested chunk bytes | source SHA/size + monotonic limits + marker/segment topology + TIFF owner/type/count/offset/slot digests + exact outside-slot bytes | source SHA/size + tamper-evident monotonic limits + MPEG frame/terminal metadata topology + ID3v1/slot digests + exact outside-slot bytes | source SHA/size + tamper-evident limits + CFB FAT/DIFAT/MiniFAT/directory topology + MAPI entry/stream/chain/range digests + exact outside-range bytes | source SHA/size + tamper-evident limits + CFB allocation/directory authority + BIFF record/sheet/NUMBER owner digests + exact outside-slot bytes | remote URI + snapshot SHA/size + converter identity/blob + Markdown SHA/UTF-8 size + no-network evidence | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
@@ -1271,6 +1322,8 @@ Current v0.9 execution documents include:
 
 - `docs/superpowers/specs/2026-09-18-markitdown-2ways-phase-h18-wikipedia-remote-derived-snapshot-parity-design.md`
 - `docs/superpowers/plans/2026-09-18-markitdown-2ways-phase-h18-wikipedia-remote-derived-snapshot-parity-implementation.md`
+- `docs/superpowers/specs/2026-09-18-markitdown-2ways-phase-h19-bing-serp-remote-derived-snapshot-parity-design.md`
+- `docs/superpowers/plans/2026-09-18-markitdown-2ways-phase-h19-bing-serp-remote-derived-snapshot-parity-implementation.md`
 
 Each tranche is complete only after its exact final branch head passes pre-commit plus
 the package and OCR matrices on Python 3.10-3.13. H5 uses a separate recovery-aware
@@ -1294,9 +1347,11 @@ fresh CFB/MAPI authority, tamper-evident read limits and exact outside-range pre
 H17 adds only existing BIFF8 NUMBER Xnum mutation with fresh CFB/BIFF authority,
 tamper-evident read limits and exact outside-slot preservation. H18 starts v0.9 with an
 already-materialized Wikipedia snapshot, deterministic derived Markdown/provenance,
-explicit `DERIVED` capability state and no network or remote/native writeback path. The
-one-way `ImageConverter`, `AudioConverter`, `OutlookMsgConverter`, `XlsConverter`
-and `WikipediaConverter` remain unchanged. Annotation structural editing, form structure and non-H11 form controls,
+explicit `DERIVED` capability state and no network or remote/native writeback path. H19
+extends that Class-D boundary to already-materialized Bing SERP HTML while still making
+no search request, network call or remote writeback claim. The one-way `ImageConverter`,
+`AudioConverter`, `OutlookMsgConverter`, `XlsConverter`, `WikipediaConverter` and
+`BingSerpConverter` remain unchanged. Annotation structural editing, form structure and non-H11 form controls,
 appearance-backed forms, non-URI actions, page text/image/content mutation, outlines, new
 metadata keys, further media-native mutation, other archive families, remote writeback
 and archive structural editing remain outside the current completed boundary.

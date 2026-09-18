@@ -24,7 +24,7 @@ For the H16 property:
 - for a variable-length `PtypString` entry, the property-stream `Size` field equals the subject value stream byte length plus two bytes for the logical UTF-16 terminating NUL;
 - the stored subject stream bytes themselves are treated as the UTF-16LE payload owned by that property entry; H16 does not synthesize, remove, or resize a property stream entry.
 
-MSG Unicode/non-Unicode authority is message-wide. H16 supports only a source whose string-property authority is Unicode and whose subject owner is the exact `0x0037001F` stream. ANSI `0x0037001E` subject authority remains read-only.
+MSG Unicode/non-Unicode authority is message-wide. H16 requires exactly one top-level `PidTagStoreSupportMask` fixed property entry (`property id 0x340D`, `PT_LONG 0x0003`, tag `0x340D0003`) whose value has `STORE_UNICODE_OK (0x00040000)` set. A missing mask, a mask without that bit, or contradictory ANSI subject authority is read-only. Only then can the exact `0x0037001F` stream be considered a Unicode subject owner. ANSI `0x0037001E` subject authority remains read-only.
 
 CFB allocates streams smaller than the mini-stream cutoff (normally 4096 bytes) through MiniFAT and the root mini stream, and larger streams through ordinary FAT sector chains. H16 supports the subject only when its complete physical byte ranges can be derived unambiguously from the existing directory entry and the relevant FAT/MiniFAT chains.
 
@@ -159,6 +159,7 @@ H16 requires:
 - reserved/flags bytes are preserved exactly and treated as immutable;
 - no duplicate `0x0037001F` entry;
 - no `0x0037001E` subject entry;
+- exactly one `0x340D0003` `PidTagStoreSupportMask` fixed property entry with `STORE_UNICODE_OK (0x00040000)` set;
 - no contradictory message-wide ANSI authority;
 - no encrypted/protected subject payload signature recognized by the bounded H16 policy.
 
@@ -168,7 +169,7 @@ H16 records the exact logical offset and physical ranges of the subject property
 
 `PidTagSubject` can coexist with properties used to express subject prefix and normalized subject semantics. H16 is not a subject-normalization engine.
 
-Writable authority is therefore blocked when the top-level property stream advertises a related property that H16 would be required to update to keep message subject semantics synchronized. At minimum, H16 treats present `PidTagSubjectPrefix` and `PidTagNormalizedSubject` string owners as competing semantic authority unless the design can prove they are absent from the source.
+Writable authority is therefore blocked when the top-level property stream advertises a related property that H16 would be required to update to keep message subject semantics synchronized. H16 treats any present `PidTagSubjectPrefix` (`property id 0x003D`, Unicode tag `0x003D001F`, ANSI tag `0x003D001E`) or `PidTagNormalizedSubject` (`property id 0x0E1D`, Unicode tag `0x0E1D001F`, ANSI tag `0x0E1D001E`) as competing semantic authority. These properties must be absent for H16 writability.
 
 This rule is intentionally conservative. H16 mutates only a standalone full subject owner whose requested replacement cannot leave a second subject representation stale.
 
@@ -387,8 +388,9 @@ It must reject or remain read-only for:
 - subject stream aliasing any structural or non-subject stream bytes;
 - contradictory property-entry size;
 - duplicate Unicode subject property entries;
+- missing/duplicate `PidTagStoreSupportMask` or missing `STORE_UNICODE_OK` authority;
 - simultaneous/competing ANSI subject authority;
-- competing subject-prefix/normalized-subject semantic authority;
+- present `PidTagSubjectPrefix` or `PidTagNormalizedSubject` semantic authority;
 - subject stream with invalid UTF-16LE;
 - encrypted/protected subject representation recognized by policy;
 - resource-limit exhaustion;
@@ -417,7 +419,9 @@ H16 is complete only after all of the following are true:
   - top-level property-stream header/entries;
   - exact `0x0037001F` subject owner;
   - declared `Size = stream_size + 2`;
+  - exact `PidTagStoreSupportMask` / `STORE_UNICODE_OK` authority;
   - duplicate/missing/ANSI/competing subject authority;
+  - explicit `PidTagSubjectPrefix` / `PidTagNormalizedSubject` blockers;
   - strict UTF-16LE;
 - reader/capability tests prove deterministic IR and persisted tamper-evident read limits;
 - writer tests cover:

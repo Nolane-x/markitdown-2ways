@@ -70,9 +70,7 @@ _MIME_PREFIXES: dict[str, tuple[str, ...]] = {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ),
     "pptx": ("application/vnd.openxmlformats-officedocument.presentationml",),
-    "xlsx": (
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ),
+    "xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",),
     "html": ("text/html", "application/xhtml+xml"),
     "txt": ("text/plain",),
     "md": ("text/markdown",),
@@ -340,7 +338,7 @@ def read_content_understanding_analysis_ir(
     analysis_digest = sha256(analysis_bytes).hexdigest()
     uri = stream_info.url
 
-    identity_seed = "\\0".join(
+    identity_seed = "\0".join(
         (
             "content-understanding-derived-analysis",
             source_digest,

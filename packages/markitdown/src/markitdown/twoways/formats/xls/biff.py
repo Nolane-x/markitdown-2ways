@@ -209,10 +209,7 @@ def parse_xls(data: bytes, *, limits: XlsLimits | None = None) -> ParsedXls:
         raise XlsFormatError("XLS Workbook stream exceeds resource limit")
 
     blockers: list[str] = []
-    if any(
-        stream.parent_id == 0 and stream.name == "Book"
-        for stream in cfb.streams
-    ):
+    if any(stream.parent_id == 0 and stream.name == "Book" for stream in cfb.streams):
         blockers.append("xls.container.competing_book_stream")
 
     records = _scan_records(workbook_stream.logical_bytes, limits=active_limits)

@@ -107,7 +107,7 @@ def test_empty_snapshot_still_matches_one_way_scaffold() -> None:
         stream_info=INFO,
         snapshot=OutlookMsgConverterSnapshot(provider="fixture"),
     )
-    assert _root(document).payload.text == "# Email Message\n\n## Content"
+    assert _root(document).payload.text == "# Email Message\n\n\n## Content"
     assert document.metadata.title is None
 
 

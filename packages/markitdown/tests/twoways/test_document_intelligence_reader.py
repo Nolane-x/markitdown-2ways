@@ -75,9 +75,7 @@ def test_reader_binds_source_analysis_and_derived_markdown() -> None:
     assert document.canvases[0].kind == "derived-analysis"
     assert document.canvases[0].native_locator is None
 
-    evidence = document.metadata.custom[
-        "twoways.document_intelligence_analysis.v1"
-    ]
+    evidence = document.metadata.custom["twoways.document_intelligence_analysis.v1"]
     analysis_bytes = ANALYSIS_CONTENT.encode("utf-8")
     markdown_bytes = node.payload.text.encode("utf-8")
 

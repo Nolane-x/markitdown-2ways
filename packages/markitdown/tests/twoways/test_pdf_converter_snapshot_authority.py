@@ -42,10 +42,7 @@ class _BoundedReadProbe(BytesIO):
         ("materialization_id", ""),
     ),
 )
-def test_snapshot_descriptors_reject_blank_values(
-    field: str,
-    value: str,
-) -> None:
+def test_snapshot_descriptors_reject_blank_values(field: str, value: str) -> None:
     values = {
         "extracted_text": RAW_TEXT,
         "provider": "fixture",

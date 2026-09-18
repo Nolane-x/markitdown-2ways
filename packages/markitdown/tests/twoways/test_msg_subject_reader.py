@@ -112,7 +112,9 @@ def test_competing_authority_is_read_only() -> None:
     )
 
     for options, reason in cases:
-        document = read_msg_ir(BytesIO(make_msg_cfb(**options).data), filename="mail.msg")
+        document = read_msg_ir(
+            BytesIO(make_msg_cfb(**options).data), filename="mail.msg"
+        )
         node = _subject_node(document)
         decision = capabilities_for_node(node).for_operation("update_msg_subject_text")
         assert decision.state is CapabilityState.READ_ONLY

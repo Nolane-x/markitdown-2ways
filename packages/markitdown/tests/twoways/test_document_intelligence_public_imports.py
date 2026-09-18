@@ -4,9 +4,7 @@ import importlib
 
 
 def test_h22_symbols_are_public_without_writer_exports() -> None:
-    module = importlib.import_module(
-        "markitdown.twoways.readers.document_intelligence"
-    )
+    module = importlib.import_module("markitdown.twoways.readers.document_intelligence")
     readers = importlib.import_module("markitdown.twoways.readers")
     tw = importlib.import_module("markitdown.twoways")
 

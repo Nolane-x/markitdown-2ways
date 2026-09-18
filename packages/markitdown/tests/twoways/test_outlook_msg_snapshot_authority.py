@@ -133,9 +133,7 @@ def test_snapshot_and_markdown_limits_have_exact_boundaries() -> None:
             BytesIO(SOURCE),
             stream_info=INFO,
             snapshot=SNAPSHOT,
-            limits=OutlookMsgDerivedLimits(
-                max_snapshot_utf8_bytes=snapshot_size - 1
-            ),
+            limits=OutlookMsgDerivedLimits(max_snapshot_utf8_bytes=snapshot_size - 1),
         )
 
     with pytest.raises(ValueError, match="max_markdown_utf8_bytes"):
@@ -143,7 +141,5 @@ def test_snapshot_and_markdown_limits_have_exact_boundaries() -> None:
             BytesIO(SOURCE),
             stream_info=INFO,
             snapshot=SNAPSHOT,
-            limits=OutlookMsgDerivedLimits(
-                max_markdown_utf8_bytes=markdown_size - 1
-            ),
+            limits=OutlookMsgDerivedLimits(max_markdown_utf8_bytes=markdown_size - 1),
         )

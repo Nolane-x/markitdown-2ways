@@ -1,19 +1,18 @@
-name: h16-writer-focused
+name: h16-hardening-focused
 
 on:
   pull_request:
     paths:
       - "packages/markitdown/src/markitdown/twoways/formats/msg/**"
       - "packages/markitdown/tests/twoways/_msg_fixtures.py"
-      - "packages/markitdown/tests/twoways/test_msg_subject_writer.py"
-      - "packages/markitdown/tests/twoways/test_msg_subject_verification.py"
-      - ".github/workflows/h16-writer-focused.yml"
+      - "packages/markitdown/tests/twoways/test_msg_subject_hardening.py"
+      - ".github/workflows/h16-hardening-focused.yml"
 
 permissions:
   contents: read
 
 jobs:
-  writer-313:
+  hardening-313:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -22,5 +21,5 @@ jobs:
           python-version: "3.13"
       - name: Install package and pytest
         run: pip install -e ./packages/markitdown pytest
-      - name: Run focused H16 writer/verifier tests
-        run: pytest -q packages/markitdown/tests/twoways/test_msg_subject_writer.py packages/markitdown/tests/twoways/test_msg_subject_verification.py
+      - name: Run focused H16 hardening tests
+        run: pytest -q packages/markitdown/tests/twoways/test_msg_subject_hardening.py

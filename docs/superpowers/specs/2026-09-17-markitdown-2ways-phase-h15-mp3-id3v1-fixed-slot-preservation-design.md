@@ -135,7 +135,7 @@ The native locator uses backend `mp3`, part URI `/`, object identity `id3v1:<fie
 - `max_frame_bytes`;
 - `max_terminal_metadata_bytes`.
 
-All values are positive integers. Read-time limits are persisted under `mp3.read_limits.v1`. Writer-supplied limits are intersected field-by-field with read-time limits and can never widen authority.
+All values are positive integers. Read-time limits are persisted under `mp3.read_limits.v1` and bound to a deterministic SHA-256 fingerprint. The writer rejects a stale or forged mapping before using any budget. Writer-supplied limits are intersected field-by-field with read-time limits and can never widen authority.
 
 ## Mutation contract
 

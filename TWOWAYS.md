@@ -17,7 +17,7 @@ package-preserving EPUB 3 metadata/XHTML text mutation, bounded recursive ordina
 composition over supported typed inner formats, conservative PDF Document Information,
 existing URI-link targets, bounded terminal plain-text AcroForm `/V` incremental
 mutation, bounded existing PNG `tEXt`/`zTXt`/`iTXt` metadata value mutation, and bounded
-existing JPEG Exif IFD0 `ImageDescription`/`Artist` fixed-allocation text mutation. It is
+existing JPEG Exif IFD0 `ImageDescription`/`Artist` fixed-allocation text mutation, and\nbounded existing MP3 ID3v1/ID3v1.1 `Title`/`Artist`/`Album` fixed-slot text mutation. It is
 not an Office automation platform, workflow engine, document-management service, browser
 automation layer, archive authoring suite, or general application framework.
 
@@ -797,6 +797,59 @@ allocation growth, TIFF relocation, sub-IFD/GPS/MakerNote/UserComment mutation, 
 mutation, image/scan rewriting and identity-Markdown writeback remain unsupported. The
 existing one-way `ImageConverter` remains unchanged.
 
+
+## MP3 existing ID3v1 fixed-slot text edits
+
+Phase H15 extends v0.8 to MP3 with a fixed-width terminal ID3v1/ID3v1.1 boundary. The
+reader requires a terminal 128-byte `TAG` record, conservatively proves MPEG Layer III
+frame topology, and projects only existing `Title`, `Artist`, and `Album` fields. The
+only writable operation is `update_mp3_id3v1_text`.
+
+```python
+from io import BytesIO
+
+from markitdown.twoways import EditOperation
+from markitdown.twoways.formats.mp3 import patch_mp3, read_mp3_ir
+
+with open("song.mp3", "rb") as source_file:
+    source = source_file.read()
+
+document = read_mp3_ir(BytesIO(source), filename="song.mp3")
+title_node = next(
+    node
+    for node in document.nodes.values()
+    if node.metadata.get("mp3.id3v1_field") == "Title"
+)
+edit = EditOperation(
+    operation_id="update-title",
+    type="update_mp3_id3v1_text",
+    target_node_id=title_node.node_id,
+    payload={
+        "field": "Title",
+        "old_value": title_node.payload.text,
+        "value": "Nolane",
+    },
+)
+
+with open("song-edited.mp3", "wb") as output_file:
+    patch_mp3(document, BytesIO(source), output_file, edits=(edit,))
+```
+
+Each writable field owns exactly 30 bytes. Replacements must be representable in
+ISO-8859-1, contain no embedded NUL, and fit that allocation. Short values are NUL-padded
+inside the same slot; the file length and every byte outside requested slots remain
+exact. Read-time resource limits are persisted with tamper-evident authority and may only
+be tightened at write time.
+
+Before mutation, the writer revalidates source SHA/size, recomputes read-limit authority,
+fresh-parses MPEG and terminal metadata, rechecks native locators and slot/tag digests,
+and rejects forged cached capabilities. ID3v2, APEv2, Lyrics3, noncanonical ID3v1
+padding, free-format/unsupported/unproven MPEG topology and malformed terminal metadata
+remain read-only. H15 never creates or deletes tags and never writes Year, Comment,
+Track, Genre, MPEG audio frames, WAV, M4A or MP4 metadata. The existing one-way
+`AudioConverter` remains unchanged.
+
+
 ## PPTX and DOCX round trips
 
 PPTX and DOCX use identity Markdown where the projection/importer can prove a semantic
@@ -854,21 +907,21 @@ a serializer; `openpyxl` is an independent regression oracle.
 
 ## Current capability boundary
 
-| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9-H11 | PNG H12-H13 | JPEG H14 | PPTX | DOCX | XLSX tranche one |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners + URI-link topology + bounded AcroForm text-field evidence | strict PNG chunk topology + existing `tEXt`/`zTXt`/`iTXt` owners + bounded compressed-text/read-time resource authority | strict JPEG marker/scan topology + bounded Exif APP1/TIFF IFD0 text-owner evidence | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
-| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | routes the existing typed inner operation through the exact member chain; ZIP structure itself is read-only | `update_pdf_metadata` + `update_pdf_link_uri` + `update_pdf_text_field_value` for existing H11-safe terminal plain-text fields | `update_png_text_metadata` for an existing cross-type uniquely owned `tEXt`/`zTXt`/`iTXt` value | `update_jpeg_exif_text` for existing unique safe IFD0 `ImageDescription`/`Artist` type-2 allocations | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
-| Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only for every ZIP-backed imported node | inspection-only | inspection-only | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
-| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | root/member SHA+size, ordered nested inventory, member metadata, full chain + shared global budgets | exact source prefix + root/Info/page/annotation/AcroForm identities + annotation/form topology/fingerprints + immutable target digests + exact changed-object audit + pypdf/pdfminer/pdfplumber agreement | source SHA/size + monotonic read-time limits + chunk order/type/CRC/raw digests + bounded zlib decode + immutable compression/language metadata + exact unrequested chunk bytes | source SHA/size + monotonic limits + marker/segment topology + TIFF owner/type/count/offset/slot digests + exact outside-slot bytes | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
-| Structural edits | unsupported | unsupported | unsupported | unsupported | unsupported | unsupported; notebook/cell structure and non-source state are read-only | unsupported; package graph/inventory/nav/media are read-only | unsupported; add/delete/rename/reorder/comment/compression/encryption/raw member replacement are read-only | unsupported; no new metadata keys, annotation structure, form structure, page/object-graph edits, appearance regeneration or non-H11 form controls | unsupported; existing unique text value only, with chunk type/keyword/compression mode/language metadata immutable | unsupported; fixed-allocation existing text value only, with APP1/TIFF topology immutable | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
+| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9-H11 | PNG H12-H13 | JPEG H14 | MP3 H15 | PPTX | DOCX | XLSX tranche one |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners + URI-link topology + bounded AcroForm text-field evidence | strict PNG chunk topology + existing `tEXt`/`zTXt`/`iTXt` owners + bounded compressed-text/read-time resource authority | strict JPEG marker/scan topology + bounded Exif APP1/TIFF IFD0 text-owner evidence | terminal ID3v1/1.1 owners + conservative MPEG Layer III topology + competing-metadata authority | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
+| Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | routes the existing typed inner operation through the exact member chain; ZIP structure itself is read-only | `update_pdf_metadata` + `update_pdf_link_uri` + `update_pdf_text_field_value` for existing H11-safe terminal plain-text fields | `update_png_text_metadata` for an existing cross-type uniquely owned `tEXt`/`zTXt`/`iTXt` value | `update_jpeg_exif_text` for existing unique safe IFD0 `ImageDescription`/`Artist` type-2 allocations | `update_mp3_id3v1_text` for existing `Title`/`Artist`/`Album` 30-byte slots | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
+| Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only for every ZIP-backed imported node | inspection-only | inspection-only | inspection-only | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
+| Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | root/member SHA+size, ordered nested inventory, member metadata, full chain + shared global budgets | exact source prefix + root/Info/page/annotation/AcroForm identities + annotation/form topology/fingerprints + immutable target digests + exact changed-object audit + pypdf/pdfminer/pdfplumber agreement | source SHA/size + monotonic read-time limits + chunk order/type/CRC/raw digests + bounded zlib decode + immutable compression/language metadata + exact unrequested chunk bytes | source SHA/size + monotonic limits + marker/segment topology + TIFF owner/type/count/offset/slot digests + exact outside-slot bytes | source SHA/size + tamper-evident monotonic limits + MPEG frame/terminal metadata topology + ID3v1/slot digests + exact outside-slot bytes | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
+| Structural edits | unsupported | unsupported | unsupported | unsupported | unsupported | unsupported; notebook/cell structure and non-source state are read-only | unsupported; package graph/inventory/nav/media are read-only | unsupported; add/delete/rename/reorder/comment/compression/encryption/raw member replacement are read-only | unsupported; no new metadata keys, annotation structure, form structure, page/object-graph edits, appearance regeneration or non-H11 form controls | unsupported; existing unique text value only, with chunk type/keyword/compression mode/language metadata immutable | unsupported; fixed-allocation existing text value only, with APP1/TIFF topology immutable | unsupported; fixed terminal slots only; ID3v2/APEv2/Lyrics3/audio frames are read-only | bounded; ambiguous structures fail closed | bounded; ambiguous structures fail closed | row/column/sheet changes unsupported |
 
 H1-H5 together form the v0.5 text/structured-text parity tranche. H6-H8 extend v0.6
 with bounded Jupyter Notebook source preservation, EPUB 3 package-preserving text
 mutation and recursive ordinary ZIP composition. H9-H11 extend v0.7 with conservative
 PDF Document Information mutation, existing URI-link target preservation, and bounded
-existing terminal plain-text AcroForm value mutation. H12-H14 extend v0.8 with
-conservative native media metadata preservation across bounded PNG text owners and fixed-
-allocation JPEG Exif IFD0 text owners. Every tranche remains isolated behind exact source
+existing terminal plain-text AcroForm value mutation. H12-H15 extend v0.8 with
+conservative native media metadata preservation across bounded PNG text owners, fixed-
+allocation JPEG Exif IFD0 text owners, and fixed-slot MP3 ID3v1 text owners. Every tranche remains isolated behind exact source
 and native ownership authority.
 
 ## Fidelity details
@@ -906,6 +959,10 @@ Format-specific proof strengthens the common safety model:
   topology, Exif APP1/TIFF byte order and IFD0 entry identity, fixed value allocation,
   owner/slot digests, and byte-identical preservation of every byte outside requested
   value slots; Pillow independently checks decoded pixels and semantic Exif readback;
+- MP3 H15 binds source SHA/size, tamper-evident monotonic read-time limits, conservative
+  MPEG Layer III frame topology, terminal metadata classification, exact ID3v1/slot
+  digests and fixed 30-byte ownership; every byte outside requested slots remains exact,
+  with Mutagen used only as an optional read-only semantic oracle in tests;
 - CSV, JSON, XML, HTML and IPYNB prove every encoded byte segment outside requested
   targets remains exact through their native or composed preservation contracts;
 - EPUB proves byte-identical content for every untouched archive member and strict graph
@@ -913,7 +970,7 @@ Format-specific proof strengthens the common safety model:
 - ZIP proves byte-identical uncompressed content for untouched members, delegates touched
   terminal semantics to existing typed inner writers and re-reads the complete recursive
   candidate before output;
-- text, CSV, JSON, XML, HTML, IPYNB, EPUB, ZIP, PDF, PNG and JPEG candidates are re-read
+- text, CSV, JSON, XML, HTML, IPYNB, EPUB, ZIP, PDF, PNG, JPEG and MP3 candidates are re-read
   before destination emission according to their native or composed verifier contract;
 - XML additionally rejects DTD/entity/external-resolution surfaces before mutation;
 - HTML additionally rejects recovery-sensitive/foreign/template/table/rawtext/RCDATA
@@ -1005,6 +1062,8 @@ Current v0.8 execution documents include:
 - `docs/superpowers/plans/2026-09-17-markitdown-2ways-phase-h13-png-compressed-international-text-preservation-implementation.md`
 - `docs/superpowers/specs/2026-09-17-markitdown-2ways-phase-h14-jpeg-exif-inplace-text-preservation-design.md`
 - `docs/superpowers/plans/2026-09-17-markitdown-2ways-phase-h14-jpeg-exif-inplace-text-preservation-implementation.md`
+- `docs/superpowers/specs/2026-09-17-markitdown-2ways-phase-h15-mp3-id3v1-fixed-slot-preservation-design.md`
+- `docs/superpowers/plans/2026-09-17-markitdown-2ways-phase-h15-mp3-id3v1-fixed-slot-preservation-implementation.md`
 
 Each tranche is complete only after its exact final branch head passes pre-commit plus
 the package and OCR matrices on Python 3.10-3.13. H5 uses a separate recovery-aware
@@ -1020,8 +1079,10 @@ unchanged. H12 starts v0.8 with existing unique PNG `tEXt` value mutation; H13 e
 that same bounded operation to existing cross-type unique `zTXt`/`iTXt` owners with
 bounded decompression and immutable compression/language metadata. H14 adds only
 fixed-allocation existing Exif IFD0 `ImageDescription`/`Artist` mutation with fresh native
-authority and exact outside-slot preservation. The one-way `ImageConverter` remains
-unchanged. Annotation structural editing, form structure and non-H11 form controls,
+authority and exact outside-slot preservation. H15 adds only existing terminal ID3v1/1.1
+`Title`/`Artist`/`Album` fixed-slot mutation with fresh MPEG/terminal-metadata
+authority, tamper-evident read limits and exact outside-slot preservation. The one-way
+`ImageConverter` and `AudioConverter` remain unchanged. Annotation structural editing, form structure and non-H11 form controls,
 appearance-backed forms, non-URI actions, page text/image/content mutation, outlines, new
 metadata keys, further media-native mutation, other archive families, remote writeback
 and archive structural editing remain outside the current completed boundary.

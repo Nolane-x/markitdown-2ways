@@ -201,8 +201,7 @@ def test_repeated_reads_and_canonical_round_trip_are_deterministic() -> None:
     ),
 )
 def test_explicit_one_way_acceptance_surface(
-    info: StreamInfo,
-    accepted_by: str,
+    info: StreamInfo, accepted_by: str
 ) -> None:
     document = read_pdf_converter_snapshot_ir(
         BytesIO(SOURCE),

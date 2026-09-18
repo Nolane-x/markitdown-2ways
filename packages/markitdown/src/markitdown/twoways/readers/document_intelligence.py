@@ -25,12 +25,8 @@ from ..ir.provenance import Provenance
 from ..ir.serialization import validate_document
 
 
-_DOCUMENT_INTELLIGENCE_EVIDENCE_KEY = (
-    "twoways.document_intelligence_analysis.v1"
-)
-_DOCUMENT_INTELLIGENCE_CONVERTER_BLOB_SHA = (
-    "f8a5c8e8c82638fc5186105679ff1af0175992c8"
-)
+_DOCUMENT_INTELLIGENCE_EVIDENCE_KEY = "twoways.document_intelligence_analysis.v1"
+_DOCUMENT_INTELLIGENCE_CONVERTER_BLOB_SHA = "f8a5c8e8c82638fc5186105679ff1af0175992c8"
 
 _DEFAULT_EXTENSIONS = frozenset(
     {
@@ -118,9 +114,7 @@ def _is_owned_by_default_converter(stream_info: StreamInfo) -> bool:
 
     if extension in _DEFAULT_EXTENSIONS:
         return True
-    return any(
-        mimetype.startswith(prefix) for prefix in _DEFAULT_MIME_TYPE_PREFIXES
-    )
+    return any(mimetype.startswith(prefix) for prefix in _DEFAULT_MIME_TYPE_PREFIXES)
 
 
 def _capture_source(source_stream: BinaryIO, *, max_bytes: int) -> bytes:
@@ -132,9 +126,7 @@ def _capture_source(source_stream: BinaryIO, *, max_bytes: int) -> bytes:
             break
         chunk = source_stream.read(min(64 * 1024, remaining))
         if isinstance(chunk, str):
-            raise TypeError(
-                "Document Intelligence source stream must return bytes"
-            )
+            raise TypeError("Document Intelligence source stream must return bytes")
         if not isinstance(chunk, (bytes, bytearray, memoryview)):
             raise TypeError(
                 "Document Intelligence source stream returned a non-bytes value"
@@ -145,9 +137,7 @@ def _capture_source(source_stream: BinaryIO, *, max_bytes: int) -> bytes:
         chunks.append(data)
         total += len(data)
         if total > max_bytes:
-            raise ValueError(
-                "Document Intelligence source exceeds max_source_bytes"
-            )
+            raise ValueError("Document Intelligence source exceeds max_source_bytes")
     return b"".join(chunks)
 
 
@@ -181,9 +171,7 @@ def read_document_intelligence_analysis_ir(
     limits: DocumentIntelligenceDerivedLimits | None = None,
 ) -> DocumentIR:
     if not isinstance(analysis, DocumentIntelligenceAnalysisSnapshot):
-        raise TypeError(
-            "analysis must be a DocumentIntelligenceAnalysisSnapshot"
-        )
+        raise TypeError("analysis must be a DocumentIntelligenceAnalysisSnapshot")
 
     if not _is_owned_by_default_converter(stream_info):
         raise ValueError(
@@ -199,9 +187,7 @@ def read_document_intelligence_analysis_ir(
 
     analysis_bytes = analysis.content.encode("utf-8")
     if len(analysis_bytes) > active_limits.max_analysis_utf8_bytes:
-        raise ValueError(
-            "analysis content exceeds max_analysis_utf8_bytes"
-        )
+        raise ValueError("analysis content exceeds max_analysis_utf8_bytes")
 
     markdown = _project_markdown(analysis.content)
     markdown_bytes = markdown.encode("utf-8")
@@ -293,9 +279,7 @@ def read_document_intelligence_analysis_ir(
         payload=TextPayload(text=markdown),
         metadata={
             CAPABILITY_METADATA_KEY: _derived_capability(),
-            "twoways.document_intelligence_analysis.markdown_sha256": (
-                markdown_digest
-            ),
+            "twoways.document_intelligence_analysis.markdown_sha256": (markdown_digest),
         },
     )
 

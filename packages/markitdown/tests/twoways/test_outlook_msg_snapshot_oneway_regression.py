@@ -25,7 +25,7 @@ SOURCE = b"offline outlook msg differential fixture"
 def test_existing_outlook_msg_converter_blob_is_unchanged() -> None:
     path = Path(inspect.getsourcefile(converter_module.OutlookMsgConverter) or "")
     assert path.is_file()
-    data = path.read_bytes()
+    data = path.read_bytes().replace(b"\r\n", b"\n")
     git_blob = sha1(
         b"blob " + str(len(data)).encode("ascii") + b"\0" + data
     ).hexdigest()

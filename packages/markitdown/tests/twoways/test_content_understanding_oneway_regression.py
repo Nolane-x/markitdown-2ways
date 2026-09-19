@@ -37,7 +37,7 @@ def test_existing_content_understanding_converter_blob_is_unchanged() -> None:
         inspect.getsourcefile(converter_module.ContentUnderstandingConverter) or ""
     )
     assert path.is_file()
-    data = path.read_bytes()
+    data = path.read_bytes().replace(b"\r\n", b"\n")
     git_blob = sha1(
         b"blob " + str(len(data)).encode("ascii") + b"\0" + data
     ).hexdigest()

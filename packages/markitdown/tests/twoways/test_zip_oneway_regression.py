@@ -16,6 +16,7 @@ _PROTECTED_ZIP_CONVERTER_BLOB = "a30a8bdc8d24f4f161b83e92ee6ebea03a956e67"
 
 
 def _git_blob_sha(payload: bytes) -> str:
+    payload = payload.replace(b"\r\n", b"\n")
     header = f"blob {len(payload)}\0".encode("ascii")
     return sha1(header + payload).hexdigest()
 

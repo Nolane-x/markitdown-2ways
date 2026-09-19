@@ -15,6 +15,7 @@ _PROTECTED_PDF_CONVERTER_BLOB = "ffbcbd990cfc40a577404c453ebe47bf477c4929"
 
 
 def _git_blob_sha(payload: bytes) -> str:
+    payload = payload.replace(b"\r\n", b"\n")
     header = f"blob {len(payload)}\0".encode("ascii")
     return sha1(header + payload).hexdigest()
 

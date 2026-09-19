@@ -12,7 +12,7 @@ from markitdown.converters._zip_converter import ZipConverter
 from ._zip_fixtures import make_zip
 
 
-_PROTECTED_ZIP_CONVERTER_BLOB = "3d388a7812aa6e62dcf24751a9d092144703a6b8"
+_PROTECTED_ZIP_CONVERTER_BLOB = "a30a8bdc8d24f4f161b83e92ee6ebea03a956e67"
 
 
 def _git_blob_sha(payload: bytes) -> str:

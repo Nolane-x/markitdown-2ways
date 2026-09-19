@@ -72,8 +72,9 @@ def snapshot_zip_package(
         total = 0
         entries: list[ZipPackageEntry] = []
         for info in infos:
+            raw_name = getattr(info, "orig_filename", info.filename)
+            validate_member_name(raw_name)
             name = info.filename
-            validate_member_name(name)
             if name in seen:
                 _fail(
                     "zip.package.duplicate_member",

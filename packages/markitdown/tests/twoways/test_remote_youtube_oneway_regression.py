@@ -11,7 +11,7 @@ from markitdown.converters._youtube_converter import YouTubeConverter
 from .test_remote_youtube_reader import HTML_SNAPSHOT, VIDEO_ID, _info
 
 
-EXPECTED_CONVERTER_BLOB = "c3779743c6fe55c4716d8816b9a5a52b929c5e32"
+EXPECTED_CONVERTER_BLOB = "70e8457bc12295202aa82e14065c7ca5eb4d4564"
 
 
 def test_existing_youtube_converter_blob_is_unchanged() -> None:

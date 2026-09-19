@@ -68,7 +68,7 @@ az-content-understanding = ["azure-ai-contentunderstanding>=1.2.0b1", "azure-ide
 
 [project.urls]
 Documentation = "https://github.com/Nolane-x/markitdown-2ways/blob/main/TWOWAYS.md"
-Issues = "https://github.com/Nolane-x/markitdown-2ways/pulls"
+Issues = "https://github.com/Nolane-x/markitdown-2ways/issues"
 Source = "https://github.com/Nolane-x/markitdown-2ways"
 Upstream = "https://github.com/microsoft/markitdown"
 

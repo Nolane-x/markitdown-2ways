@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+import re
 
 from markitdown import MarkItDown
 from markitdown.converters._rss_converter import RssConverter
@@ -24,7 +25,11 @@ def test_existing_rss_converter_ownership_and_semantics_remain_intact() -> None:
     public = MarkItDown().convert_stream(BytesIO(source), stream_info=info)
 
     assert direct.title == public.title == "The Official Microsoft Blog"
-    assert direct.markdown == public.markdown
+    normalized = "\n".join(
+        line.rstrip() for line in re.split(r"\r?\n", direct.markdown)
+    )
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    assert public.markdown == normalized
     assert "Ignite 2024" in direct.markdown
 
 

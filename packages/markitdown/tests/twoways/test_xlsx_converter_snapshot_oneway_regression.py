@@ -49,11 +49,7 @@ def test_h29_matches_full_one_way_xlsx_assembly_offline(monkeypatch) -> None:
         "<data>": "  second sheet  ",
     }
 
-    monkeypatch.setattr(
-        converter_module,
-        "_read_xlsx_sheets",
-        lambda file_stream: frames,
-    )
+    monkeypatch.setattr(converter_module, "_read_xlsx_sheets", lambda file_stream: frames)
     monkeypatch.setattr(converter_module, "_xlsx_dependency_exc_info", None)
 
     converter = converter_module.XlsxConverter()
@@ -67,9 +63,7 @@ def test_h29_matches_full_one_way_xlsx_assembly_offline(monkeypatch) -> None:
 
     info = StreamInfo(
         extension=".xlsx",
-        mimetype=(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         filename="fixture.xlsx",
     )
     one_way = converter.convert(BytesIO(SOURCE), info)

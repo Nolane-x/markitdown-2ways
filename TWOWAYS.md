@@ -2996,6 +2996,27 @@ never gain native locators or writers. H21's optional transcript plus H22/H23 an
 native owners. Direct typed native paths remain
 writable only where source evidence is sufficient.
 
+## v1.0 contract freeze
+
+Phase H30 closes the roadmap's v1.0.0 gate without widening any native or derived
+capability. The machine-readable release contract is
+`docs/twoways-v1-contract.json`. It freezes the current public
+`markitdown.twoways.__all__` surface, IR schema identity, capability wire
+key/states, native support matrix, H18-H29 derived support matrix and explicit
+out-of-scope mutation surfaces.
+
+The v1.0 product/release contract is intentionally separate from the serialized
+`MarkItDown2WaysDocument` schema version. H30 does **not** change schema
+`0.1.0`, the supported schema major, or the upstream MarkItDown package version.
+Future public-contract changes must update the manifest and its regression court
+intentionally; future IR schema-major changes remain a separate compatibility event.
+
+H30 adds no reader, writer, converter, edit type or remote writeback path. It turns
+the H1-H29 proven boundary into a long-term regression authority: listed native
+operations are writable only under their existing format-specific proofs, ZIP
+remains a preservation/routing container with read-only archive structure, and every
+derived surface remains non-native and non-writeback.
+
 ## Scope discipline and roadmap
 
 New work should improve fidelity, compatibility, safety, tests, or reduce complexity.
@@ -3064,7 +3085,7 @@ Current v0.9 execution documents include:
 - `docs/superpowers/specs/2026-09-18-markitdown-2ways-phase-h23-content-understanding-derived-analysis-design.md`
 - `docs/superpowers/plans/2026-09-18-markitdown-2ways-phase-h23-content-understanding-derived-analysis-implementation.md`
 
-Current v1.0-gate execution documents include:
+v1.0-gate execution documents include:
 
 - `docs/superpowers/specs/2026-09-18-markitdown-2ways-phase-h24-audio-derived-snapshot-parity-design.md`
 - `docs/superpowers/plans/2026-09-18-markitdown-2ways-phase-h24-audio-derived-snapshot-parity-implementation.md`
@@ -3074,6 +3095,13 @@ Current v1.0-gate execution documents include:
 - `docs/superpowers/plans/2026-09-18-markitdown-2ways-phase-h26-outlook-msg-derived-semantic-parity-implementation.md`
 - `docs/superpowers/specs/2026-09-18-markitdown-2ways-phase-h27-pdf-derived-extraction-parity-design.md`
 - `docs/superpowers/plans/2026-09-18-markitdown-2ways-phase-h27-pdf-derived-extraction-parity-implementation.md`
+- `docs/superpowers/specs/2026-09-19-markitdown-2ways-phase-h28-xls-derived-sheet-parity-design.md`
+- `docs/superpowers/plans/2026-09-19-markitdown-2ways-phase-h28-xls-derived-sheet-parity-implementation.md`
+- `docs/superpowers/specs/2026-09-19-markitdown-2ways-phase-h29-xlsx-derived-sheet-parity-design.md`
+- `docs/superpowers/plans/2026-09-19-markitdown-2ways-phase-h29-xlsx-derived-sheet-parity-implementation.md`
+- `docs/superpowers/specs/2026-09-19-markitdown-2ways-phase-h30-v1-contract-support-matrix-closure-design.md`
+- `docs/superpowers/plans/2026-09-19-markitdown-2ways-phase-h30-v1-contract-support-matrix-closure-implementation.md`
+- `docs/twoways-v1-contract.json`
 
 Each tranche is complete only after its exact final branch head passes pre-commit plus
 the package and OCR matrices on Python 3.10-3.13. H5 uses a separate recovery-aware
@@ -3112,7 +3140,7 @@ bridge by independently verifying default file-type/modality/analyzer/content-ty
 and binding exact caller-materialized `to_llm_input()` output, again with no SDK,
 credential or network action. H24 then closes the unchanged `AudioConverter`'s local
 metadata/transcript derived-semantic gap for WAV/MP3/M4A/MP4 while keeping H15 as the
-only native MP3 authority and adding no WAV/M4A/MP4 writer. H25-H29 then bind the unchanged ImageConverter, OutlookMsgConverter, PdfConverter, XlsConverter and XlsxConverter derived semantic projections without creating new native write authority. The one-way
+only native MP3 authority and adding no WAV/M4A/MP4 writer. H25-H29 then bind the unchanged ImageConverter, OutlookMsgConverter, PdfConverter, XlsConverter and XlsxConverter derived semantic projections without creating new native write authority. H30 then freezes the resulting public/wire/support boundary as the v1.0 contract without expanding capability or changing the IR schema. The one-way
 `ContentUnderstandingConverter`, `ImageConverter`, `AudioConverter`, `OutlookMsgConverter`, `PdfConverter`, `XlsConverter`, `WikipediaConverter`,
 `BingSerpConverter`, `RssConverter` and `YouTubeConverter` remain unchanged. Annotation structural editing, form structure and non-H11 form controls,
 appearance-backed forms, non-URI actions, page text/image/content mutation, outlines, new

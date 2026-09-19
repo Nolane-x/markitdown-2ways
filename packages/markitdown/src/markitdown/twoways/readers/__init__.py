@@ -38,6 +38,12 @@ from .xls_converter import (
     XlsSheetMarkdownSnapshot,
     read_xls_converter_snapshot_ir,
 )
+from .xlsx_converter import (
+    XlsxConverterSnapshot,
+    XlsxDerivedLimits,
+    XlsxSheetMarkdownSnapshot,
+    read_xlsx_converter_snapshot_ir,
+)
 from .youtube import (
     YouTubeDerivedLimits,
     YouTubeTranscriptSnapshot,
@@ -63,6 +69,9 @@ __all__ = [
     "XlsConverterSnapshot",
     "XlsDerivedLimits",
     "XlsSheetMarkdownSnapshot",
+    "XlsxConverterSnapshot",
+    "XlsxDerivedLimits",
+    "XlsxSheetMarkdownSnapshot",
     "YouTubeDerivedLimits",
     "YouTubeTranscriptSnapshot",
     "read_audio_snapshot_ir",
@@ -75,5 +84,6 @@ __all__ = [
     "read_remote_feed_snapshot_ir",
     "read_wikipedia_snapshot_ir",
     "read_xls_converter_snapshot_ir",
+    "read_xlsx_converter_snapshot_ir",
     "read_youtube_snapshot_ir",
 ]

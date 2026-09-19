@@ -2766,6 +2766,38 @@ materialized UTF-8 Markdown and final workbook Markdown, with source reads cappe
 64 KiB. The one-way `_xlsx_converter.py` remains byte-identical and is protected by
 a Git-blob regression court.
 
+## XlsxConverter derived sheet parity
+
+Phase H29 separates the unchanged one-way `XlsxConverter` visible workbook Markdown
+from the native XLSX reader/writer and identity-Markdown authority. Native XLSX remains
+authoritative for SpreadsheetML typed cells and proven `update_sheet_cells` mutation;
+H29 exists only to reproduce the one-way pandas/openpyxl/HtmlConverter-facing output.
+
+The caller supplies exact XLSX source bytes plus an ordered tuple of per-sheet Markdown
+values materialized immediately before `XlsxConverter` applies its local strip/scaffold
+logic. For every sheet H29 reproduces exactly:
+
+```text
+## {sheet name}
+{sheet markdown stripped at both ends}
+
+```
+
+The complete concatenation is then stripped once. Raw and stripped per-sheet Markdown
+are independently digested, sheet order is identity-bearing, and an optional
+`materialization_path` is recorded only as unverified descriptive provenance.
+
+Production H29 performs no XLSX/ZIP/OOXML parsing and imports or executes neither pandas
+nor openpyxl. It does not execute the one-way legacy `showZeroes` repair, DataFrame
+rendering, HtmlConverter, BeautifulSoup, markdownify, network or subprocess work. The
+root is `CapabilityState.DERIVED` with reason `xlsx.output.not_native_writable`, has
+no native locator and exposes no writer.
+
+`XlsxDerivedLimits` independently bounds source bytes, sheet count, aggregate raw
+materialized Markdown and final workbook Markdown, with source reads capped at 64 KiB.
+The protected `_xlsx_converter.py` remains byte-identical. Native `read_xlsx_ir`,
+identity Markdown and `patch_xlsx` remain the sole XLSX mutation authorities.
+
 ## PPTX and DOCX round trips
 
 PPTX and DOCX use identity Markdown where the projection/importer can prove a semantic
@@ -2823,9 +2855,9 @@ a serializer; `openpyxl` is an independent regression oracle.
 
 ## Current capability boundary
 
-| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9-H11 | PNG H12-H13 | JPEG H14 | MP3 H15 | MSG H16 | XLS H17 | Derived H18-H28 | PPTX | DOCX | XLSX tranche one |
+| Area | Text / Markdown H1 | CSV H2 | JSON H3 | XML H4 | HTML H5 | IPYNB H6 | EPUB H7 | ZIP H8 | PDF H9-H11 | PNG H12-H13 | JPEG H14 | MP3 H15 | MSG H16 | XLS H17 | Derived H18-H29 | PPTX | DOCX | XLSX tranche one |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners + URI-link topology + bounded AcroForm text-field evidence | strict PNG chunk topology + existing `tEXt`/`zTXt`/`iTXt` owners + bounded compressed-text/read-time resource authority | strict JPEG marker/scan topology + bounded Exif APP1/TIFF IFD0 text-owner evidence | terminal ID3v1/1.1 owners + conservative MPEG Layer III topology + competing-metadata authority | bounded CFB v3/v4 topology + top-level Unicode `PidTagSubject`/MAPI authority | bounded CFB v3/v4 + BIFF8 workbook/sheet topology + existing NUMBER owners | materialized Wikipedia/Bing SERP/feed/YouTube snapshots + optional YouTube transcript + source/analysis-separated Azure bridges + H24 AudioConverter materialized Markdown + H25 ImageConverter metadata/caption materializations + H26 Outlook MSG semantic materialization + H27 PdfConverter extraction materialization + H28 XlsConverter ordered sheet materializations | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
+| Read into `DocumentIR` | exact decoded lexical source + representation | lexical field spans + table semantics | strict spans + RFC 6901 hierarchy | strict XML owners + namespace identity | lexical owners + independent recovery signature | notebook/cell source semantics + lexical representation | OCF package graph + selected OPF/XHTML owners | ordered recursive inventory + namespaced supported inner IR | strict PDF source + existing `/Info` text owners + URI-link topology + bounded AcroForm text-field evidence | strict PNG chunk topology + existing `tEXt`/`zTXt`/`iTXt` owners + bounded compressed-text/read-time resource authority | strict JPEG marker/scan topology + bounded Exif APP1/TIFF IFD0 text-owner evidence | terminal ID3v1/1.1 owners + conservative MPEG Layer III topology + competing-metadata authority | bounded CFB v3/v4 topology + top-level Unicode `PidTagSubject`/MAPI authority | bounded CFB v3/v4 + BIFF8 workbook/sheet topology + existing NUMBER owners | materialized Wikipedia/Bing SERP/feed/YouTube snapshots + optional YouTube transcript + source/analysis-separated Azure bridges + H24 AudioConverter materialized Markdown + H25 ImageConverter metadata/caption materializations + H26 Outlook MSG semantic materialization + H27 PdfConverter extraction materialization + H28 XlsConverter ordered sheet materializations + H29 XlsxConverter ordered sheet materializations | slides/groups/notes/text/media/tables | body/headers/footers/text/media/tables | worksheets and typed cells |
 | Primary patch | `replace_text` | `update_csv_cells` | `replace_json_scalar` | `replace_xml_text` / `replace_xml_attribute` | `replace_html_text` / `replace_html_attribute` | `replace_ipynb_cell_source` via H3 scalar lowering | `replace_epub_metadata_text` / `replace_epub_xhtml_text` via H4 lowering | routes the existing typed inner operation through the exact member chain; ZIP structure itself is read-only | `update_pdf_metadata` + `update_pdf_link_uri` + `update_pdf_text_field_value` for existing H11-safe terminal plain-text fields | `update_png_text_metadata` for an existing cross-type uniquely owned `tEXt`/`zTXt`/`iTXt` value | `update_jpeg_exif_text` for existing unique safe IFD0 `ImageDescription`/`Artist` type-2 allocations | `update_mp3_id3v1_text` for existing `Title`/`Artist`/`Album` 30-byte slots | `update_msg_subject_text` for one existing top-level Unicode Subject stream with exact encoded length | `update_sheet_cells` for existing unique BIFF8 NUMBER Xnum slots only | none; `replace_text` is explicit DERIVED/read-only | bounded native text/style/geometry/media/table | bounded native text/style/media/table | scalar non-formula, non-merged cells |
 | Identity Markdown edit | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only for every ZIP-backed imported node | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | inspection-only | supported safe semantic regions | supported safe semantic regions | supported safe simple cell regions |
 | Representation proof | encoding/BOM/newline | encoding/BOM + dialect/spans/terminators | encoding/BOM + pointer/span/raw token | encoding/BOM/declaration + lexical spans/namespaces | encoding/BOM/meta + lexical spans + recovery signature | encoding/BOM + source string/list shape/cardinality + notebook reread | ordered OCF inventory + member digests + OPF graph + H4 XML ownership | root/member SHA+size, ordered nested inventory, member metadata, full chain + shared global budgets | exact source prefix + root/Info/page/annotation/AcroForm identities + annotation/form topology/fingerprints + immutable target digests + exact changed-object audit + pypdf/pdfminer/pdfplumber agreement | source SHA/size + monotonic read-time limits + chunk order/type/CRC/raw digests + bounded zlib decode + immutable compression/language metadata + exact unrequested chunk bytes | source SHA/size + monotonic limits + marker/segment topology + TIFF owner/type/count/offset/slot digests + exact outside-slot bytes | source SHA/size + tamper-evident monotonic limits + MPEG frame/terminal metadata topology + ID3v1/slot digests + exact outside-slot bytes | source SHA/size + tamper-evident limits + CFB FAT/DIFAT/MiniFAT/directory topology + MAPI entry/stream/chain/range digests + exact outside-range bytes | source SHA/size + tamper-evident limits + CFB allocation/directory authority + BIFF record/sheet/NUMBER owner digests + exact outside-slot bytes | remote/snapshot evidence through H21; H22 separately binds Document Intelligence source/analysis/Markdown evidence; H23 binds Content Understanding source/materialized-output plus verified default routing; H24 independently binds local audio source/materialized Markdown plus exact AudioConverter acceptance/transcription-route evidence without optional dependency execution; H25 independently binds image source, ordered metadata materialization and optional caption materialization while reproducing exact ImageConverter ordering/strip semantics without ExifTool or LLM execution; H26 independently binds MSG source plus materialized From/To/Subject/body while reproducing exact one-way message scaffold/title semantics without OLE or charset runtime dependencies; H27 independently binds PDF source plus pre-postprocess extraction text and reproduces the exact one-way partial-numbering transform without pdfminer/pdfplumber runtime execution | OPC/XML ownership | OPC/XML ownership | OPC/XML + typed cell ownership |
@@ -2959,7 +2991,7 @@ cannot become an alternate archive mutation path. H9-H11 apply the same inspecti
 boundary to PDF metadata, URI-link and form-value blocks. H12-H13 keep PNG native text
 identity projection inspection-only; H14 applies the same inspection-only boundary to
 JPEG Exif text owners; H15-H17 apply it to MP3 ID3v1, MSG Subject and legacy XLS NUMBER owners.
-H18-H28 derived text is likewise inspection-only and explicitly derived; these nodes
+H18-H29 derived text is likewise inspection-only and explicitly derived; these nodes
 never gain native locators or writers. H21's optional transcript plus H22/H23 analysis snapshots are provenance, not writable
 native owners. Direct typed native paths remain
 writable only where source evidence is sufficient.
@@ -3080,7 +3112,7 @@ bridge by independently verifying default file-type/modality/analyzer/content-ty
 and binding exact caller-materialized `to_llm_input()` output, again with no SDK,
 credential or network action. H24 then closes the unchanged `AudioConverter`'s local
 metadata/transcript derived-semantic gap for WAV/MP3/M4A/MP4 while keeping H15 as the
-only native MP3 authority and adding no WAV/M4A/MP4 writer. H25-H28 then bind the unchanged ImageConverter, OutlookMsgConverter, PdfConverter and XlsConverter derived semantic projections without creating new native write authority. The one-way
+only native MP3 authority and adding no WAV/M4A/MP4 writer. H25-H29 then bind the unchanged ImageConverter, OutlookMsgConverter, PdfConverter, XlsConverter and XlsxConverter derived semantic projections without creating new native write authority. The one-way
 `ContentUnderstandingConverter`, `ImageConverter`, `AudioConverter`, `OutlookMsgConverter`, `PdfConverter`, `XlsConverter`, `WikipediaConverter`,
 `BingSerpConverter`, `RssConverter` and `YouTubeConverter` remain unchanged. Annotation structural editing, form structure and non-H11 form controls,
 appearance-backed forms, non-URI actions, page text/image/content mutation, outlines, new

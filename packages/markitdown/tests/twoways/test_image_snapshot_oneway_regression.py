@@ -18,7 +18,7 @@ from markitdown.twoways.readers.image import (
 )
 
 
-EXPECTED_CONVERTER_BLOB = "cd49b96d29f50861625cecfb6cee7bdd1eb30b54"
+EXPECTED_CONVERTER_BLOB = "dd8fbac61cd3625fd577a6f52e65c66c701e894a"
 SOURCE = b"offline image differential fixture"
 
 

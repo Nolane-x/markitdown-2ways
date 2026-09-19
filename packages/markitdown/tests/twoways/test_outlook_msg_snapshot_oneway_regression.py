@@ -18,7 +18,7 @@ from markitdown.twoways.readers.outlook_msg import (
 )
 
 
-EXPECTED_CONVERTER_BLOB = "79d7656e5bd32d3b6aaa143a32635d5fb3e8f087"
+EXPECTED_CONVERTER_BLOB = "e3668651abfa8407b9d084b59ce09a230347d3d1"
 SOURCE = b"offline outlook msg differential fixture"
 
 

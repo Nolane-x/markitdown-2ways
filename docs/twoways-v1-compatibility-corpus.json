@@ -1,0 +1,27 @@
+{
+  "corpus_name": "MarkItDown 2Ways v1 compatibility corpus",
+  "corpus_version": "1.0.0",
+  "ir_schema": {
+    "name": "MarkItDown2WaysDocument",
+    "version": "0.1.0",
+    "supported_major": 0
+  },
+  "goldens": [
+    {
+      "name": "minimal-defaults",
+      "canonical_size_bytes": 242,
+      "sha256": "22aca8403e891c3b79badd8e1219ca84d0506f603c2d0d5e2d72793f3cd7aa07"
+    },
+    {
+      "name": "representative-document",
+      "canonical_size_bytes": 3265,
+      "sha256": "cc6609eb20846d548a73986df01fae2d43490199655c92a2bbf15d75d9c0f0cf"
+    }
+  ],
+  "decoder_contract": {
+    "strict_unknown_fields": "reject",
+    "forward_unknown_fields": "ignore",
+    "unknown_major": "reject",
+    "encode_decode_encode": "byte-identical"
+  }
+}

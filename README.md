@@ -99,6 +99,10 @@ print(result.markdown)
 
 The fork intentionally keeps the original MarkItDown conversion workflow available alongside 2Ways.
 
+### Upstream LLM image-description behavior
+
+The synced one-way converter path follows upstream MarkItDown's client-driven retry behavior. For OpenAI-compatible clients, retry policy is configured on the client itself (for example, `OpenAI(max_retries=5)`). If image description still fails after the client's retries, MarkItDown can continue through other applicable converter fallbacks and raises `FileConversionException` only when no converter succeeds.
+
 ## 2Ways example
 
 ```python

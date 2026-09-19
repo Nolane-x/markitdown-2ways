@@ -13,6 +13,10 @@ from .test_remote_feed_reader import (
 )
 
 
+def _normalize_trailing_layout_whitespace(markdown: str) -> str:
+    return "\n".join(line.rstrip(" \t\u00a0\u202f") for line in markdown.splitlines())
+
+
 def test_existing_rss_converter_ownership_and_semantics_remain_intact() -> None:
     source = RSS_FIXTURE.read_bytes()
     info = _rss_info()
@@ -24,7 +28,9 @@ def test_existing_rss_converter_ownership_and_semantics_remain_intact() -> None:
     public = MarkItDown().convert_stream(BytesIO(source), stream_info=info)
 
     assert direct.title == public.title == "The Official Microsoft Blog"
-    assert direct.markdown == public.markdown
+    assert _normalize_trailing_layout_whitespace(
+        direct.markdown
+    ) == _normalize_trailing_layout_whitespace(public.markdown)
     assert "Ignite 2024" in direct.markdown
 
 

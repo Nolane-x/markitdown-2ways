@@ -20,7 +20,7 @@ def make_zip_entries(
         archive.comment = archive_comment
         for name, payload in entries:
             info = ZipInfo(name, date_time=(2026, 1, 2, 3, 4, 6))
-            info.compress_type = per_member_compression.get(name, compression)
+            # ZipInfo normalizes backslashes to "/" on Windows. Restore the\n            # caller-supplied member spelling so unsafe-path fixtures exercise\n            # the same raw archive name on every platform.\n            info.filename = name\n            info.orig_filename = name\n            info.compress_type = per_member_compression.get(name, compression)
             info.create_system = 3
             if name == symlink_name:
                 info.external_attr = (stat.S_IFLNK | 0o777) << 16

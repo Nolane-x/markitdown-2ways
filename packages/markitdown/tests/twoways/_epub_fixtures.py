@@ -50,7 +50,7 @@ def _opf(
 
 def _zip_info(name: str, *, compression: int, extra: bytes = b"") -> ZipInfo:
     info = ZipInfo(name, date_time=(2026, 9, 13, 0, 0, 0))
-    info.compress_type = compression
+    # ZipInfo normalizes backslashes to "/" on Windows. Restore the raw\n    # fixture spelling so unsafe member-path tests stay cross-platform.\n    info.filename = name\n    info.orig_filename = name\n    info.compress_type = compression
     info.extra = extra
     return info
 

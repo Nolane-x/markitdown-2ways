@@ -1,0 +1,377 @@
+{
+  "contract_name": "MarkItDown 2Ways",
+  "contract_version": "1.0.0",
+  "ir_schema": {
+    "name": "MarkItDown2WaysDocument",
+    "version": "0.1.0",
+    "supported_major": 0
+  },
+  "capability_wire": {
+    "metadata_key": "twoways.capabilities.v1",
+    "states": [
+      "derived",
+      "read-only",
+      "writable"
+    ]
+  },
+  "public_root_symbols": [
+    "AmbiguousNativeLocatorError",
+    "AudioConverterSnapshot",
+    "AudioDerivedLimits",
+    "BoundingBox",
+    "Canvas",
+    "CapabilityDecision",
+    "CapabilityReasonSummary",
+    "CapabilityReport",
+    "CapabilityState",
+    "ChartPayload",
+    "ContentUnderstandingAnalysisSnapshot",
+    "ContentUnderstandingDerivedLimits",
+    "Diagnostic",
+    "DocumentIR",
+    "DocumentIRReader",
+    "DocumentIdFactory",
+    "DocumentIntelligenceAnalysisSnapshot",
+    "DocumentIntelligenceDerivedLimits",
+    "DocumentMetadata",
+    "DocumentWriter",
+    "EditOperation",
+    "EditPrecondition",
+    "FidelityEvidence",
+    "FidelityReport",
+    "FidelityStatus",
+    "Geometry",
+    "IRValidationError",
+    "ImageDerivedLimits",
+    "ImageDescriptionSnapshot",
+    "ImageMetadataSnapshot",
+    "ImagePayload",
+    "MarkdownIdentityError",
+    "MarkdownImportError",
+    "MarkdownImportResult",
+    "MarkdownProjection",
+    "MarkdownProjectionError",
+    "MarkdownProjectionMode",
+    "MarkdownProjectionOptions",
+    "MarkdownSemanticParseError",
+    "MissingOptionalDependencyError",
+    "NativeLocator",
+    "NativePayload",
+    "Node",
+    "NodeCapabilityProfile",
+    "OOXMLPackageError",
+    "OutlookMsgConverterSnapshot",
+    "OutlookMsgDerivedLimits",
+    "Paragraph",
+    "PatchPreconditionError",
+    "PdfConverterExtractionSnapshot",
+    "PdfDerivedLimits",
+    "ProjectionManifest",
+    "Provenance",
+    "ReaderNotFoundError",
+    "Relationship",
+    "RemoteDerivedLimits",
+    "Resource",
+    "RoundTripVerificationError",
+    "SourceDescriptor",
+    "SourcePackageMismatchError",
+    "Style",
+    "TableCell",
+    "TablePayload",
+    "TargetInfo",
+    "TextPayload",
+    "TextRun",
+    "TwoWayError",
+    "UnknownNativePayload",
+    "UnsupportedEditError",
+    "UnsupportedSchemaVersionError",
+    "WriterNotFoundError",
+    "WriterResult",
+    "XlsConverterSnapshot",
+    "XlsDerivedLimits",
+    "XlsSheetMarkdownSnapshot",
+    "XlsxConverterSnapshot",
+    "XlsxDerivedLimits",
+    "XlsxSheetMarkdownSnapshot",
+    "YouTubeDerivedLimits",
+    "YouTubeTranscriptSnapshot",
+    "build_capability_report",
+    "canonical_json_bytes",
+    "canonical_json_digest",
+    "capabilities_for_node",
+    "decode_document",
+    "import_identity_markdown",
+    "project_markdown",
+    "projection_manifest_bytes",
+    "projection_manifest_digest",
+    "read_audio_snapshot_ir",
+    "read_bing_serp_snapshot_ir",
+    "read_content_understanding_analysis_ir",
+    "read_document_intelligence_analysis_ir",
+    "read_image_snapshot_ir",
+    "read_markdown_ir",
+    "read_outlook_msg_snapshot_ir",
+    "read_pdf_converter_snapshot_ir",
+    "read_remote_feed_snapshot_ir",
+    "read_wikipedia_snapshot_ir",
+    "read_xls_converter_snapshot_ir",
+    "read_xlsx_converter_snapshot_ir",
+    "read_youtube_snapshot_ir",
+    "to_canonical_dict",
+    "validate_document"
+  ],
+  "native_support": [
+    {
+      "format": "text-markdown",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "replace_text"
+      ],
+      "preservation": "source encoding, BOM, newline policy and untouched lexical source remain authoritative"
+    },
+    {
+      "format": "csv",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "update_csv_cells"
+      ],
+      "preservation": "dialect, lexical field spans, quoting and physical row terminators are preserved outside targets"
+    },
+    {
+      "format": "json",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "replace_json_scalar"
+      ],
+      "preservation": "strict JSON pointer ownership and lexical scalar spans patch target values without whole-document serialization"
+    },
+    {
+      "format": "xml",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "replace_xml_attribute",
+        "replace_xml_text"
+      ],
+      "preservation": "namespace-aware lexical ownership, declaration and untouched source bytes remain authoritative"
+    },
+    {
+      "format": "html",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "replace_html_attribute",
+        "replace_html_text"
+      ],
+      "preservation": "recovery-aware lexical ownership and independent recovery signatures gate mutation"
+    },
+    {
+      "format": "ipynb",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "replace_ipynb_cell_source"
+      ],
+      "preservation": "cell source representation and notebook cardinality are preserved through JSON lexical lowering"
+    },
+    {
+      "format": "epub",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "replace_epub_metadata_text",
+        "replace_epub_xhtml_text"
+      ],
+      "preservation": "OCF inventory, package graph and untouched member bytes are preserved through XML lowering"
+    },
+    {
+      "format": "zip",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [],
+      "routed_inner_operations": true,
+      "preservation": "supported inner typed operations may be routed through exact member chains; ZIP structure remains read-only"
+    },
+    {
+      "format": "pdf",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "update_pdf_link_uri",
+        "update_pdf_metadata",
+        "update_pdf_text_field_value"
+      ],
+      "preservation": "append-only incremental updates preserve original bytes as a prefix and require strict native ownership proofs"
+    },
+    {
+      "format": "png",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "update_png_text_metadata"
+      ],
+      "preservation": "existing uniquely owned text chunks only; unrequested chunks remain byte-identical"
+    },
+    {
+      "format": "jpeg",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "update_jpeg_exif_text"
+      ],
+      "preservation": "existing fixed-allocation Exif IFD0 text owners only; bytes outside authorized slots remain exact"
+    },
+    {
+      "format": "mp3",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "update_mp3_id3v1_text"
+      ],
+      "preservation": "existing terminal ID3v1 fixed slots only; MPEG/audio bytes and unrelated metadata remain exact"
+    },
+    {
+      "format": "msg",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "update_msg_subject_text"
+      ],
+      "preservation": "existing top-level Unicode Subject stream with exact encoded length only; CFB/MAPI topology remains fixed"
+    },
+    {
+      "format": "xls",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "update_sheet_cells"
+      ],
+      "preservation": "existing BIFF8 NUMBER Xnum slots only; CFB/BIFF record and allocation topology remain immutable"
+    },
+    {
+      "format": "xlsx",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "update_sheet_cells"
+      ],
+      "preservation": "typed non-formula non-merged cells only; original OOXML package and untouched members remain authoritative"
+    },
+    {
+      "format": "pptx",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "move_resize",
+        "replace_text",
+        "set_alt_text",
+        "set_text_style",
+        "update_table_cells"
+      ],
+      "preservation": "bounded native slide text/style/geometry/alt-text/table mutation with ambiguous structures failing closed"
+    },
+    {
+      "format": "docx",
+      "read": true,
+      "native_write": true,
+      "direct_operations": [
+        "replace_text",
+        "set_alt_text",
+        "set_text_style",
+        "update_table_cells"
+      ],
+      "preservation": "bounded native document text/style/alt-text/table mutation with ambiguous structures failing closed"
+    }
+  ],
+  "derived_support": [
+    {
+      "surface": "wikipedia",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "caller-materialized Wikipedia remote snapshot; H18"
+    },
+    {
+      "surface": "bing-serp",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "caller-materialized Bing SERP snapshot; H19"
+    },
+    {
+      "surface": "remote-feed",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "caller-materialized remote RSS/Atom snapshot; H20"
+    },
+    {
+      "surface": "youtube",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "caller-materialized YouTube HTML plus optional transcript provenance; H21"
+    },
+    {
+      "surface": "document-intelligence",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "source-bound caller-materialized Azure Document Intelligence analysis; H22"
+    },
+    {
+      "surface": "content-understanding",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "source-bound caller-materialized Azure Content Understanding output with routing proof; H23"
+    },
+    {
+      "surface": "audio-converter",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "local audio source plus caller-materialized one-way metadata/transcript projection; H24"
+    },
+    {
+      "surface": "image-converter",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "image source plus caller-materialized metadata/caption projection; H25"
+    },
+    {
+      "surface": "outlook-msg-converter",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "MSG source plus caller-materialized one-way message semantics; H26"
+    },
+    {
+      "surface": "pdf-converter",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "PDF source plus caller-materialized one-way extraction projection; H27"
+    },
+    {
+      "surface": "xls-converter",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "XLS source plus ordered caller-materialized sheet Markdown; H28"
+    },
+    {
+      "surface": "xlsx-converter",
+      "state": "derived",
+      "native_writeback": false,
+      "authority": "XLSX source plus ordered caller-materialized sheet Markdown; H29"
+    }
+  ],
+  "out_of_scope": [
+    "remote origin writeback",
+    "archive add/delete/rename/reorder or structural mutation",
+    "PDF page text/image/content-stream mutation",
+    "PDF annotation or form structural editing beyond proven H9-H11 owners",
+    "new PDF metadata keys or appearance regeneration",
+    "row/column/sheet structural spreadsheet mutation",
+    "XLSX formula mutation, merge/unmerge, chart/drawing mutation or style mutation",
+    "ID3v2/APEv2/Lyrics3 or audio-frame mutation",
+    "JPEG/PNG structural or pixel mutation",
+    "Outlook MSG CFB/MAPI structural mutation or non-Subject property mutation",
+    "unsupported OOXML SmartArt, macro, OLE or ambiguous relationship mutation",
+    "derived semantic text being treated as native writable ownership"
+  ]
+}

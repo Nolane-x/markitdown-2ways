@@ -43,7 +43,11 @@ class CapabilityDecision:
         if not isinstance(self.constraints, Mapping):
             raise ValueError("capability constraints must be a mapping")
         object.__setattr__(self, "state", state)
-        object.__setattr__(self, "constraints", dict(self.constraints))
+        object.__setattr__(
+            self,
+            "constraints",
+            MappingProxyType(dict(self.constraints)),
+        )
 
 
 @dataclass(frozen=True)
@@ -55,7 +59,16 @@ class NodeCapabilityProfile:
     def __post_init__(self) -> None:
         if not self.node_id:
             raise ValueError("node_id must be non-empty")
+        try:
+            default_state = (
+                self.default_state
+                if isinstance(self.default_state, CapabilityState)
+                else CapabilityState(self.default_state)
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("capability default_state is invalid") from exc
         object.__setattr__(self, "decisions", tuple(self.decisions))
+        object.__setattr__(self, "default_state", default_state)
 
     def for_operation(self, operation: str) -> CapabilityDecision:
         for decision in self.decisions:

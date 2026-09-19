@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from hashlib import sha1
 from io import BytesIO
 import inspect
@@ -17,7 +18,7 @@ from markitdown.twoways.readers.xlsx_converter import (
 )
 
 
-EXPECTED_CONVERTER_BLOB = "355dd8f8d74ab5c9a40bba37e1f7a7d601eeba27"
+EXPECTED_CONVERTER_BLOB = "9f794a3b77e34c84b67358c21001ad7a87f3b9c4"
 SOURCE = b"offline H29 XLSX differential fixture"
 
 
@@ -49,10 +50,16 @@ def test_h29_matches_full_one_way_xlsx_assembly_offline(monkeypatch) -> None:
         "<data>": "  second sheet  ",
     }
 
+    @contextmanager
+    def _read_xlsx_sheets(file_stream):
+        assert file_stream.read() == SOURCE
+        file_stream.seek(0)
+        yield frames, file_stream
+
     monkeypatch.setattr(
         converter_module,
         "_read_xlsx_sheets",
-        lambda file_stream: frames,
+        _read_xlsx_sheets,
     )
     monkeypatch.setattr(converter_module, "_xlsx_dependency_exc_info", None)
 

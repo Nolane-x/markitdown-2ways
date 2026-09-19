@@ -1,1 +1,8 @@
-*.py text eol=lf\n
+packages/markitdown/tests/test_files/** linguist-vendored
+packages/markitdown-sample-plugin/tests/test_files/** linguist-vendored
+
+# Treat PDF files as binary to prevent line ending conversion
+*.pdf binary
+
+# Keep Python source canonical across Windows/Linux for blob regression courts
+*.py text eol=lf

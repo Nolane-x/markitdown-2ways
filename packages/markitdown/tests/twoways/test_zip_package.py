@@ -44,8 +44,11 @@ def test_zip_snapshot_records_ordered_inventory_and_member_digests() -> None:
     ["../escape", "/absolute", "C:/drive", "dir\\evil", "a/../evil"],
 )
 def test_zip_unsafe_member_paths_fail_closed(name: str) -> None:
+    source = make_zip(members={name: b"x"})
+    if name == "dir\\evil" and b"dir\\evil" not in source:
+        source = source.replace(b"dir/evil", b"dir\\evil")
     with pytest.raises(ZipParseError) as exc:
-        snapshot_zip_package(make_zip(members={name: b"x"}))
+        snapshot_zip_package(source)
     _assert_reason(exc, "zip.package.unsafe_member_path")
 
 

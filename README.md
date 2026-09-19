@@ -1,404 +1,163 @@
-# MarkItDown
+# MarkItDown 2Ways
 
-[![PyPI](https://img.shields.io/pypi/v/markitdown.svg)](https://pypi.org/project/markitdown/)
-![PyPI - Downloads](https://img.shields.io/pypi/dd/markitdown)
+> Preservation-first, evidence-driven bidirectional document editing built on top of Microsoft MarkItDown.
 
-> [!IMPORTANT]
-> MarkItDown performs I/O with the privileges of the current process. Like open() or requests.get(), it will access resources that the process itself can access. Sanitize your inputs in untrusted environments, and call the narrowest `convert_*` function needed for your use case (e.g., `convert_stream()`, or `convert_local()`). See the [Security Considerations](#security-considerations) section of the documentation for more information.
+MarkItDown 2Ways keeps the original one-way `MarkItDown` API and CLI while adding a bounded two-way layer:
 
-MarkItDown is a lightweight Python utility for converting various files to Markdown for use with LLMs and related text analysis pipelines. To this end, it is most comparable to [textract](https://github.com/deanmalmgren/textract), but with a focus on preserving important document structure and content as Markdown (including: headings, lists, tables, links, etc.) While the output is often reasonably presentable and human-friendly, it is meant to be consumed by text analysis tools -- and may not be the best option for high-fidelity document conversions for human consumption.
-
-MarkItDown currently supports the conversion from:
-
-- PDF
-- PowerPoint
-- Word
-- Excel
-- Images (EXIF metadata and OCR)
-- Audio (EXIF metadata and speech transcription)
-- HTML
-- Text-based formats (CSV, JSON, XML)
-- ZIP files (iterates over contents)
-- YouTube URLs
-- EPubs
-- ... and more!
-
-## Why Markdown?
-
-Markdown is extremely close to plain text, with minimal markup or formatting, but still
-provides a way to represent important document structure. Mainstream LLMs, such as
-OpenAI's GPT-4o, natively "_speak_" Markdown, and often incorporate Markdown into their
-responses unprompted. This suggests that they have been trained on vast amounts of
-Markdown-formatted text, and understand it well. As a side benefit, Markdown conventions
-are also highly token-efficient.
-
-## Prerequisites
-MarkItDown requires Python 3.10 or higher. It is recommended to use a virtual environment to avoid dependency conflicts.
-
-With the standard Python installation, you can create and activate a virtual environment using the following commands:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
+```text
+native document -> DocumentIR -> Markdown / typed edits -> native document
 ```
 
-If using `uv`, you can create a virtual environment with:
+The project is designed around one rule: **understanding a document is not the same as owning the right to mutate it**. Readers expose explicit capability evidence, writers re-check native ownership and preconditions, and ambiguous mutations fail closed.
+
+## v1.0 status
+
+v1.0 freezes the proven H1-H33 boundary:
+
+- 17 native format families with explicit read/write contracts;
+- 12 derived semantic surfaces with `native_writeback=false`;
+- source-preserving mutation for supported owners rather than whole-document regeneration;
+- deterministic canonical `DocumentIR` serialization and compatibility goldens;
+- adversarial capability hardening and fail-closed defaults;
+- deterministic engineering budgets for source size, public surface and core dependencies.
+
+The machine-readable contract is in [`docs/twoways-v1-contract.json`](docs/twoways-v1-contract.json). The full technical specification, examples and phase history are in [`TWOWAYS.md`](TWOWAYS.md).
+
+## Why 2Ways?
+
+Ordinary conversion tools answer: **what text can I extract?** 2Ways also asks:
+
+- Which semantic node maps to which native owner?
+- Is that owner writable, read-only or merely derived?
+- Can the requested edit be expressed without rewriting unrelated bytes or package members?
+- Has the source changed since the edit was prepared?
+- Can the candidate output be re-read and verified before it is emitted?
+
+This allows narrow edits to preserve far more of the original representation while refusing operations that cannot be proven safe.
+
+## Native support
+
+| Format | Native mutation boundary |
+| --- | --- |
+| Text / Markdown | source-preserving `replace_text` |
+| CSV | target-only cell updates |
+| JSON | lexical scalar replacement |
+| XML | lexical text / attribute replacement |
+| HTML | recovery-aware text / quoted-attribute replacement |
+| IPYNB | target cell-source replacement |
+| EPUB | package-preserving metadata / XHTML text replacement |
+| ZIP | preservation/routing container for supported inner edits |
+| PDF | bounded metadata, URI-link and terminal text-field updates |
+| PNG | existing text metadata owners |
+| JPEG | existing fixed-allocation Exif text owners |
+| MP3 | existing ID3v1 fixed slots |
+| MSG | existing top-level Unicode Subject stream |
+| XLS | existing BIFF8 NUMBER slots |
+| XLSX | typed non-formula, non-merged cell updates |
+| PPTX | bounded text/style/geometry/alt-text/table edits |
+| DOCX | bounded text/style/alt-text/table edits |
+
+Everything outside a proven native boundary remains read-only or unsupported.
+
+## Derived semantic parity
+
+2Ways also preserves semantics from one-way converter surfaces without pretending those semantics are writable native ownership:
+
+- Wikipedia
+- Bing SERP
+- remote RSS/Atom
+- YouTube HTML + optional transcript provenance
+- Azure Document Intelligence analysis
+- Azure Content Understanding analysis
+- AudioConverter materialized output
+- ImageConverter metadata / caption output
+- Outlook MSG converter semantics
+- PdfConverter extraction output
+- XlsConverter sheet Markdown
+- XlsxConverter sheet Markdown
+
+All v1 derived surfaces remain explicitly non-writeback.
+
+## Install this fork
 
 ```bash
-uv venv --python=3.12 .venv
-source .venv/bin/activate
-# NOTE: Be sure to use 'uv pip install' rather than just 'pip install' to install packages in this virtual environment
-```
-
-If you are using Anaconda, you can create a virtual environment with:
-
-```bash
-conda create -n markitdown python=3.12
-conda activate markitdown
-```
-
-## Installation
-
-To install MarkItDown, use pip: `pip install 'markitdown[all]'`. Alternatively, you can install it from the source:
-
-```bash
-git clone git@github.com:microsoft/markitdown.git
-cd markitdown
+git clone https://github.com/Nolane-x/markitdown-2ways.git
+cd markitdown-2ways
 pip install -e 'packages/markitdown[all]'
 ```
 
-## Usage
+Python 3.10-3.13 are covered by the repository CI matrix.
 
-### Command-Line
-
-```bash
-markitdown path-to-file.pdf > document.md
-```
-
-Or use `-o` to specify the output file:
-
-```bash
-markitdown path-to-file.pdf -o document.md
-```
-
-You can also pipe content:
-
-```bash
-cat path-to-file.pdf | markitdown
-```
-
-### Optional Dependencies
-MarkItDown has optional dependencies for activating various file formats. Earlier in this document, we installed all optional dependencies with the `[all]` option. However, you can also install them individually for more control. For example:
-
-```bash
-pip install 'markitdown[pdf, docx, pptx]'
-```
-
-will install only the dependencies for PDF, DOCX, and PPTX files.
-
-At the moment, the following optional dependencies are available:
-
-* `[all]` Installs all optional dependencies
-* `[pptx]` Installs dependencies for PowerPoint files
-* `[docx]` Installs dependencies for Word files
-* `[xlsx]` Installs dependencies for Excel files
-* `[xls]` Installs dependencies for older Excel files
-* `[pdf]` Installs dependencies for PDF files
-* `[outlook]` Installs dependencies for Outlook messages
-* `[az-doc-intel]` Installs dependencies for Azure Document Intelligence
-* `[az-content-understanding]` Installs dependencies for Azure Content Understanding
-* `[audio-transcription]` Installs dependencies for audio transcription of wav and mp3 files
-* `[youtube-transcription]` Installs dependencies for fetching YouTube video transcription
-
-### Plugins
-
-MarkItDown also supports 3rd-party plugins. Plugins are disabled by default. To list installed plugins:
-
-```bash
-markitdown --list-plugins
-```
-
-To enable plugins use:
-
-```bash
-markitdown --use-plugins path-to-file.pdf
-```
-
-To find available plugins, search GitHub for the hashtag `#markitdown-plugin`. To develop a plugin, see `packages/markitdown-sample-plugin`.
-
-#### markitdown-ocr Plugin
-
-The `markitdown-ocr` plugin adds OCR support to PDF, DOCX, PPTX, and XLSX converters, extracting text from embedded images using LLM Vision — the same `llm_client` / `llm_model` pattern that MarkItDown already uses for image descriptions. No new ML libraries or binary dependencies required.
-
-**Installation:**
-
-```bash
-pip install markitdown-ocr
-pip install openai  # or any OpenAI-compatible client
-```
-
-**Usage:**
-
-Pass the same `llm_client` and `llm_model` you would use for image descriptions:
+## One-way API remains available
 
 ```python
 from markitdown import MarkItDown
-from openai import OpenAI
 
-md = MarkItDown(
-    enable_plugins=True,
-    llm_client=OpenAI(),
-    llm_model="gpt-4o",
+result = MarkItDown().convert('report.pdf')
+print(result.markdown)
+```
+
+The fork intentionally keeps the original MarkItDown conversion workflow available alongside 2Ways.
+
+## 2Ways example
+
+```python
+from io import BytesIO
+
+from markitdown.twoways import EditOperation
+from markitdown.twoways.formats.text import patch_text, read_text_ir
+
+source = b'# Title\n\nOriginal text.\n'
+document = read_text_ir(BytesIO(source), filename='example.md')
+node_id = document.canvases[0].root_node_ids[0]
+
+edit = EditOperation(
+    operation_id='edit-1',
+    type='replace_text',
+    target_node_id=node_id,
+    payload={'text': '# Title\n\nUpdated text.\n'},
 )
-result = md.convert("document_with_images.pdf")
-print(result.markdown)
+
+output = BytesIO()
+patch_text(document, BytesIO(source), output, edits=(edit,))
+assert output.getvalue() == b'# Title\n\nUpdated text.\n'
 ```
 
-If no `llm_client` is provided the plugin still loads, but OCR is silently skipped and the standard built-in converter is used instead.
+For format-specific APIs and preservation rules, see [`TWOWAYS.md`](TWOWAYS.md).
 
-See [`packages/markitdown-ocr/README.md`](packages/markitdown-ocr/README.md) for detailed documentation.
+## Safety model
 
-### Azure Content Understanding
+2Ways treats mutation authority as evidence, not inference:
 
-[Azure Content Understanding](https://learn.microsoft.com/azure/ai-services/content-understanding/) provides higher-quality conversion with structured field extraction (YAML front matter), multi-modal support (documents, images, audio, video), and configurable analyzers.
+- source SHA-256 and byte size are bound and re-checked;
+- unadvertised operations default to read-only;
+- typed edits may carry expected semantic/native/value preconditions;
+- complete transactions are preflighted before writing;
+- malformed or ambiguous ownership fails closed;
+- format-specific verification protects untouched regions;
+- derived semantics never automatically become native write authority;
+- the 2Ways core performs no hidden network or subprocess action for its derived snapshot readers.
 
-Install: `pip install 'markitdown[az-content-understanding]'`
+## Compatibility and engineering gates
 
-#### When to use Content Understanding
+Before v1.0, three final hardening phases were added:
 
-Content Understanding is ideal when you need capabilities beyond what built-in or Document Intelligence converters provide:
+- **H31 — Adversarial capability hardening:** immutable capability constraints, validated defaults and malformed-wire courts.
+- **H32 — v1 compatibility corpus:** frozen canonical byte sizes/SHA-256 digests plus strict/forward decoder behavior.
+- **H33 — deterministic engineering budgets:** bounded source size, file count, public/support cardinality and core dependencies.
 
-- **Audio and video files** — CU is the only option for video, and the higher-quality cloud option for audio. Built-in converters have no video support and only basic audio transcription.
-- **Structured field extraction** — [Prebuilt](https://learn.microsoft.com/azure/ai-services/content-understanding/concepts/prebuilt-analyzers) or [custom-built](https://learn.microsoft.com/azure/ai-services/content-understanding/how-to/customize-analyzer-content-understanding-studio?tabs=portal) analyzers extract domain-specific fields (invoice amounts, receipt dates, contract clauses) serialized as YAML front matter. Neither built-in nor Doc Intel integration exposes fields.
-- **Higher-quality document extraction** — Cloud-based layout analysis and OCR for scanned PDFs, complex tables, and multi-page documents.
-- **Single API for all modalities** — One `cu_endpoint` handles documents, images, audio, and video with automatic analyzer routing.
+Required PR CI continues to run pre-commit plus package and OCR test matrices on Python 3.10, 3.11, 3.12 and 3.13.
 
-| Capability | Built-in converters | Azure Document Intelligence | Azure Content Understanding |
-|------------|---------------------|-----------------------------|-----------------------------|
-| Document conversion | Offline, format-specific extraction | Cloud layout extraction | Cloud multimodal extraction |
-| Structured fields | Not available | Not exposed by this integration | YAML front matter from analyzer fields |
-| Custom analyzers | Not available | Not configurable in this integration | Supported with `cu_analyzer_id` |
-| Audio and video | Basic audio, no video | Not supported | Audio and video analyzers |
-| Cost | Local compute only | Billable Azure API calls | Billable Azure API calls |
+## Project scope
 
-**CLI:**
+MarkItDown 2Ways is a document conversion and preservation library. It is not a workflow engine, browser automation system, document management service, Office automation replacement or hosted conversion platform.
 
-```bash
-markitdown path-to-file.pdf --use-cu --cu-endpoint "<content_understanding_endpoint>"
-```
+New work should improve fidelity, compatibility, safety, tests, performance or implementation clarity without weakening the native/derived authority boundary.
 
-The endpoint can also be set once in the environment, so callers only need `--use-cu`:
+## Upstream
 
-```bash
-export MARKITDOWN_CU_ENDPOINT="<content_understanding_endpoint>"
-markitdown path-to-file.pdf --use-cu
-```
+This repository is a fork of [`microsoft/markitdown`](https://github.com/microsoft/markitdown). The original MarkItDown project, contributors, license notices and third-party notices remain acknowledged in this repository. 2Ways-specific behavior and contracts are maintained in this fork.
 
-**Python API:**
+## License
 
-```python
-from markitdown import MarkItDown
-
-# Zero-config — auto-selects analyzer per file type
-md = MarkItDown(cu_endpoint="<content_understanding_endpoint>")
-result = md.convert("report.pdf")   # documents → prebuilt-documentSearch
-result = md.convert("meeting.mp4")  # video → prebuilt-videoSearch
-result = md.convert("call.wav")     # audio → prebuilt-audioSearch
-print(result.markdown)
-```
-
-**With a custom analyzer** (for domain-specific field extraction):
-
-```python
-md = MarkItDown(
-    cu_endpoint="<content_understanding_endpoint>",
-    cu_analyzer_id="my-invoice-analyzer",
-)
-result = md.convert("invoice.pdf")
-print(result.markdown)
-# Output includes YAML front matter with extracted fields:
-# ---
-# contentType: document
-# fields:
-#   VendorName: CONTOSO LTD.
-#   InvoiceDate: '2019-11-15'
-# ---
-# <!-- page 1 -->
-# ...
-```
-
-When `cu_analyzer_id` is set, the converter automatically scopes it to compatible file types based on the analyzer's modality. Incompatible types (e.g., audio files with a document analyzer) auto-route to default prebuilt analyzers.
-
-**Cost note:** Each `convert()` call for a CU-routed format is a billable Azure API call. Use `cu_file_types` to restrict which formats route to CU:
-
-```python
-from markitdown.converters import ContentUnderstandingFileType
-
-md = MarkItDown(
-    cu_endpoint="<content_understanding_endpoint>",
-    cu_file_types=[ContentUnderstandingFileType.PDF],  # only PDFs use CU
-)
-```
-
-More information about Azure Content Understanding can be found [here](https://learn.microsoft.com/azure/ai-services/content-understanding/).
-
-### Azure Document Intelligence
-
-To use Microsoft Document Intelligence for conversion:
-
-```bash
-markitdown path-to-file.pdf -o document.md -d -e "<document_intelligence_endpoint>"
-```
-
-The endpoint can also be set once in the environment, so callers only need `-d`:
-
-```bash
-export MARKITDOWN_DOCINTEL_ENDPOINT="<document_intelligence_endpoint>"
-markitdown path-to-file.pdf -o document.md -d
-```
-
-More information about how to set up an Azure Document Intelligence Resource can be found [here](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/how-to-guides/create-document-intelligence-resource?view=doc-intel-4.0.0)
-
-### Python API
-
-Basic usage in Python:
-
-```python
-from markitdown import MarkItDown
-
-md = MarkItDown(enable_plugins=False) # Set to True to enable plugins
-result = md.convert("test.xlsx")
-print(result.markdown)
-```
-
-Document Intelligence conversion in Python:
-
-```python
-from markitdown import MarkItDown
-
-md = MarkItDown(docintel_endpoint="<document_intelligence_endpoint>")
-result = md.convert("test.pdf")
-print(result.markdown)
-```
-
-To use Large Language Models for image descriptions (currently only for pptx and image files), provide `llm_client` and `llm_model`:
-
-```python
-from markitdown import MarkItDown
-from openai import OpenAI
-
-client = OpenAI()
-md = MarkItDown(llm_client=client, llm_model="gpt-4o", llm_prompt="optional custom prompt")
-result = md.convert("example.jpg")
-print(result.markdown)
-```
-
-### Docker
-
-```sh
-docker build -t markitdown:latest .
-docker run --rm -i markitdown:latest < ~/your-file.pdf > output.md
-```
-
-## Contributing
-
-Before starting significant work, please read [What to Contribute](#what-to-contribute), which describes what is in and out of scope for this repository.
-
-This project welcomes contributions and suggestions. Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-### What to Contribute
-
-MarkItDown is a Python utility for converting files to Markdown for use with LLMs and related text analysis pipelines. This repository is intended to provide Python libraries that can be incorporated into other systems — not the end-user applications built on top of them.
-
-#### In scope
-
-- Improvements to the fidelity of existing converters (New formats are added sparingly -- especially if they incur new dependencies. In most cases, new formats can be better supported via [3rd-party plugins](#extending-markitdown-without-changing-this-repository).)
-- Bug fixes, performance improvements, and security fixes
-- The `markitdown` command-line interface
-- The `markitdown-mcp` package
-- Tests, documentation, and developer tooling
-
-#### Out of scope
-
-We cannot accept additional applications, services, or servers. This includes:
-
-- Web servers, REST or HTTP APIs, and hosted conversion services
-- Web frontends and browser-based user interfaces
-- Desktop and mobile applications (PyQt, PySide, Tkinter, Electron, Flutter, and similar)
-
-Projects like these are genuinely useful, and we would rather see them thrive than be turned away. If you are interested in providing a web service, API, or graphical application for MarkItDown, please maintain it as a separate package or project that depends on [`markitdown` from PyPI](https://pypi.org/project/markitdown/).
-
-### Extending MarkItDown Without Changing This Repository
-
-MarkItDown supports 3rd-party plugins, so support for a new format can be published and installed independently of this repository:
-
-```sh
-markitdown --list-plugins
-markitdown --use-plugins path-to-file.pdf
-```
-
-See `packages/markitdown-sample-plugin` to get started, and tag your repository `#markitdown-plugin` so that others can find it.
-
-### How to Contribute
-
-You can help by looking at issues or helping review PRs. We have also marked some issues as 'open for contribution' and PRs as 'open for reviewing' to help facilitate community contributions. These labels are suggestions; contributions within the scope described above are welcome.
-
-<div align="center">
-
-|            | All                                                          | Especially Needs Help from Community                                                                                                      |
-| ---------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| **Issues** | [All Issues](https://github.com/microsoft/markitdown/issues) | [Issues open for contribution](https://github.com/microsoft/markitdown/issues?q=is%3Aissue+is%3Aopen+label%3A%22open+for+contribution%22) |
-| **PRs**    | [All PRs](https://github.com/microsoft/markitdown/pulls)     | [PRs open for reviewing](https://github.com/microsoft/markitdown/pulls?q=is%3Apr+is%3Aopen+label%3A%22open+for+reviewing%22)              |
-
-</div>
-
-### Running Tests and Checks
-
-- Navigate to the MarkItDown package:
-
-  ```sh
-  cd packages/markitdown
-  ```
-
-- Install `hatch` in your environment and run tests:
-
-  ```sh
-  pip install hatch  # Other ways of installing hatch: https://hatch.pypa.io/dev/install/
-  hatch shell
-  hatch test
-  ```
-
-  (Alternative) Use the Devcontainer which has all the dependencies installed:
-
-  ```sh
-  # Reopen the project in Devcontainer and run:
-  hatch test
-  ```
-
-- Run pre-commit checks before submitting a PR: `pre-commit run --all-files`
-
-### Security Considerations
-
-MarkItDown performs I/O with the privileges of the current process. Like `open()` or `requests.get()`, it will access resources that the process itself can access.
-
-**Sanitize your inputs:** Do not pass untrusted input directly to MarkItDown. If any part of the input may be controlled by an untrusted user or system, such as in hosted or server-side applications, it must be validated and restricted before calling MarkItDown. Depending on your environment, this may include restricting file paths, limiting URI schemes and network destinations, and blocking access to private, loopback, link-local, or metadata-service addresses.
-
-**Call only the conversion method you need:** Prefer the narrowest conversion API that fits your use case. MarkItDown's `convert()` method is intentionally permissive and can handle local files, remote URIs, and byte streams. If your application only needs to read local files, call `convert_local()` instead. If you need more control over URI fetching, call `requests.get()` yourself and pass the response object to `convert_response()`. For maximum control, open a stream to the input you want converted and call `convert_stream()`.
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+MIT. See [`LICENSE`](LICENSE), [`ThirdPartyNotices.md`](packages/markitdown/ThirdPartyNotices.md) and the repository notices for details.

@@ -1,0 +1,77 @@
+name: v1 release gate
+
+on:
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'packages/markitdown/README.md'
+      - 'packages/markitdown/pyproject.toml'
+      - 'packages/markitdown/src/markitdown/__about__.py'
+      - 'docs/releases/2ways-v1.0.0.md'
+      - '.github/workflows/release-v1.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/releases/2ways-v1.0.0.md'
+
+jobs:
+  verify-artifacts:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.13'
+      - name: Build wheel and sdist
+        run: |
+          python -m pip install --upgrade build
+          python -m build packages/markitdown --outdir dist
+      - name: Verify package version
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('packages/markitdown/src/markitdown/__about__.py').read_text()
+          assert '__version__ = "1.0.0"' in text
+          PY
+      - name: Smoke install built wheel
+        run: |
+          python -m venv .release-venv
+          .release-venv/bin/python -m pip install dist/*.whl
+          .release-venv/bin/python - <<'PY'
+          from markitdown.__about__ import __version__
+          import markitdown.twoways as tw
+          assert __version__ == '1.0.0'
+          assert 'DocumentIR' in tw.__all__
+          assert 'build_capability_report' in tw.__all__
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: markitdown-2ways-v1.0.0-dist
+          path: dist/*
+
+  publish-github-release:
+    if: github.event_name == 'push'
+    needs: verify-artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: markitdown-2ways-v1.0.0-dist
+          path: dist
+      - name: Create immutable v1.0.0 GitHub release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view 2ways-v1.0.0 >/dev/null 2>&1; then
+            echo 'Release 2ways-v1.0.0 already exists; refusing to replace it.'
+            exit 1
+          fi
+          gh release create 2ways-v1.0.0 dist/* \
+            --target '${{ github.sha }}' \
+            --title 'MarkItDown 2Ways v1.0.0' \
+            --notes-file docs/releases/2ways-v1.0.0.md

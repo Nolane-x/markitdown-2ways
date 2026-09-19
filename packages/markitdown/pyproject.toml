@@ -5,16 +5,19 @@ build-backend = "hatchling.build"
 [project]
 name = "markitdown"
 dynamic = ["version"]
-description = 'Utility tool for converting various files to Markdown'
+description = 'Preservation-first bidirectional document IR and Markdown conversion built on MarkItDown'
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-keywords = []
+keywords = ["markdown", "document-conversion", "round-trip", "document-ir", "preservation", "llm"]
 authors = [
   { name = "Adam Fourney", email = "adamfo@microsoft.com" },
 ]
+maintainers = [
+  { name = "Nolane-x" },
+]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -64,9 +67,10 @@ az-doc-intel = ["azure-ai-documentintelligence", "azure-identity"]
 az-content-understanding = ["azure-ai-contentunderstanding>=1.2.0b1", "azure-identity"]
 
 [project.urls]
-Documentation = "https://github.com/microsoft/markitdown#readme"
-Issues = "https://github.com/microsoft/markitdown/issues"
-Source = "https://github.com/microsoft/markitdown"
+Documentation = "https://github.com/Nolane-x/markitdown-2ways/blob/main/TWOWAYS.md"
+Issues = "https://github.com/Nolane-x/markitdown-2ways/pulls"
+Source = "https://github.com/Nolane-x/markitdown-2ways"
+Upstream = "https://github.com/microsoft/markitdown"
 
 [tool.hatch.version]
 path = "src/markitdown/__about__.py"

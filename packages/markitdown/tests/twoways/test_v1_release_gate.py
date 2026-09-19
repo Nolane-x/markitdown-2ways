@@ -9,6 +9,7 @@ from markitdown.__about__ import __version__
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _README = _REPO_ROOT / "README.md"
 _PACKAGE = _REPO_ROOT / "packages" / "markitdown" / "pyproject.toml"
+_MCP_PACKAGE = _REPO_ROOT / "packages" / "markitdown-mcp" / "pyproject.toml"
 _NOTES = _REPO_ROOT / "docs" / "releases" / "2ways-v1.0.0.md"
 _WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "release-v1.yml"
 
@@ -24,6 +25,11 @@ def test_v1_release_metadata_targets_this_fork() -> None:
     assert 'Issues = "https://github.com/Nolane-x/markitdown-2ways/issues"' in pyproject
     assert "round-trip" in pyproject
     assert "document-ir" in pyproject
+
+
+def test_v1_mcp_dependency_accepts_fork_major_version() -> None:
+    pyproject = _MCP_PACKAGE.read_text(encoding="utf-8")
+    assert '"markitdown[all]>=0.1.1,<2.0.0"' in pyproject
 
 
 def test_v1_readme_is_a_2ways_landing_page() -> None:

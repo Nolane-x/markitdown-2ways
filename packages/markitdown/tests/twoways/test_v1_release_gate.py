@@ -21,6 +21,7 @@ def test_v1_release_metadata_targets_this_fork() -> None:
     pyproject = _PACKAGE.read_text(encoding="utf-8")
     assert "Development Status :: 5 - Production/Stable" in pyproject
     assert "https://github.com/Nolane-x/markitdown-2ways" in pyproject
+    assert 'Issues = "https://github.com/Nolane-x/markitdown-2ways/issues"' in pyproject
     assert "round-trip" in pyproject
     assert "document-ir" in pyproject
 

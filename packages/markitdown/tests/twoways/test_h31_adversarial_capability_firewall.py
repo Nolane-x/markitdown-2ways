@@ -132,9 +132,7 @@ def test_v1_contract_never_grants_direct_structural_mutation() -> None:
     assert isinstance(rows, list)
 
     operations = {
-        operation
-        for row in rows
-        for operation in row["direct_operations"]
+        operation for row in rows for operation in row["direct_operations"]
     }
     assert operations.isdisjoint(_STRUCTURAL_MUTATIONS)
 
@@ -145,7 +143,6 @@ def test_v1_derived_surfaces_are_uniformly_non_writeback() -> None:
     assert isinstance(rows, list)
     assert rows
 
-    assert {
-        (row["state"], row["native_writeback"])
-        for row in rows
-    } == {("derived", False)}
+    assert {(row["state"], row["native_writeback"]) for row in rows} == {
+        ("derived", False)
+    }

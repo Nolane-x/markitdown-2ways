@@ -3146,3 +3146,48 @@ only native MP3 authority and adding no WAV/M4A/MP4 writer. H25-H29 then bind th
 appearance-backed forms, non-URI actions, page text/image/content mutation, outlines, new
 metadata keys, further media-native mutation, other archive families, remote writeback
 and archive structural editing remain outside the current completed boundary.
+
+## Pre-release hardening: H31-H33
+
+After the H30 contract freeze, v1.0 received three non-expansive hardening phases before
+release.
+
+### H31 — adversarial capability hardening
+
+H31 treats capability metadata as security-sensitive authority. Top-level capability
+constraints are detached and immutable after decision construction, invalid default
+states are rejected, malformed/duplicated wire claims fail closed, unspecified
+operations remain read-only, structural edits remain outside the native matrix and all
+derived surfaces remain non-writeback.
+
+Design:
+`docs/superpowers/specs/2026-09-19-markitdown-2ways-phase-h31-adversarial-capability-hardening-design.md`
+
+### H32 — v1 compatibility corpus
+
+H32 adds `docs/twoways-v1-compatibility-corpus.json`, freezing canonical size and
+SHA-256 for minimal and representative IR documents. The court also freezes strict
+unknown-field rejection, forward-mode compatibility, unsupported-major rejection and
+byte-identical encode/decode/encode behavior.
+
+Design:
+`docs/superpowers/specs/2026-09-19-markitdown-2ways-phase-h32-v1-compatibility-corpus-design.md`
+
+### H33 — deterministic engineering budgets
+
+H33 adds `docs/twoways-v1-engineering-budgets.json` and a deterministic CI court for
+production source size, file count, maximum file size, public/support cardinality and
+core runtime dependencies. Required CI deliberately avoids wall-clock thresholds on
+shared runners.
+
+Design:
+`docs/superpowers/specs/2026-09-19-markitdown-2ways-phase-h33-engineering-budgets-design.md`
+
+## v1.0.0 release closure
+
+The GitHub v1.0.0 release is bound to `docs/releases/2ways-v1.0.0.md`. Release CI builds
+wheel and sdist artifacts, smoke-installs the built wheel, verifies the package version
+and public 2Ways import surface, and creates the immutable `2ways-v1.0.0` GitHub tag
+and release only from the merged main commit. The workflow intentionally does not
+publish to or replace the upstream PyPI project.
+

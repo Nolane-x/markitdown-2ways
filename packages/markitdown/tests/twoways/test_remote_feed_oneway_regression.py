@@ -12,6 +12,7 @@ from .test_remote_feed_reader import (
     _rss_info,
 )
 
+
 def _normalize_trailing_layout_whitespace(markdown: str) -> str:
     return "\n".join(
         line.rstrip(" \t\u00a0\u202f") for line in markdown.splitlines()

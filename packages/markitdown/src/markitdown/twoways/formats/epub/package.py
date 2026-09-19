@@ -94,8 +94,9 @@ def snapshot_epub_package(
         total = 0
         entries: list[EpubPackageEntry] = []
         for info in infos:
+            raw_name = getattr(info, "orig_filename", info.filename)
+            validate_member_name(raw_name)
             name = info.filename
-            validate_member_name(name)
             if name in seen:
                 _fail(
                     "epub.package.duplicate_member",

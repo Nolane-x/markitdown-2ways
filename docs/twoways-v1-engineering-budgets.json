@@ -1,0 +1,30 @@
+{
+  "budget_name": "MarkItDown 2Ways v1 engineering budgets",
+  "budget_version": "1.0.0",
+  "baseline": {
+    "production_python_files": 200,
+    "production_source_bytes": 1547539,
+    "largest_production_file_bytes": 37389
+  },
+  "ceilings": {
+    "production_python_files": 220,
+    "production_source_bytes": 1750000,
+    "largest_production_file_bytes": 45000,
+    "public_root_symbols": 104,
+    "native_support_rows": 17,
+    "derived_support_rows": 12
+  },
+  "core_dependencies": [
+    "beautifulsoup4",
+    "charset-normalizer",
+    "defusedxml",
+    "magika~=0.6.1",
+    "markdownify",
+    "requests"
+  ],
+  "policy": {
+    "timing_thresholds": "forbidden-in-required-ci",
+    "new-core-dependency": "requires-intentional-budget-update",
+    "budget-growth": "requires-design-record-and-regression-court"
+  }
+}

@@ -17,7 +17,7 @@ from markitdown.twoways.readers.xls_converter import (
 )
 
 
-EXPECTED_CONVERTER_BLOB = "355dd8f8d74ab5c9a40bba37e1f7a7d601eeba27"
+EXPECTED_CONVERTER_BLOB = "9f794a3b77e34c84b67358c21001ad7a87f3b9c4"
 SOURCE = b"offline H28 XLS differential fixture"
 
 

@@ -113,12 +113,14 @@ def test_reader_binds_source_ordered_sheets_and_exact_projection() -> None:
     sheet_evidence = evidence["sheets"]
     assert sheet_evidence[0]["index"] == 0
     assert sheet_evidence[0]["name"] == "Summary"
-    assert sheet_evidence[0]["raw_markdown_sha256"] == sha256(
-        SHEETS[0].markdown.encode("utf-8")
-    ).hexdigest()
-    assert sheet_evidence[0]["stripped_markdown_sha256"] == sha256(
-        SHEETS[0].markdown.strip().encode("utf-8")
-    ).hexdigest()
+    assert (
+        sheet_evidence[0]["raw_markdown_sha256"]
+        == sha256(SHEETS[0].markdown.encode("utf-8")).hexdigest()
+    )
+    assert (
+        sheet_evidence[0]["stripped_markdown_sha256"]
+        == sha256(SHEETS[0].markdown.strip().encode("utf-8")).hexdigest()
+    )
 
 
 @pytest.mark.parametrize(
@@ -132,8 +134,7 @@ def test_reader_binds_source_ordered_sheets_and_exact_projection() -> None:
     ),
 )
 def test_per_sheet_strip_and_final_strip_are_exact(
-    markdown: str,
-    expected: str,
+    markdown: str, expected: str
 ) -> None:
     document = read_xlsx_converter_snapshot_ir(
         BytesIO(SOURCE),
@@ -271,8 +272,7 @@ def test_repeated_reads_and_canonical_round_trip_are_deterministic() -> None:
     ),
 )
 def test_explicit_one_way_acceptance_surface(
-    info: StreamInfo,
-    accepted_by: str,
+    info: StreamInfo, accepted_by: str
 ) -> None:
     document = read_xlsx_converter_snapshot_ir(
         BytesIO(SOURCE),
